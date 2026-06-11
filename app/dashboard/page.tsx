@@ -48,7 +48,7 @@ export default function Dashboard() {
         <button onClick={handleLogout} style={styles.logoutBtn}>Sair</button>
       </header>
       <iframe
-        src="https://dashboard-meta-esquina.vercel.app/"
+        src="https://dashboard-meta-esquina-ebon.vercel.app/"
         style={styles.iframe}
         title="Dashboard Meta Esquina"
       />
