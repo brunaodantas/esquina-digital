@@ -5,10 +5,14 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
+import EntregasPage from './entregas/page'
+
+type Tab = 'meta' | 'entregas'
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<Tab>('meta')
   const router = useRouter()
 
   useEffect(() => {
@@ -42,16 +46,37 @@ export default function Dashboard() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
+        <nav style={styles.nav}>
+          <button
+            onClick={() => setActiveTab('meta')}
+            style={{ ...styles.navBtn, ...(activeTab === 'meta' ? styles.navBtnActive : {}) }}
+          >
+            Meta Ads
+          </button>
+          <button
+            onClick={() => setActiveTab('entregas')}
+            style={{ ...styles.navBtn, ...(activeTab === 'entregas' ? styles.navBtnActive : {}) }}
+          >
+            Entregas
+          </button>
+        </nav>
         <div style={styles.spacer} />
         <div style={styles.avatar}>{initials}</div>
         <span style={styles.name}>{user?.displayName?.split(' ')[0]}</span>
         <button onClick={handleLogout} style={styles.logoutBtn}>Sair</button>
       </header>
-      <iframe
-        src="https://dashboard-meta-esquina-ebon.vercel.app/"
-        style={styles.iframe}
-        title="Dashboard Meta Esquina"
-      />
+
+      <div style={{ ...styles.content, display: activeTab === 'meta' ? 'flex' : 'none' }}>
+        <iframe
+          src="https://dashboard-meta-esquina-ebon.vercel.app/"
+          style={styles.iframe}
+          title="Dashboard Meta Esquina"
+        />
+      </div>
+
+      <div style={{ ...styles.content, display: activeTab === 'entregas' ? 'flex' : 'none' }}>
+        <EntregasPage />
+      </div>
     </div>
   )
 }
@@ -75,6 +100,17 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '10px 24px', borderBottom: '1px solid #2a2a2a',
     background: '#1a1a1a', flexShrink: 0,
   },
+  nav: { display: 'flex', gap: 4 },
+  navBtn: {
+    background: 'transparent', border: '1px solid transparent',
+    color: '#666', padding: '5px 14px', borderRadius: 6,
+    cursor: 'pointer', fontSize: 13, fontWeight: 500,
+    transition: 'all 0.15s',
+  },
+  navBtnActive: {
+    background: '#1A3CFF22', border: '1px solid #1A3CFF55',
+    color: '#fff',
+  },
   spacer: { flex: 1 },
   avatar: {
     width: 30, height: 30, borderRadius: '50%',
@@ -88,7 +124,10 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#888', padding: '5px 12px', borderRadius: 6,
     cursor: 'pointer', fontSize: 13,
   },
+  content: {
+    flex: 1, flexDirection: 'column', overflow: 'hidden',
+  },
   iframe: {
-    flex: 1, border: 'none', width: '100%',
+    flex: 1, border: 'none', width: '100%', height: '100%',
   },
 }
