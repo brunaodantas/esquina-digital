@@ -144,7 +144,7 @@ function TempoBar({ diasPercorridos, totalDias, status, track }: {
 }) {
   if (status === 'futura') return null
   const pct = Math.min(100, Math.round((diasPercorridos / totalDias) * 100))
-  const color = status === 'encerrada' ? '#6b7280' : '#475569'
+  const color = status === 'encerrada' ? '#6b7280' : '#facc15'
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ background: track, borderRadius: 3, height: 3 }}>
