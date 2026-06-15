@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { JWT } from 'google-auth-library'
 
 const SHEET_ID = process.env.SHEETS_ID!
-const API_KEY = process.env.SHEETS_API_KEY!
+const SA_EMAIL = process.env.GOOGLE_SA_EMAIL!
+const SA_KEY = (process.env.GOOGLE_SA_KEY ?? '').replace(/\\n/g, '\n')
+
+async function getAuthHeader(): Promise<string> {
+  const client = new JWT({
+    email: SA_EMAIL,
+    key: SA_KEY,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  })
+  const token = await client.getAccessToken()
+  return `Bearer ${token.token}`
+}
 
 // Abas que não são clientes — ignoradas na descoberta dinâmica
 const SKIP_SHEETS = new Set([
@@ -84,9 +96,9 @@ function diffDays(a: Date, b: Date): number {
 }
 
 // Lê todas as abas da planilha via Sheets metadata API
-async function fetchSheetList(): Promise<string[]> {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}&fields=sheets.properties.title`
-  const res = await fetch(url, { next: { revalidate: 3600 } })
+async function fetchSheetList(auth: string): Promise<string[]> {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`
+  const res = await fetch(url, { headers: { Authorization: auth }, next: { revalidate: 3600 } })
   if (!res.ok) return []
   const json = await res.json()
   return (json.sheets ?? [])
@@ -94,10 +106,10 @@ async function fetchSheetList(): Promise<string[]> {
     .filter((title: string) => title && !SKIP_SHEETS.has(title))
 }
 
-async function fetchAba(nome: string): Promise<string[][]> {
+async function fetchAba(nome: string, auth: string): Promise<string[][]> {
   const encoded = encodeURIComponent(nome)
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encoded}!A:Z?key=${API_KEY}`
-  const res = await fetch(url, { next: { revalidate: 1800 } })
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encoded}!A:Z`
+  const res = await fetch(url, { headers: { Authorization: auth }, next: { revalidate: 1800 } })
   if (!res.ok) return []
   const json = await res.json()
   return json.values ?? []
@@ -201,7 +213,7 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
 }
 
 export async function GET(req: NextRequest) {
-  if (!SHEET_ID || !API_KEY) {
+  if (!SHEET_ID || !SA_EMAIL || !SA_KEY) {
     return NextResponse.json({ error: 'Variáveis de ambiente não configuradas' }, { status: 500 })
   }
 
@@ -219,8 +231,10 @@ export async function GET(req: NextRequest) {
     ? new Date(endParam + 'T23:59:59')
     : new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
 
+  const auth = await getAuthHeader()
+
   // Descobre todas as abas dinamicamente
-  const sheetNames = await fetchSheetList()
+  const sheetNames = await fetchSheetList(auth)
 
   const abas = sheetNames.map(nome => ({
     nome,
@@ -236,7 +250,7 @@ export async function GET(req: NextRequest) {
 
   await Promise.all(
     abas.map(async (aba) => {
-      const rows = await fetchAba(aba.nome)
+      const rows = await fetchAba(aba.nome, auth)
       const campanhas = parseRows(rows, periodoStart, periodoFim, hoje)
       if (!campanhas.length) return
 
