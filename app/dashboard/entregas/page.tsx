@@ -124,11 +124,20 @@ function statusBadge(c: Campanha) {
   return { label: 'EM ANDAMENTO', color: '#d97706', bg: '#fef3c7' }
 }
 
+function deliveryColor(pct: number, bateu: boolean, status: string): string {
+  if (bateu || pct >= 100) return '#22c55e'
+  if (status === 'encerrada') return '#9ca3af'
+  if (pct <= 35) return '#f87171'
+  if (pct <= 60) return '#facc15'
+  if (pct <= 70) return '#fb923c'
+  return '#22c55e'
+}
+
 function ProgressBar({ pct, bateu, status, track }: { pct: number; bateu: boolean; status: string; track: string }) {
   const w = Math.min(100, pct)
-  const color = bateu ? '#22c55e' : status === 'encerrada' ? '#9ca3af' : pct < 60 ? '#f87171' : pct < 80 ? '#facc15' : '#60a5fa'
+  const color = deliveryColor(pct, bateu, status)
   return (
-    <div style={{ background: track, borderRadius: 4, height: 6 }}>
+    <div style={{ background: track, borderRadius: 4, height: 8 }}>
       <div style={{ width: `${w}%`, height: '100%', background: color, borderRadius: 4, transition: 'width 0.6s ease' }} />
     </div>
   )
@@ -142,8 +151,8 @@ function BarsWithTooltip({ c, t }: { c: Campanha; t: typeof C['dark'] }) {
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
   })
 
-  const entregaColor = c.bateu ? '#22c55e' : c.status === 'encerrada' ? '#9ca3af' : c.pct < 60 ? '#f87171' : c.pct < 80 ? '#facc15' : '#60a5fa'
-  const tempoColor = c.status === 'encerrada' ? '#6b7280' : '#facc15'
+  const entregaColor = deliveryColor(c.pct, c.bateu, c.status)
+  const tempoColor = c.status === 'encerrada' ? '#6b7280' : '#3b82f6'
   const tempoPct = c.status === 'futura' ? 0 : Math.min(100, Math.round((c.diasPercorridos / c.totalDias) * 100))
 
   return (
@@ -164,8 +173,8 @@ function BarsWithTooltip({ c, t }: { c: Campanha; t: typeof C['dark'] }) {
       {c.status !== 'futura' && (
         <div style={{ marginTop: 6 }}>
           <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>Dias Percorridos</div>
-          <div style={{ background: t.barTrack, borderRadius: 3, height: 3 }}>
-            <div style={{ width: `${tempoPct}%`, height: '100%', background: tempoColor, borderRadius: 3, transition: 'width 0.6s ease' }} />
+          <div style={{ background: t.barTrack, borderRadius: 4, height: 6 }}>
+            <div style={{ width: `${tempoPct}%`, height: '100%', background: tempoColor, borderRadius: 4, transition: 'width 0.6s ease' }} />
           </div>
           <div style={{ fontSize: 9, color: '#6b7280', marginTop: 3, textAlign: 'right' }}>
             {tempoPct}% do período · {c.diasPercorridos}/{c.totalDias} dias
