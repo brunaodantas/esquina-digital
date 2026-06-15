@@ -41,6 +41,8 @@ interface Campanha {
   pct: number
   bateu: boolean
   diasRestantes: number
+  diasPercorridos: number
+  totalDias: number
   investimento: number
   status: 'ativa' | 'encerrada' | 'futura'
   inicioStr: string
@@ -183,12 +185,14 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
     const pct = meta > 0 ? Math.round((entregue / meta) * 1000) / 10 : 0
     const bateu = iBateu >= 0 ? (row[iBateu] ?? '').toString().toUpperCase().includes('BATEU') : pct >= 100
     const diasRestantes = Math.max(0, diffDays(hoje, termino))
+    const totalDias = Math.max(1, diffDays(inicio, termino))
+    const diasPercorridos = status === 'futura' ? 0 : Math.min(totalDias, Math.max(0, diffDays(inicio, hoje)))
 
     campanhas.push({
       nome,
       canal: iCanal >= 0 ? (row[iCanal] ?? '').trim() : '',
       metrica: iMetrica >= 0 ? (row[iMetrica] ?? '').trim() : '',
-      meta, entregue, pct, bateu, diasRestantes, investimento, status,
+      meta, entregue, pct, bateu, diasRestantes, diasPercorridos, totalDias, investimento, status,
       inicioStr: iInicio >= 0 ? (row[iInicio] ?? '').trim() : '',
       terminoStr: iTermino >= 0 ? (row[iTermino] ?? '').trim() : '',
     })

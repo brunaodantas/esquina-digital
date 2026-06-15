@@ -14,6 +14,8 @@ interface Campanha {
   pct: number
   bateu: boolean
   diasRestantes: number
+  diasPercorridos: number
+  totalDias: number
   investimento: number
   status: 'ativa' | 'encerrada' | 'futura'
   inicioStr: string
@@ -137,6 +139,24 @@ function ProgressBar({ pct, bateu, status, track }: { pct: number; bateu: boolea
   )
 }
 
+function TempoBar({ diasPercorridos, totalDias, status, track }: {
+  diasPercorridos: number; totalDias: number; status: string; track: string
+}) {
+  if (status === 'futura') return null
+  const pct = Math.min(100, Math.round((diasPercorridos / totalDias) * 100))
+  const color = status === 'encerrada' ? '#6b7280' : '#475569'
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ background: track, borderRadius: 3, height: 3 }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.6s ease' }} />
+      </div>
+      <div style={{ fontSize: 9, color: '#6b7280', marginTop: 3, textAlign: 'right' }}>
+        {pct}% do período · {diasPercorridos}/{totalDias} dias
+      </div>
+    </div>
+  )
+}
+
 function normData(s: string) {
   return s ? s.replace(/\./g, '/') : ''
 }
@@ -238,8 +258,9 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
         </div>
       )}
 
-      {/* Barra de progresso */}
+      {/* Barras de progresso: entrega + tempo */}
       <ProgressBar pct={c.pct} bateu={c.bateu} status={c.status} track={t.barTrack} />
+      <TempoBar diasPercorridos={c.diasPercorridos} totalDias={c.totalDias} status={c.status} track={t.barTrack} />
 
       {/* Métricas inferiores */}
       <div style={{
