@@ -165,8 +165,9 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
 
     const meta = iMeta >= 0 ? parseNum(row[iMeta]) : 0
     let entregue = iEntregue >= 0 ? parseNum(row[iEntregue]) : 0
-    // Fallback: se não encontrou coluna "entregue" mas tem "Quanto Falta", calcula entregue = meta - falta
-    if (entregue === 0 && meta > 0 && iQuantoFalta >= 0) {
+    // Fallback via "Quanto Falta" — só quando a coluna "Quanto entregamos" não foi encontrada no header
+    // (não sobrescreve zeros legítimos quando a coluna existe mas ainda não há entrega)
+    if (iEntregue < 0 && meta > 0 && iQuantoFalta >= 0) {
       const falta = parseNum(row[iQuantoFalta])
       if (falta > 0) entregue = Math.max(0, meta - falta)
     }

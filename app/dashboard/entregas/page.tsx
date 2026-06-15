@@ -106,8 +106,6 @@ function getPeriodo(preset: Preset, custom?: { start: string; end: string }): { 
 }
 
 function fmt(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.', ',') + 'M'
-  if (n >= 1_000) return (n / 1_000).toFixed(0) + 'k'
   return n.toLocaleString('pt-BR')
 }
 
@@ -157,9 +155,9 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
       <ProgressBar pct={c.pct} bateu={c.bateu} status={c.status} track={t.barTrack} />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
         {[
-          { label: 'Meta', val: fmt(c.meta), color: t.textSecondary },
-          { label: 'Entregue', val: fmt(c.entregue), color: t.textSecondary },
-          { label: '%', val: `${c.pct.toFixed(1).replace('.', ',')}%`, color: c.bateu ? '#16a34a' : c.pct < 60 ? '#dc2626' : t.textSecondary },
+          { label: 'Meta', val: c.meta > 0 ? fmt(c.meta) : '—', color: t.textSecondary },
+          { label: 'Entregue', val: fmt(c.entregue), color: c.entregue === 0 && c.status === 'ativa' ? t.textMuted : t.textSecondary },
+          { label: '%', val: c.meta > 0 ? `${c.pct.toFixed(1).replace('.', ',')}%` : '—', color: c.bateu ? '#16a34a' : c.pct < 60 && c.meta > 0 ? '#dc2626' : t.textSecondary },
           { label: 'Dias rest.', val: c.status !== 'ativa' ? '—' : String(c.diasRestantes), color: c.diasRestantes <= 3 && c.status === 'ativa' ? '#dc2626' : t.textSecondary },
           ...(c.investimento > 0 ? [{ label: 'Invest.', val: fmtBrl(c.investimento), color: t.textSecondary }] : []),
         ].map((s, i) => (
