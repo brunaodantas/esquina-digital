@@ -1,6 +1,4 @@
-import { NextResponse } from 'next/server'
-
-export const revalidate = 1800
+import { NextRequest, NextResponse } from 'next/server'
 
 const SHEET_ID = process.env.SHEETS_ID!
 const API_KEY = process.env.SHEETS_API_KEY!
@@ -56,9 +54,7 @@ function parseDate(ddmm: string): Date | null {
   const day = parseInt(parts[0])
   const month = parseInt(parts[1]) - 1
   if (isNaN(day) || isNaN(month)) return null
-  // Assume 2026; se o mês já passou e o dia também, tenta 2027
-  const d = new Date(2026, month, day)
-  return isNaN(d.getTime()) ? null : d
+  return new Date(2026, month, day)
 }
 
 function parseNum(val: string): number {
@@ -98,7 +94,7 @@ function findCol(header: string[], keywords: string[]): number {
   return -1
 }
 
-function parseRows(rows: string[][], hoje: Date): Campanha[] {
+function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje: Date): Campanha[] {
   if (!rows.length) return []
 
   const headerIdx = findHeaderRow(rows)
@@ -113,7 +109,6 @@ function parseRows(rows: string[][], hoje: Date): Campanha[] {
   const iEntregue = findCol(header, ['entregamos', 'ENTREGAMOS', 'Entregamos'])
   const iBateu = findCol(header, ['BATEU', 'bateu'])
   const iInvestimento = findCol(header, ['INVESTIMENTO', 'investimento'])
-  const iStatus = findCol(header, ['STATUS', 'status'])
 
   const campanhas: Campanha[] = []
 
@@ -129,74 +124,62 @@ function parseRows(rows: string[][], hoje: Date): Campanha[] {
 
     if (!inicio || !termino) continue
 
-    let status: 'ativa' | 'encerrada' | 'futura' = 'ativa'
-    if (hoje > termino) status = 'encerrada'
-    else if (hoje < inicio) status = 'futura'
+    // Campanha ativa no período: sobrepõe com [periodoStart, periodoFim]
+    if (inicio > periodoFim || termino < periodoStart) continue
 
-    // Só mostrar ativas e futuras próximas (≤7 dias para iniciar)
-    const diasParaIniciar = diffDays(hoje, inicio)
-    if (status === 'futura' && diasParaIniciar > 7) continue
-    if (status === 'encerrada') continue
+    const status: 'ativa' | 'encerrada' | 'futura' =
+      hoje > termino ? 'encerrada' : hoje < inicio ? 'futura' : 'ativa'
 
     const meta = iMeta >= 0 ? parseNum(row[iMeta]) : 0
     const entregue = iEntregue >= 0 ? parseNum(row[iEntregue]) : 0
     const pct = meta > 0 ? Math.round((entregue / meta) * 1000) / 10 : 0
     const bateu = iBateu >= 0 ? (row[iBateu] ?? '').toString().toUpperCase().includes('BATEU') : pct >= 100
-    const diasRestantes = termino ? Math.max(0, diffDays(hoje, termino)) : 0
+    const diasRestantes = Math.max(0, diffDays(hoje, termino))
     const investimento = iInvestimento >= 0 ? parseNum(row[iInvestimento]) : 0
 
-    campanhas.push({
-      nome,
-      canal: iCanal >= 0 ? (row[iCanal] ?? '').trim() : '',
-      metrica: iMetrica >= 0 ? (row[iMetrica] ?? '').trim() : '',
-      meta,
-      entregue,
-      pct,
-      bateu,
-      diasRestantes,
-      investimento,
-      status,
-    })
+    campanhas.push({ nome, canal: iCanal >= 0 ? (row[iCanal] ?? '').trim() : '', metrica: iMetrica >= 0 ? (row[iMetrica] ?? '').trim() : '', meta, entregue, pct, bateu, diasRestantes, investimento, status })
   }
 
   return campanhas
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!SHEET_ID || !API_KEY) {
     return NextResponse.json({ error: 'Variáveis de ambiente não configuradas' }, { status: 500 })
   }
 
+  const { searchParams } = new URL(req.url)
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
 
-  // Agrupa abas por cliente
+  // Período: default = mês atual
+  const startParam = searchParams.get('start')
+  const endParam = searchParams.get('end')
+
+  const periodoStart = startParam ? new Date(startParam + 'T00:00:00') : new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  const periodoFim = endParam ? new Date(endParam + 'T23:59:59') : new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+
   const clienteMap = new Map<string, ClienteData>()
 
   await Promise.all(
     ABAS.map(async (aba) => {
       const rows = await fetchAba(aba.nome)
-      const campanhas = parseRows(rows, hoje)
+      const campanhas = parseRows(rows, periodoStart, periodoFim, hoje)
       if (!campanhas.length) return
 
       const existing = clienteMap.get(aba.cliente)
       if (existing) {
         existing.campanhas.push(...campanhas)
       } else {
-        clienteMap.set(aba.cliente, {
-          cliente: aba.cliente,
-          grupo: aba.grupo,
-          campanhas,
-        })
+        clienteMap.set(aba.cliente, { cliente: aba.cliente, grupo: aba.grupo, campanhas })
       }
     })
   )
 
   const result = Array.from(clienteMap.values()).filter(c => c.campanhas.length > 0)
 
-  // Ordena: em risco primeiro, depois ativas, depois bateu
   result.sort((a, b) => {
-    const risco = (c: ClienteData) => c.campanhas.some(x => !x.bateu && x.pct < 80 && x.diasRestantes <= 7) ? 0 : 1
+    const risco = (c: ClienteData) => c.campanhas.some(x => !x.bateu && x.pct < 80 && x.diasRestantes <= 7 && x.status === 'ativa') ? 0 : 1
     return risco(a) - risco(b)
   })
 
