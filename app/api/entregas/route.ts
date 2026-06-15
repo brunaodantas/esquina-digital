@@ -132,10 +132,14 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
 
     const meta = iMeta >= 0 ? parseNum(row[iMeta]) : 0
     const entregue = iEntregue >= 0 ? parseNum(row[iEntregue]) : 0
+    const investimento = iInvestimento >= 0 ? parseNum(row[iInvestimento]) : 0
+
+    // Ocultar campanhas sem veiculação real no período
+    if (entregue === 0 && investimento === 0) continue
+
     const pct = meta > 0 ? Math.round((entregue / meta) * 1000) / 10 : 0
     const bateu = iBateu >= 0 ? (row[iBateu] ?? '').toString().toUpperCase().includes('BATEU') : pct >= 100
     const diasRestantes = Math.max(0, diffDays(hoje, termino))
-    const investimento = iInvestimento >= 0 ? parseNum(row[iInvestimento]) : 0
 
     campanhas.push({ nome, canal: iCanal >= 0 ? (row[iCanal] ?? '').trim() : '', metrica: iMetrica >= 0 ? (row[iMetrica] ?? '').trim() : '', meta, entregue, pct, bateu, diasRestantes, investimento, status })
   }
