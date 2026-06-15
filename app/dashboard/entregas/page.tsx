@@ -137,14 +137,14 @@ function normData(s: string) {
   return s ? s.replace(/\./g, '/') : ''
 }
 
-function CampanhaCard({ c, t }: { c: Campanha; t: typeof C['dark'] }) {
+function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimmed?: boolean }) {
   const badge = statusBadge(c)
   const periodo = c.inicioStr && c.terminoStr
     ? `${normData(c.inicioStr)} → ${normData(c.terminoStr)}`
     : ''
   const detalhe = [c.canal, c.metrica, periodo].filter(Boolean).join(' · ')
   return (
-    <div style={{ background: t.cardInner, border: `1px solid ${t.borderInner}`, borderRadius: 8, padding: 12, marginBottom: 8 }}>
+    <div style={{ background: t.cardInner, border: `1px solid ${t.borderInner}`, borderRadius: 8, padding: 12, marginBottom: 8, opacity: dimmed ? 0.5 : 1 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 500, color: t.textSecondary }}>{c.nome}</div>
@@ -178,14 +178,15 @@ const STATUS_ORDER: Record<string, number> = { ativa: 0, futura: 1, encerrada: 2
 function ClienteBlock({ data, t }: { data: ClienteData; t: typeof C['dark'] }) {
   const [open, setOpen] = useState(true)
 
-  // Mostra só campanhas ativas e futuras, ordenadas: ativas primeiro
-  const visiveis = data.campanhas
+  const ativas = data.campanhas
     .filter(c => c.status !== 'encerrada')
     .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
+  const encerradas = data.campanhas.filter(c => c.status === 'encerrada')
 
-  if (visiveis.length === 0) return null
+  if (ativas.length === 0 && encerradas.length === 0) return null
 
-  const emRisco = visiveis.some(c => !c.bateu && c.pct < 80 && c.diasRestantes <= 7 && c.status === 'ativa')
+  const emRisco = ativas.some(c => !c.bateu && c.pct < 80 && c.diasRestantes <= 7 && c.status === 'ativa')
+  const totalVisiveis = ativas.length + encerradas.length
 
   return (
     <div style={{ border: `1px solid ${emRisco ? '#fca5a5' : t.border}`, borderRadius: 10, overflow: 'hidden', background: t.card }}>
@@ -193,13 +194,19 @@ function ClienteBlock({ data, t }: { data: ClienteData; t: typeof C['dark'] }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {emRisco && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f87171', flexShrink: 0, display: 'inline-block' }} />}
           <span style={{ fontSize: 14, fontWeight: 600, color: t.textPrimary }}>{data.cliente}</span>
-          <span style={{ fontSize: 11, color: t.textMuted, marginLeft: 4 }}>{visiveis.length} campanha{visiveis.length !== 1 ? 's' : ''}</span>
+          <span style={{ fontSize: 11, color: t.textMuted, marginLeft: 4 }}>{totalVisiveis} campanha{totalVisiveis !== 1 ? 's' : ''}</span>
         </div>
         <span style={{ color: t.chevron, fontSize: 12 }}>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
         <div style={{ padding: '0 16px 16px' }}>
-          {visiveis.map((c, i) => <CampanhaCard key={i} c={c} t={t} />)}
+          {ativas.map((c, i) => <CampanhaCard key={i} c={c} t={t} />)}
+          {encerradas.length > 0 && ativas.length > 0 && (
+            <div style={{ fontSize: 10, fontWeight: 600, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', margin: '12px 0 8px', paddingTop: 8, borderTop: `1px solid ${t.border}` }}>
+              ENCERRADAS
+            </div>
+          )}
+          {encerradas.map((c, i) => <CampanhaCard key={`enc-${i}`} c={c} t={t} dimmed />)}
         </div>
       )}
     </div>

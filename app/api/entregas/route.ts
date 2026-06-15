@@ -105,7 +105,13 @@ async function fetchAba(nome: string): Promise<string[][]> {
 function findHeaderRow(rows: string[][]): number {
   for (let i = 0; i < Math.min(rows.length, 10); i++) {
     const row = rows[i].map(c => c?.toString().toUpperCase() ?? '')
-    if (row.some(c => c.includes('CAMPANHA') || c.includes('META') || c.includes('INÍCIO') || c.includes('INICIO'))) {
+    if (row.some(c =>
+      c.includes('CAMPANHA') || c.includes('META') ||
+      c.includes('INÍCIO') || c.includes('INICIO') ||
+      c.includes('TÉRMINO') || c.includes('TERMINO') ||
+      c.includes('CANAL') || c.includes('ENTREGA') ||
+      c.includes('INVESTIMENTO')
+    )) {
       return i
     }
   }
@@ -131,10 +137,11 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
   const iInicio = findCol(header, ['INICIO', 'INÍCIO', 'início', 'inicio'])
   const iTermino = findCol(header, ['TÉRMINO', 'TERMINO', 'término', 'termino'])
   const iMetrica = findCol(header, ['MÉTRICA', 'METRICA', 'COMPRA'])
-  const iMeta = findCol(header, ['Meta', 'META'])
-  const iEntregue = findCol(header, ['entregamos', 'ENTREGAMOS', 'Entregamos'])
-  const iBateu = findCol(header, ['BATEU', 'bateu'])
-  const iInvestimento = findCol(header, ['INVESTIMENTO', 'investimento'])
+  const iMeta = findCol(header, ['Meta', 'META', 'VOLUME', 'Volume'])
+  const iEntregue = findCol(header, ['entregamos', 'ENTREGAMOS', 'Entregamos', 'ENTREGUE', 'Entregue', 'entregue', 'REALIZADO', 'Realizado'])
+  const iQuantoFalta = findCol(header, ['Quanto Falta', 'QUANTO FALTA', 'FALTA'])
+  const iBateu = findCol(header, ['BATEU', 'bateu', 'STATUS DA ENTREGA', 'Status da Entrega'])
+  const iInvestimento = findCol(header, ['INVESTIMENTO', 'investimento', 'Investimento'])
 
   const campanhas: Campanha[] = []
 
@@ -157,11 +164,16 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
       hoje > termino ? 'encerrada' : hoje < inicio ? 'futura' : 'ativa'
 
     const meta = iMeta >= 0 ? parseNum(row[iMeta]) : 0
-    const entregue = iEntregue >= 0 ? parseNum(row[iEntregue]) : 0
+    let entregue = iEntregue >= 0 ? parseNum(row[iEntregue]) : 0
+    // Fallback: se não encontrou coluna "entregue" mas tem "Quanto Falta", calcula entregue = meta - falta
+    if (entregue === 0 && meta > 0 && iQuantoFalta >= 0) {
+      const falta = parseNum(row[iQuantoFalta])
+      if (falta > 0) entregue = Math.max(0, meta - falta)
+    }
     const investimento = iInvestimento >= 0 ? parseNum(row[iInvestimento]) : 0
 
-    // Ocultar campanhas sem veiculação real
-    if (entregue === 0 && investimento === 0) continue
+    // Ocultar campanhas sem nenhum dado relevante (meta zerada E sem entrega E sem investimento)
+    if (meta === 0 && entregue === 0 && investimento === 0) continue
 
     // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA)
     // entregue=1 com meta grande é sinal de coluna errada
@@ -208,7 +220,7 @@ export async function GET(req: NextRequest) {
 
   const abas = sheetNames.map(nome => ({
     nome,
-    cliente: NOME_MAP[nome] ?? nome,
+    cliente: (NOME_MAP[nome] ?? nome).trim(),
     grupo: (GRUPO_MAP[nome] ?? 'agencia') as 'agencia' | 'govba' | 'politica',
   }))
 
