@@ -133,20 +133,21 @@ function ProgressBar({ pct, bateu, status, track }: { pct: number; bateu: boolea
   const w = Math.min(100, pct)
   const color = bateu ? '#22c55e' : status === 'encerrada' ? '#9ca3af' : pct < 60 ? '#f87171' : pct < 80 ? '#facc15' : '#60a5fa'
   return (
-    <div style={{ background: track, borderRadius: 4, height: 6, marginTop: 8 }}>
+    <div style={{ background: track, borderRadius: 4, height: 6 }}>
       <div style={{ width: `${w}%`, height: '100%', background: color, borderRadius: 4, transition: 'width 0.6s ease' }} />
     </div>
   )
 }
 
-function TempoBar({ diasPercorridos, totalDias, status, track }: {
-  diasPercorridos: number; totalDias: number; status: string; track: string
+function TempoBar({ diasPercorridos, totalDias, status, track, labelColor }: {
+  diasPercorridos: number; totalDias: number; status: string; track: string; labelColor: string
 }) {
   if (status === 'futura') return null
   const pct = Math.min(100, Math.round((diasPercorridos / totalDias) * 100))
   const color = status === 'encerrada' ? '#6b7280' : '#facc15'
   return (
-    <div style={{ marginTop: 4 }}>
+    <div style={{ marginTop: 6 }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>Dias Percorridos</div>
       <div style={{ background: track, borderRadius: 3, height: 3 }}>
         <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.6s ease' }} />
       </div>
@@ -259,8 +260,11 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
       )}
 
       {/* Barras de progresso: entrega + tempo */}
-      <ProgressBar pct={c.pct} bateu={c.bateu} status={c.status} track={t.barTrack} />
-      <TempoBar diasPercorridos={c.diasPercorridos} totalDias={c.totalDias} status={c.status} track={t.barTrack} />
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>Entrega</div>
+        <ProgressBar pct={c.pct} bateu={c.bateu} status={c.status} track={t.barTrack} />
+      </div>
+      <TempoBar diasPercorridos={c.diasPercorridos} totalDias={c.totalDias} status={c.status} track={t.barTrack} labelColor={t.textMuted} />
 
       {/* Métricas inferiores */}
       <div style={{

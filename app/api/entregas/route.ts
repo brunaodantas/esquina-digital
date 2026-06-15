@@ -159,6 +159,9 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
 
     if (!inicio || !termino) continue
 
+    // Descarta linhas com datas invertidas (termino < inicio) — erro de preenchimento no sheet
+    if (termino < inicio) continue
+
     // Campanha ativa no período: sobrepõe com [periodoStart, periodoFim]
     if (inicio > periodoFim || termino < periodoStart) continue
 
