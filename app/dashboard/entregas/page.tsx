@@ -16,7 +16,6 @@ interface Campanha {
   diasRestantes: number
   diasPercorridos: number
   totalDias: number
-  investimento: number
   status: 'ativa' | 'encerrada' | 'futura'
   inicioStr: string
   terminoStr: string
@@ -115,10 +114,6 @@ function fmt(n: number): string {
 
 function fmtExact(n: number): string {
   return n.toLocaleString('pt-BR')
-}
-
-function fmtBrl(n: number): string {
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 function statusBadge(c: Campanha) {
@@ -285,7 +280,7 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
   const entAbrev = fmt(c.entregue)
   const entExact = fmtExact(c.entregue)
 
-  const cols = c.investimento > 0 ? 5 : 4
+  const cols = 4
 
   return (
     <div style={{
@@ -377,15 +372,6 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
           </span>
         </div>
 
-        {/* Investimento (condicional) */}
-        {c.investimento > 0 && (
-          <div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Investido</div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: t.textSecondary }}>
-              {fmtBrl(c.investimento)}
-            </span>
-          </div>
-        )}
       </div>
     </div>
   )

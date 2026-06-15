@@ -43,7 +43,6 @@ interface Campanha {
   diasRestantes: number
   diasPercorridos: number
   totalDias: number
-  investimento: number
   status: 'ativa' | 'encerrada' | 'futura'
   inicioStr: string
   terminoStr: string
@@ -143,7 +142,6 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
   const iEntregue = findCol(header, ['entregamos', 'ENTREGAMOS', 'Entregamos', 'ENTREGUE', 'Entregue', 'entregue', 'REALIZADO', 'Realizado'])
   const iQuantoFalta = findCol(header, ['Quanto Falta', 'QUANTO FALTA', 'FALTA'])
   const iBateu = findCol(header, ['BATEU', 'bateu', 'STATUS DA ENTREGA', 'Status da Entrega'])
-  const iInvestimento = findCol(header, ['INVESTIMENTO', 'investimento', 'Investimento'])
 
   const campanhas: Campanha[] = []
 
@@ -176,10 +174,8 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
       const falta = parseNum(row[iQuantoFalta])
       if (falta > 0) entregue = Math.max(0, meta - falta)
     }
-    const investimento = iInvestimento >= 0 ? Math.max(0, parseNum(row[iInvestimento])) : 0
-
-    // Ocultar campanhas sem nenhum dado relevante (meta zerada E sem entrega E sem investimento)
-    if (meta === 0 && entregue === 0 && investimento === 0) continue
+    // Ocultar campanhas sem nenhum dado relevante
+    if (meta === 0 && entregue === 0) continue
 
     // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA)
     // entregue=1 com meta grande é sinal de coluna errada
@@ -195,7 +191,7 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
       nome,
       canal: iCanal >= 0 ? (row[iCanal] ?? '').trim() : '',
       metrica: iMetrica >= 0 ? (row[iMetrica] ?? '').trim() : '',
-      meta, entregue, pct, bateu, diasRestantes, diasPercorridos, totalDias, investimento, status,
+      meta, entregue, pct, bateu, diasRestantes, diasPercorridos, totalDias, status,
       inicioStr: iInicio >= 0 ? (row[iInicio] ?? '').trim() : '',
       terminoStr: iTermino >= 0 ? (row[iTermino] ?? '').trim() : '',
     })
