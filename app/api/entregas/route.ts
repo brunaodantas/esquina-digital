@@ -48,19 +48,27 @@ interface ClienteData {
 
 function parseDate(ddmm: string): Date | null {
   if (!ddmm || typeof ddmm !== 'string') return null
-  const clean = ddmm.trim().replace(/[^0-9.]/g, '')
-  const parts = clean.split('.')
-  if (parts.length < 2) return null
-  const day = parseInt(parts[0])
-  const month = parseInt(parts[1]) - 1
-  if (isNaN(day) || isNaN(month)) return null
+  const str = ddmm.trim()
+  const match = str.match(/^(\d{1,2})[\/.](\d{1,2})$/)
+  if (!match) return null
+  const day = parseInt(match[1])
+  const month = parseInt(match[2]) - 1
+  if (isNaN(day) || isNaN(month) || day < 1 || day > 31 || month < 0 || month > 11) return null
   return new Date(2026, month, day)
 }
 
 function parseNum(val: string): number {
   if (!val) return 0
-  const clean = val.toString().replace(/[^0-9,.-]/g, '').replace(',', '.')
-  return parseFloat(clean) || 0
+  const s = val.toString().trim().replace(/[R$\s]/g, '')
+  if (s.includes(',')) {
+    // Vírgula = separador decimal (formato BR): "1.234,56" → 1234.56
+    return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0
+  }
+  if (/\.\d{3}$/.test(s)) {
+    // Ponto seguido de exatamente 3 dígitos = separador de milhar: "224.513" → 224513
+    return parseFloat(s.replace(/\./g, '')) || 0
+  }
+  return parseFloat(s) || 0
 }
 
 function diffDays(a: Date, b: Date): number {
@@ -136,6 +144,10 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
 
     // Ocultar campanhas sem veiculação real no período
     if (entregue === 0 && investimento === 0) continue
+
+    // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA):
+    // entregue=1 com meta grande indica que a coluna lida não é a real
+    if (entregue === 1 && meta > 1000) continue
 
     const pct = meta > 0 ? Math.round((entregue / meta) * 1000) / 10 : 0
     const bateu = iBateu >= 0 ? (row[iBateu] ?? '').toString().toUpperCase().includes('BATEU') : pct >= 100
