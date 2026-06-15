@@ -50,91 +50,86 @@ export default function Dashboard() {
 
   const initials = user?.displayName?.split(' ').map(n => n[0]).slice(0, 2).join('') ?? 'U'
 
-  const btnBase: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 6,
-    padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
-    cursor: 'pointer', border: '1px solid #3a3a3a', transition: 'all 0.15s',
-  }
-
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#111' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid #2a2a2a', borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0d0d0d' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid #333', borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#111', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
-      {/* Barra de navegação fixa no topo */}
+      {/* Header sempre visível */}
       <div style={{
-        position: 'absolute', top: 12, left: 16, right: 16, zIndex: 9999,
-        display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'none',
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '0 20px', height: 52, flexShrink: 0,
+        background: '#0d0d0d',
+        borderBottom: '1px solid #2a2a2a',
       }}>
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto' }}>
-          {(['meta', 'entregas'] as Tab[]).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                ...btnBase,
-                background: activeTab === tab ? '#1A3CFF' : '#1e1e1e',
-                border: `1px solid ${activeTab === tab ? '#1A3CFF' : '#3a3a3a'}`,
-                color: activeTab === tab ? '#fff' : '#bbb',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-              }}
-            >
-              {tab === 'meta' ? '📊 Meta Ads' : '📦 Entregas'}
-            </button>
-          ))}
-        </div>
+        {/* Tabs de navegação */}
+        <button
+          onClick={() => setActiveTab('meta')}
+          style={{
+            height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+            background: activeTab === 'meta' ? '#1A3CFF' : '#252525',
+            color: activeTab === 'meta' ? '#fff' : '#999',
+            outline: activeTab !== 'meta' ? '1px solid #333' : 'none',
+          }}
+        >
+          Meta Ads
+        </button>
+
+        <button
+          onClick={() => setActiveTab('entregas')}
+          style={{
+            height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+            background: activeTab === 'entregas' ? '#1A3CFF' : '#252525',
+            color: activeTab === 'entregas' ? '#fff' : '#999',
+            outline: activeTab !== 'entregas' ? '1px solid #333' : 'none',
+          }}
+        >
+          Entregas
+        </button>
 
         <div style={{ flex: 1 }} />
 
-        {/* Controles do lado direito */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, pointerEvents: 'auto' }}>
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
-            style={{
-              ...btnBase,
-              background: '#1e1e1e',
-              color: '#bbb',
-              padding: '7px 10px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-            }}
-          >
-            {theme === 'dark' ? '☀' : '☽'}
-          </button>
+        {/* Toggle tema */}
+        <button
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+          style={{
+            width: 32, height: 32, borderRadius: 7, fontSize: 15,
+            background: '#252525', border: '1px solid #333', color: '#999',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          {theme === 'dark' ? '☀' : '☽'}
+        </button>
 
-          <div style={{
-            ...btnBase,
-            background: '#1e1e1e',
-            color: '#bbb',
-            gap: 8,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-          }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#1A3CFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-              {initials}
-            </div>
-            <span style={{ fontSize: 12 }}>{user?.displayName?.split(' ')[0]}</span>
-            <button
-              onClick={handleLogout}
-              style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', fontSize: 12, padding: 0 }}
-            >
-              sair
-            </button>
-          </div>
+        {/* Avatar */}
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1A3CFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+          {initials}
         </div>
+
+        <span style={{ fontSize: 13, color: '#888' }}>{user?.displayName?.split(' ')[0]}</span>
+
+        <button
+          onClick={handleLogout}
+          style={{ height: 30, padding: '0 12px', borderRadius: 6, fontSize: 12, background: 'transparent', border: '1px solid #333', color: '#666', cursor: 'pointer' }}
+        >
+          Sair
+        </button>
       </div>
 
       {/* Conteúdo */}
-      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'meta' ? 'block' : 'none', position: 'relative' }}>
+      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'meta' ? 'flex' : 'none', flexDirection: 'column' }}>
         <iframe
           src="https://dashboard-meta-esquina-ebon.vercel.app/"
-          style={{ width: '100%', height: '100%', border: 'none' }}
+          style={{ flex: 1, border: 'none', width: '100%', height: '100%' }}
           title="Dashboard Meta Esquina"
         />
       </div>
