@@ -75,8 +75,8 @@ function getPeriodo(preset: Preset, custom?: { start: string; end: string }): { 
 
   if (preset === 'personalizado' && custom?.start && custom?.end) {
     const [sy, sm, sd] = custom.start.split('-')
-    const [, em, ed] = custom.end.split('-')
-    const label = sm === em ? `${sd}/${sm} – ${ed}/${em}/${sy}` : `${sd}/${sm} – ${ed}/${em}/${sy}`
+    const [ey, em, ed] = custom.end.split('-')
+    const label = sm === em && sy === ey ? `${sd}/${sm} – ${ed}/${em}/${sy}` : `${sd}/${sm}/${sy} – ${ed}/${em}/${ey}`
     return { start: custom.start, end: custom.end, label }
   }
   if (preset === 'mes-atual') {
@@ -267,7 +267,7 @@ function PeriodoDropdown({
                 ))}
               </div>
 
-              {/* Custom date inputs */}
+              {/* Datas personalizadas */}
               {tempPreset === 'personalizado' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, paddingTop: 28 }}>
                   <div>
@@ -313,19 +313,11 @@ function PeriodoDropdown({
   )
 }
 
-const GRUPOS: { key: 'todos' | 'risco' | 'agencia' | 'govba' | 'politica'; baseLabel: string }[] = [
-  { key: 'todos', baseLabel: 'Todos' },
-  { key: 'risco', baseLabel: 'Em risco' },
-  { key: 'agencia', baseLabel: 'Agência' },
-  { key: 'govba', baseLabel: 'GOV-BA' },
-  { key: 'politica', baseLabel: 'Política' },
-]
-
 export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
   const [data, setData] = useState<ClienteData[] | null>(null)
+  const [sheets, setSheets] = useState<string[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [filtroGrupo, setFiltroGrupo] = useState<'todos' | 'risco' | 'agencia' | 'govba' | 'politica'>('todos')
   const [filtroCliente, setFiltroCliente] = useState('')
   const [preset, setPreset] = useState<Preset>('mes-atual')
   const [custom, setCustom] = useState({ start: '', end: '' })
@@ -333,12 +325,26 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
   const t = C[theme]
   const periodoRef = useRef(getPeriodo('mes-atual'))
 
+  function parseResponse(res: unknown) {
+    if (res && typeof res === 'object' && !Array.isArray(res)) {
+      const r = res as { sheets?: string[]; data?: ClienteData[] }
+      return { data: r.data ?? [], sheets: r.sheets ?? [] }
+    }
+    // fallback: resposta antiga era array direto
+    return { data: Array.isArray(res) ? res : [], sheets: [] }
+  }
+
   function fetchData(p: { start: string; end: string }) {
     setLoading(true)
     setError('')
     fetch(`/api/entregas?start=${p.start}&end=${p.end}`)
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
+      .then(res => {
+        const parsed = parseResponse(res)
+        setData(parsed.data)
+        if (parsed.sheets.length > 0) setSheets(parsed.sheets)
+        setLoading(false)
+      })
       .catch(() => { setError('Erro ao carregar dados.'); setLoading(false) })
   }
 
@@ -365,7 +371,13 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
       return setTimeout(() => {
         const cur = periodoRef.current
         fetch(`/api/entregas?start=${cur.start}&end=${cur.end}`)
-          .then(r => r.json()).then(setData).catch(() => {})
+          .then(r => r.json())
+          .then(res => {
+            const parsed = parseResponse(res)
+            setData(parsed.data)
+            if (parsed.sheets.length > 0) setSheets(parsed.sheets)
+          })
+          .catch(() => {})
         timer = scheduleNext()
       }, next.getTime() - now.getTime())
     }
@@ -376,65 +388,39 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
 
   const center: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }
 
-  // Clientes únicos para o seletor
-  const clientes = [...new Set((data ?? []).map(d => d.cliente))].sort()
+  // Dados filtrados pelo cliente selecionado
+  const filtrado = (data ?? []).filter(d => !filtroCliente || d.cliente === filtroCliente)
 
-  // Dados filtrados
-  const filtrado = (data ?? [])
-    .filter(d => !filtroCliente || d.cliente === filtroCliente)
-    .filter(d => {
-      if (filtroGrupo === 'risco') return d.campanhas.some(c => !c.bateu && c.pct < 80 && c.diasRestantes <= 7 && c.status === 'ativa')
-      if (filtroGrupo !== 'todos') return d.grupo === filtroGrupo
-      return true
-    })
-
-  const emRisco = filtrado.flatMap(d => d.campanhas.filter(c => !c.bateu && c.pct < 80 && c.diasRestantes <= 7 && c.status === 'ativa')).map(c => c.nome)
-
-  const btnGrupo = (key: typeof filtroGrupo, label: string) => (
-    <button
-      key={key}
-      onClick={() => setFiltroGrupo(key)}
-      style={{
-        padding: '6px 14px', borderRadius: 20, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
-        background: filtroGrupo === key ? '#1A3CFF' : t.filtroBtn,
-        border: `1px solid ${filtroGrupo === key ? '#1A3CFF' : t.border}`,
-        color: filtroGrupo === key ? '#fff' : t.filtroBtnText,
-      }}
-    >
-      {label}
-    </button>
-  )
+  const emRisco = filtrado
+    .flatMap(d => d.campanhas.filter(c => !c.bateu && c.pct < 80 && c.diasRestantes <= 7 && c.status === 'ativa'))
+    .map(c => c.nome)
 
   return (
     <div style={{ padding: '20px 24px 40px', overflowY: 'auto', height: '100%', boxSizing: 'border-box', background: t.page }}>
 
-      {/* Linha 1: Período + Cliente */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* Controles: período + cliente */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <PeriodoDropdown preset={preset} custom={custom} t={t} onApply={aplicarPeriodo} />
 
-        {/* Seletor de cliente */}
         <select
           value={filtroCliente}
           onChange={e => setFiltroCliente(e.target.value)}
           style={{
             background: t.selectBg, border: `1px solid ${t.selectBorder}`, color: t.selectText,
             borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', outline: 'none',
+            height: 34,
           }}
         >
           <option value="">Todos os clientes</option>
-          {clientes.map(c => <option key={c} value={c}>{c}</option>)}
+          {sheets.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+
+        {loading && (
+          <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: '2px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+        )}
       </div>
 
-      {/* Linha 2: Filtros de grupo */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {GRUPOS.map(g => {
-          const label = g.key === 'risco' ? `Em risco (${emRisco.length})` : g.baseLabel
-          return btnGrupo(g.key, label)
-        })}
-      </div>
-
-      {/* Alerta */}
+      {/* Alerta de campanhas em risco */}
       {!loading && emRisco.length > 0 && (
         <div style={{ display: 'flex', gap: 12, background: t.alertBg, border: `1px solid ${t.alertBorder}`, borderRadius: 8, padding: '12px 16px', marginBottom: 20, alignItems: 'flex-start' }}>
           <span style={{ fontSize: 18, color: '#dc2626', flexShrink: 0, marginTop: 1 }}>⚠</span>
@@ -445,15 +431,21 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
         </div>
       )}
 
-      {/* Conteúdo */}
-      {loading ? (
+      {/* Conteúdo principal */}
+      {loading && !data ? (
         <div style={center}>
           <div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         </div>
       ) : error ? (
         <div style={center}><span style={{ color: t.textMuted }}>{error}</span></div>
       ) : !filtrado.length ? (
-        <div style={center}><span style={{ color: t.emptyText }}>Nenhuma campanha no período selecionado.</span></div>
+        <div style={center}>
+          <span style={{ color: t.emptyText }}>
+            {filtroCliente
+              ? `Nenhuma campanha de ${filtroCliente} no período selecionado.`
+              : 'Nenhuma campanha no período selecionado.'}
+          </span>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filtrado.map((d, i) => <ClienteBlock key={i} data={d} t={t} />)}

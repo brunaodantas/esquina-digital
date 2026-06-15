@@ -3,29 +3,34 @@ import { NextRequest, NextResponse } from 'next/server'
 const SHEET_ID = process.env.SHEETS_ID!
 const API_KEY = process.env.SHEETS_API_KEY!
 
-const ABAS: { nome: string; cliente: string; grupo: 'agencia' | 'govba' | 'politica' }[] = [
-  { nome: 'LUM1NO', cliente: 'Lum1no', grupo: 'agencia' },
-  { nome: 'VILLA', cliente: 'Villa Global', grupo: 'agencia' },
-  { nome: 'Embasa', cliente: 'Embasa', grupo: 'agencia' },
-  { nome: 'UNIFACS', cliente: 'UNIFACS', grupo: 'agencia' },
-  { nome: 'PROVAX', cliente: 'Provax', grupo: 'agencia' },
-  { nome: 'Ministérios', cliente: 'Ministérios', grupo: 'agencia' },
-  { nome: 'BIODIESEL', cliente: 'Biodiesel', grupo: 'agencia' },
-  { nome: 'Prefeitura Americana', cliente: 'Pref. Americana', grupo: 'agencia' },
-  { nome: 'Prefeitura Hortolandia', cliente: 'Pref. Hortolândia', grupo: 'agencia' },
-  { nome: 'Prefeitura Campinas', cliente: 'Pref. Campinas', grupo: 'agencia' },
-  { nome: 'CIMATEC - Graduação PRESENCIAL e EAD', cliente: 'CIMATEC Graduação', grupo: 'agencia' },
-  { nome: 'CIMATEC Pós-Graduação 2025', cliente: 'CIMATEC Pós', grupo: 'agencia' },
-  { nome: 'MPBA', cliente: 'MPBA', grupo: 'agencia' },
-  { nome: 'Governo Bahia', cliente: 'Governo da Bahia', grupo: 'govba' },
-  { nome: 'Morya - Governo Bahia', cliente: 'Governo da Bahia', grupo: 'govba' },
-  { nome: 'TEMPO - Governo Bahia', cliente: 'Governo da Bahia', grupo: 'govba' },
-  { nome: 'Entregas GOV - BA', cliente: 'Governo da Bahia', grupo: 'govba' },
-  { nome: 'Dário Saadi', cliente: 'Dário Saadi', grupo: 'politica' },
-  { nome: 'Hugo Motta', cliente: 'Hugo Motta', grupo: 'politica' },
-  { nome: 'Celina Leão', cliente: 'Celina Leão', grupo: 'politica' },
-  { nome: 'Bragança Paulista', cliente: 'Bragança Paulista', grupo: 'politica' },
-]
+// Abas que não são clientes — ignoradas na descoberta dinâmica
+const SKIP_SHEETS = new Set([
+  'Resumo', 'Config', 'Capa', 'CAPA', 'Dashboard', 'Dados',
+  'Sheet1', 'Folha1', 'Template', 'Modelo', 'MODELO',
+  'Índice', 'Indice', 'INDICE', 'Home', 'Legenda', 'LEGENDA',
+  'Verba', 'META', 'Controle',
+])
+
+// Grupo de cada aba conhecida
+const GRUPO_MAP: Record<string, 'agencia' | 'govba' | 'politica'> = {
+  'Governo Bahia': 'govba',
+  'Morya - Governo Bahia': 'govba',
+  'TEMPO - Governo Bahia': 'govba',
+  'Entregas GOV - BA': 'govba',
+  'Dário Saadi': 'politica',
+  'Hugo Motta': 'politica',
+  'Celina Leão': 'politica',
+  'Bragança Paulista': 'politica',
+}
+
+// Nome de exibição para abas em caixa alta
+const NOME_MAP: Record<string, string> = {
+  'LUM1NO': 'Lum1no',
+  'VILLA': 'Villa Global',
+  'BIODIESEL': 'Biodiesel',
+  'PROVAX': 'Provax',
+  'MPBA': 'MPBA',
+}
 
 interface Campanha {
   nome: string
@@ -61,11 +66,11 @@ function parseNum(val: string): number {
   if (!val) return 0
   const s = val.toString().trim().replace(/[R$\s]/g, '')
   if (s.includes(',')) {
-    // Vírgula = separador decimal (formato BR): "1.234,56" → 1234.56
+    // Vírgula = decimal (BR): "1.234,56" → 1234.56
     return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0
   }
   if (/\.\d{3}$/.test(s)) {
-    // Ponto seguido de exatamente 3 dígitos = separador de milhar: "224.513" → 224513
+    // Ponto com exatamente 3 dígitos = milhar: "224.513" → 224513
     return parseFloat(s.replace(/\./g, '')) || 0
   }
   return parseFloat(s) || 0
@@ -73,6 +78,17 @@ function parseNum(val: string): number {
 
 function diffDays(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000)
+}
+
+// Lê todas as abas da planilha via Sheets metadata API
+async function fetchSheetList(): Promise<string[]> {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?key=${API_KEY}&fields=sheets.properties.title`
+  const res = await fetch(url, { next: { revalidate: 3600 } })
+  if (!res.ok) return []
+  const json = await res.json()
+  return (json.sheets ?? [])
+    .map((s: { properties: { title: string } }) => s.properties.title as string)
+    .filter((title: string) => title && !SKIP_SHEETS.has(title))
 }
 
 async function fetchAba(nome: string): Promise<string[][]> {
@@ -142,18 +158,23 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
     const entregue = iEntregue >= 0 ? parseNum(row[iEntregue]) : 0
     const investimento = iInvestimento >= 0 ? parseNum(row[iInvestimento]) : 0
 
-    // Ocultar campanhas sem veiculação real no período
+    // Ocultar campanhas sem veiculação real
     if (entregue === 0 && investimento === 0) continue
 
-    // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA):
-    // entregue=1 com meta grande indica que a coluna lida não é a real
+    // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA)
+    // entregue=1 com meta grande é sinal de coluna errada
     if (entregue === 1 && meta > 1000) continue
 
     const pct = meta > 0 ? Math.round((entregue / meta) * 1000) / 10 : 0
     const bateu = iBateu >= 0 ? (row[iBateu] ?? '').toString().toUpperCase().includes('BATEU') : pct >= 100
     const diasRestantes = Math.max(0, diffDays(hoje, termino))
 
-    campanhas.push({ nome, canal: iCanal >= 0 ? (row[iCanal] ?? '').trim() : '', metrica: iMetrica >= 0 ? (row[iMetrica] ?? '').trim() : '', meta, entregue, pct, bateu, diasRestantes, investimento, status })
+    campanhas.push({
+      nome,
+      canal: iCanal >= 0 ? (row[iCanal] ?? '').trim() : '',
+      metrica: iMetrica >= 0 ? (row[iMetrica] ?? '').trim() : '',
+      meta, entregue, pct, bateu, diasRestantes, investimento, status,
+    })
   }
 
   return campanhas
@@ -168,17 +189,33 @@ export async function GET(req: NextRequest) {
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
 
-  // Período: default = mês atual
   const startParam = searchParams.get('start')
   const endParam = searchParams.get('end')
 
-  const periodoStart = startParam ? new Date(startParam + 'T00:00:00') : new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-  const periodoFim = endParam ? new Date(endParam + 'T23:59:59') : new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+  const periodoStart = startParam
+    ? new Date(startParam + 'T00:00:00')
+    : new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  const periodoFim = endParam
+    ? new Date(endParam + 'T23:59:59')
+    : new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
 
+  // Descobre todas as abas dinamicamente
+  const sheetNames = await fetchSheetList()
+
+  const abas = sheetNames.map(nome => ({
+    nome,
+    cliente: NOME_MAP[nome] ?? nome,
+    grupo: (GRUPO_MAP[nome] ?? 'agencia') as 'agencia' | 'govba' | 'politica',
+  }))
+
+  // Lista completa de clientes para o dropdown (independe do período)
+  const sheets = [...new Set(abas.map(a => a.cliente))].sort()
+
+  // Carrega campanhas de todas as abas em paralelo
   const clienteMap = new Map<string, ClienteData>()
 
   await Promise.all(
-    ABAS.map(async (aba) => {
+    abas.map(async (aba) => {
       const rows = await fetchAba(aba.nome)
       const campanhas = parseRows(rows, periodoStart, periodoFim, hoje)
       if (!campanhas.length) return
@@ -192,12 +229,13 @@ export async function GET(req: NextRequest) {
     })
   )
 
-  const result = Array.from(clienteMap.values()).filter(c => c.campanhas.length > 0)
+  const data = Array.from(clienteMap.values()).filter(c => c.campanhas.length > 0)
 
-  result.sort((a, b) => {
-    const risco = (c: ClienteData) => c.campanhas.some(x => !x.bateu && x.pct < 80 && x.diasRestantes <= 7 && x.status === 'ativa') ? 0 : 1
+  data.sort((a, b) => {
+    const risco = (c: ClienteData) =>
+      c.campanhas.some(x => !x.bateu && x.pct < 80 && x.diasRestantes <= 7 && x.status === 'ativa') ? 0 : 1
     return risco(a) - risco(b)
   })
 
-  return NextResponse.json(result)
+  return NextResponse.json({ sheets, data })
 }
