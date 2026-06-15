@@ -6,8 +6,9 @@ import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 import EntregasPage from './entregas/page'
+import GoogleAdsPage from './google-ads/page'
 
-type Tab = 'meta' | 'entregas'
+type Tab = 'meta' | 'entregas' | 'google-ads'
 type Theme = 'dark' | 'light'
 
 export default function Dashboard() {
@@ -95,6 +96,19 @@ export default function Dashboard() {
           Entregas
         </button>
 
+        <button
+          onClick={() => setActiveTab('google-ads')}
+          style={{
+            height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+            background: activeTab === 'google-ads' ? '#1A3CFF' : '#252525',
+            color: activeTab === 'google-ads' ? '#fff' : '#999',
+            outline: activeTab !== 'google-ads' ? '1px solid #333' : 'none',
+          }}
+        >
+          Google Ads
+        </button>
+
         <div style={{ flex: 1 }} />
 
         {/* Toggle tema */}
@@ -136,6 +150,10 @@ export default function Dashboard() {
 
       <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'entregas' ? 'flex' : 'none', flexDirection: 'column' }}>
         <EntregasPage theme={theme} />
+      </div>
+
+      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'google-ads' ? 'flex' : 'none', flexDirection: 'column' }}>
+        <GoogleAdsPage theme={theme} />
       </div>
 
     </div>
