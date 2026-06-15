@@ -106,6 +106,12 @@ function getPeriodo(preset: Preset, custom?: { start: string; end: string }): { 
 }
 
 function fmt(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.', ',') + 'M'
+  if (n >= 1_000) return (n / 1_000).toFixed(0) + 'k'
+  return n.toLocaleString('pt-BR')
+}
+
+function fmtExact(n: number): string {
   return n.toLocaleString('pt-BR')
 }
 
@@ -135,37 +141,160 @@ function normData(s: string) {
   return s ? s.replace(/\./g, '/') : ''
 }
 
+function NumWithTooltip({ abbrev, exact, color }: { abbrev: string; exact: string; color: string }) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const hasDiff = abbrev !== exact && abbrev !== '—'
+
+  return (
+    <>
+      <span
+        onMouseEnter={e => {
+          if (!hasDiff) return
+          const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+          setPos({ x: r.left + r.width / 2, y: r.top })
+        }}
+        onMouseLeave={() => setPos(null)}
+        style={{
+          fontSize: 13, fontWeight: 600, color,
+          cursor: hasDiff ? 'help' : 'default',
+          textDecoration: hasDiff ? 'underline dotted' : 'none',
+          textUnderlineOffset: '3px',
+          display: 'inline-block',
+        }}
+      >
+        {abbrev}
+      </span>
+      {pos && (
+        <span style={{
+          position: 'fixed',
+          left: pos.x, top: pos.y - 8,
+          transform: 'translate(-50%, -100%)',
+          background: '#0d0d0d', border: '1px solid #444',
+          color: '#e8e8e8', fontSize: 11, fontWeight: 500,
+          padding: '5px 11px', borderRadius: 7, whiteSpace: 'nowrap',
+          zIndex: 9999, pointerEvents: 'none',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.65)',
+          letterSpacing: 0.2,
+        }}>
+          {exact}
+        </span>
+      )}
+    </>
+  )
+}
+
 function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimmed?: boolean }) {
   const badge = statusBadge(c)
-  const periodo = c.inicioStr && c.terminoStr
-    ? `${normData(c.inicioStr)} → ${normData(c.terminoStr)}`
-    : ''
-  const detalhe = [c.canal, c.metrica, periodo].filter(Boolean).join(' · ')
+  const periodoTag = c.inicioStr && c.terminoStr
+    ? `📅 ${normData(c.inicioStr)} → ${normData(c.terminoStr)}` : ''
+  const canalTag = [c.canal, c.metrica].filter(Boolean).join(' · ')
+
+  const metaAbrev = c.meta > 0 ? fmt(c.meta) : '—'
+  const metaExact = c.meta > 0 ? fmtExact(c.meta) : '—'
+  const entAbrev = fmt(c.entregue)
+  const entExact = fmtExact(c.entregue)
+
+  const cols = c.investimento > 0 ? 5 : 4
+
   return (
-    <div style={{ background: t.cardInner, border: `1px solid ${t.borderInner}`, borderRadius: 8, padding: 12, marginBottom: 8, opacity: dimmed ? 0.5 : 1 }}>
+    <div style={{
+      background: t.cardInner, border: `1px solid ${t.borderInner}`,
+      borderRadius: 8, padding: '12px 14px', marginBottom: 8,
+      opacity: dimmed ? 0.5 : 1,
+    }}>
+      {/* Linha 1: nome + badge de status */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: t.textSecondary }}>{c.nome}</div>
-          {detalhe && <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{detalhe}</div>}
-        </div>
-        <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0, color: badge.color, background: badge.bg }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: t.textPrimary, lineHeight: 1.3 }}>{c.nome}</span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 5,
+          whiteSpace: 'nowrap', flexShrink: 0, letterSpacing: 0.3,
+          color: badge.color, background: badge.bg,
+        }}>
           {badge.label}
         </span>
       </div>
+
+      {/* Linha 2: tags de período e canal/métrica */}
+      {(periodoTag || canalTag) && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          {periodoTag && (
+            <span style={{
+              fontSize: 11, padding: '3px 10px', borderRadius: 20,
+              background: '#1A3CFF18', color: '#7ba3ff',
+              border: '1px solid #1A3CFF33', whiteSpace: 'nowrap',
+            }}>
+              {periodoTag}
+            </span>
+          )}
+          {canalTag && (
+            <span style={{
+              fontSize: 11, padding: '3px 10px', borderRadius: 20,
+              background: t.filtroBtn, color: t.filtroBtnText,
+              border: `1px solid ${t.borderInner}`, whiteSpace: 'nowrap',
+            }}>
+              📊 {canalTag}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Barra de progresso */}
       <ProgressBar pct={c.pct} bateu={c.bateu} status={c.status} track={t.barTrack} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Meta', val: c.meta > 0 ? fmt(c.meta) : '—', color: t.textSecondary },
-          { label: 'Entregue', val: fmt(c.entregue), color: c.entregue === 0 && c.status === 'ativa' ? t.textMuted : t.textSecondary },
-          { label: '%', val: c.meta > 0 ? `${c.pct.toFixed(1).replace('.', ',')}%` : '—', color: c.bateu ? '#16a34a' : c.pct < 60 && c.meta > 0 ? '#dc2626' : t.textSecondary },
-          { label: 'Dias rest.', val: c.status !== 'ativa' ? '—' : String(c.diasRestantes), color: c.diasRestantes <= 3 && c.status === 'ativa' ? '#dc2626' : t.textSecondary },
-          ...(c.investimento > 0 ? [{ label: 'Invest.', val: fmtBrl(c.investimento), color: t.textSecondary }] : []),
-        ].map((s, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 10, color: t.textMuted }}>{s.label}</span>
-            <span style={{ fontSize: 13, fontWeight: 500, color: s.color }}>{s.val}</span>
+
+      {/* Métricas inferiores */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        gap: '10px 12px',
+        marginTop: 10, paddingTop: 10,
+        borderTop: `1px solid ${t.borderInner}`,
+      }}>
+        {/* Meta */}
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Meta</div>
+          <NumWithTooltip abbrev={metaAbrev} exact={metaExact} color={t.textSecondary} />
+        </div>
+
+        {/* Entregue */}
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Entregue</div>
+          <NumWithTooltip
+            abbrev={entAbrev} exact={entExact}
+            color={c.entregue === 0 && c.status === 'ativa' ? t.textMuted : t.textSecondary}
+          />
+        </div>
+
+        {/* Progresso */}
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Progresso</div>
+          <span style={{
+            fontSize: 13, fontWeight: 600,
+            color: c.bateu ? '#16a34a' : (c.pct < 60 && c.meta > 0) ? '#dc2626' : t.textSecondary,
+          }}>
+            {c.meta > 0 ? `${c.pct.toFixed(1).replace('.', ',')}%` : '—'}
+          </span>
+        </div>
+
+        {/* Dias restantes */}
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Dias rest.</div>
+          <span style={{
+            fontSize: 13, fontWeight: 600,
+            color: c.diasRestantes <= 3 && c.status === 'ativa' ? '#dc2626' : t.textSecondary,
+          }}>
+            {c.status !== 'ativa' ? '—' : String(c.diasRestantes)}
+          </span>
+        </div>
+
+        {/* Investimento (condicional) */}
+        {c.investimento > 0 && (
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Investido</div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: t.textSecondary }}>
+              {fmtBrl(c.investimento)}
+            </span>
           </div>
-        ))}
+        )}
       </div>
     </div>
   )
