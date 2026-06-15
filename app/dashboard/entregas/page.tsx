@@ -139,21 +139,91 @@ function ProgressBar({ pct, bateu, status, track }: { pct: number; bateu: boolea
   )
 }
 
-function TempoBar({ diasPercorridos, totalDias, status, track, labelColor }: {
-  diasPercorridos: number; totalDias: number; status: string; track: string; labelColor: string
-}) {
-  if (status === 'futura') return null
-  const pct = Math.min(100, Math.round((diasPercorridos / totalDias) * 100))
-  const color = status === 'encerrada' ? '#6b7280' : '#facc15'
+function BarsWithTooltip({ c, t }: { c: Campanha; t: typeof C['dark'] }) {
+  const [tip, setTip] = useState<{ x: number; y: number } | null>(null)
+
+  const hoje = new Date()
+  const dateLabel = hoje.toLocaleDateString('pt-BR', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  })
+
+  const entregaColor = c.bateu ? '#22c55e' : c.status === 'encerrada' ? '#9ca3af' : c.pct < 60 ? '#f87171' : c.pct < 80 ? '#facc15' : '#60a5fa'
+  const tempoColor = c.status === 'encerrada' ? '#6b7280' : '#facc15'
+  const tempoPct = c.status === 'futura' ? 0 : Math.min(100, Math.round((c.diasPercorridos / c.totalDias) * 100))
+
   return (
-    <div style={{ marginTop: 6 }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: labelColor, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>Dias Percorridos</div>
-      <div style={{ background: track, borderRadius: 3, height: 3 }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.6s ease' }} />
+    <div
+      onMouseMove={e => {
+        const offX = e.clientX > window.innerWidth - 230 ? -214 : 14
+        setTip({ x: e.clientX + offX, y: e.clientY })
+      }}
+      onMouseLeave={() => setTip(null)}
+    >
+      {/* Barra de entrega */}
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>Entrega</div>
+        <ProgressBar pct={c.pct} bateu={c.bateu} status={c.status} track={t.barTrack} />
       </div>
-      <div style={{ fontSize: 9, color: '#6b7280', marginTop: 3, textAlign: 'right' }}>
-        {pct}% do período · {diasPercorridos}/{totalDias} dias
-      </div>
+
+      {/* Barra de dias percorridos */}
+      {c.status !== 'futura' && (
+        <div style={{ marginTop: 6 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>Dias Percorridos</div>
+          <div style={{ background: t.barTrack, borderRadius: 3, height: 3 }}>
+            <div style={{ width: `${tempoPct}%`, height: '100%', background: tempoColor, borderRadius: 3, transition: 'width 0.6s ease' }} />
+          </div>
+          <div style={{ fontSize: 9, color: '#6b7280', marginTop: 3, textAlign: 'right' }}>
+            {tempoPct}% do período · {c.diasPercorridos}/{c.totalDias} dias
+          </div>
+        </div>
+      )}
+
+      {/* Tooltip flutuante estilo Google Ads */}
+      {tip && (
+        <div style={{
+          position: 'fixed',
+          left: tip.x,
+          top: tip.y,
+          transform: 'translateY(-50%)',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          background: '#fff',
+          border: '1px solid #dadce0',
+          borderRadius: 8,
+          boxShadow: '0 4px 18px rgba(0,0,0,0.14)',
+          padding: '10px 14px',
+          minWidth: 196,
+          fontFamily: 'inherit',
+        }}>
+          {/* Título: data atual */}
+          <div style={{ fontSize: 11, color: '#777', marginBottom: 7, fontWeight: 500, whiteSpace: 'nowrap' }}>
+            {dateLabel}
+          </div>
+          <div style={{ height: 1, background: '#eee', marginBottom: 7 }} />
+
+          {/* Linha: Entrega */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: c.status !== 'futura' ? 5 : 0 }}>
+            <div style={{ width: 12, height: 3, borderRadius: 2, background: entregaColor, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: '#555', flex: 1, whiteSpace: 'nowrap' }}>
+              {c.metrica || 'Entrega'}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#111', marginLeft: 16, whiteSpace: 'nowrap' }}>
+              {fmtExact(c.entregue)}
+            </span>
+          </div>
+
+          {/* Linha: Dias percorridos */}
+          {c.status !== 'futura' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 12, height: 3, borderRadius: 2, background: tempoColor, flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: '#555', flex: 1, whiteSpace: 'nowrap' }}>Dias percorridos</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#111', marginLeft: 16, whiteSpace: 'nowrap' }}>
+                {c.diasPercorridos} de {c.totalDias}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -259,12 +329,8 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
         </div>
       )}
 
-      {/* Barras de progresso: entrega + tempo */}
-      <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>Entrega</div>
-        <ProgressBar pct={c.pct} bateu={c.bateu} status={c.status} track={t.barTrack} />
-      </div>
-      <TempoBar diasPercorridos={c.diasPercorridos} totalDias={c.totalDias} status={c.status} track={t.barTrack} labelColor={t.textMuted} />
+      {/* Barras de progresso: entrega + tempo com tooltip */}
+      <BarsWithTooltip c={c} t={t} />
 
       {/* Métricas inferiores */}
       <div style={{
