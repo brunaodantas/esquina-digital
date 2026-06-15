@@ -151,7 +151,7 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
     const row = rows[i]
     if (!row || !row.length) continue
 
-    const nome = iCampanha >= 0 ? (row[iCampanha] ?? '').trim() : ''
+    const nome = (iCampanha >= 0 ? (row[iCampanha] ?? '') : '').trim().replace(/_+$/, '').trim()
     if (!nome) continue
 
     const inicio = iInicio >= 0 ? parseDate(row[iInicio]) : null
@@ -173,7 +173,7 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
       const falta = parseNum(row[iQuantoFalta])
       if (falta > 0) entregue = Math.max(0, meta - falta)
     }
-    const investimento = iInvestimento >= 0 ? parseNum(row[iInvestimento]) : 0
+    const investimento = iInvestimento >= 0 ? Math.max(0, parseNum(row[iInvestimento])) : 0
 
     // Ocultar campanhas sem nenhum dado relevante (meta zerada E sem entrega E sem investimento)
     if (meta === 0 && entregue === 0 && investimento === 0) continue
