@@ -12,16 +12,16 @@ type Theme = 'dark' | 'light'
 
 const T = {
   dark: {
-    page: '#111111', header: '#1a1a1a', border: '#2a2a2a',
-    text: '#ccc', navInactive: '#666', navActiveBg: '#1A3CFF22',
-    navActiveBorder: '#1A3CFF55', navActiveText: '#fff',
-    logoutBorder: '#2a2a2a', logoutText: '#888',
-    spinnerTrack: '#2a2a2a', themeBtn: '#2a2a2a', themeBtnText: '#888',
+    page: '#111111', header: '#1a1a1a', border: '#333',
+    text: '#ccc', navInactive: '#aaa', navInactiveBg: '#2a2a2a', navInactiveBorder: '#333',
+    navActiveBg: '#1A3CFF', navActiveBorder: '#1A3CFF', navActiveText: '#fff',
+    logoutBorder: '#333', logoutText: '#888',
+    spinnerTrack: '#2a2a2a', themeBtn: '#2a2a2a', themeBtnText: '#aaa',
   },
   light: {
-    page: '#f0f2f5', header: '#ffffff', border: '#e8e8e8',
-    text: '#555', navInactive: '#888', navActiveBg: '#1A3CFF15',
-    navActiveBorder: '#1A3CFF55', navActiveText: '#1A3CFF',
+    page: '#f0f2f5', header: '#ffffff', border: '#e0e0e0',
+    text: '#555', navInactive: '#555', navInactiveBg: '#f0f0f0', navInactiveBorder: '#e0e0e0',
+    navActiveBg: '#1A3CFF', navActiveBorder: '#1A3CFF', navActiveText: '#fff',
     logoutBorder: '#e0e0e0', logoutText: '#888',
     spinnerTrack: '#e0e0e0', themeBtn: '#f0f0f0', themeBtnText: '#555',
   },
@@ -85,11 +85,11 @@ export default function Dashboard() {
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
-                background: activeTab === tab ? c.navActiveBg : 'transparent',
-                border: `1px solid ${activeTab === tab ? c.navActiveBorder : 'transparent'}`,
+                background: activeTab === tab ? c.navActiveBg : c.navInactiveBg,
+                border: `1px solid ${activeTab === tab ? c.navActiveBorder : c.navInactiveBorder}`,
                 color: activeTab === tab ? c.navActiveText : c.navInactive,
-                padding: '5px 14px', borderRadius: 6,
-                cursor: 'pointer', fontSize: 13, fontWeight: 500, transition: 'all 0.15s',
+                padding: '6px 16px', borderRadius: 6,
+                cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
               }}
             >
               {tab === 'meta' ? 'Meta Ads' : 'Entregas'}
