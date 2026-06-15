@@ -43,6 +43,8 @@ interface Campanha {
   diasRestantes: number
   investimento: number
   status: 'ativa' | 'encerrada' | 'futura'
+  inicioStr: string
+  terminoStr: string
 }
 
 interface ClienteData {
@@ -93,7 +95,7 @@ async function fetchSheetList(): Promise<string[]> {
 
 async function fetchAba(nome: string): Promise<string[][]> {
   const encoded = encodeURIComponent(nome)
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encoded}!A:Q?key=${API_KEY}`
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encoded}!A:Z?key=${API_KEY}`
   const res = await fetch(url, { next: { revalidate: 1800 } })
   if (!res.ok) return []
   const json = await res.json()
@@ -174,6 +176,8 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
       canal: iCanal >= 0 ? (row[iCanal] ?? '').trim() : '',
       metrica: iMetrica >= 0 ? (row[iMetrica] ?? '').trim() : '',
       meta, entregue, pct, bateu, diasRestantes, investimento, status,
+      inicioStr: iInicio >= 0 ? (row[iInicio] ?? '').trim() : '',
+      terminoStr: iTermino >= 0 ? (row[iTermino] ?? '').trim() : '',
     })
   }
 
@@ -208,8 +212,8 @@ export async function GET(req: NextRequest) {
     grupo: (GRUPO_MAP[nome] ?? 'agencia') as 'agencia' | 'govba' | 'politica',
   }))
 
-  // Lista completa de clientes para o dropdown (independe do período)
-  const sheets = [...new Set(abas.map(a => a.cliente))].sort()
+  // sheets é calculado DEPOIS de montar clienteMap — só clientes com dados reais aparecem
+  // (abas vazias como "Página 4" somem naturalmente)
 
   // Carrega campanhas de todas as abas em paralelo
   const clienteMap = new Map<string, ClienteData>()
@@ -236,6 +240,9 @@ export async function GET(req: NextRequest) {
       c.campanhas.some(x => !x.bateu && x.pct < 80 && x.diasRestantes <= 7 && x.status === 'ativa') ? 0 : 1
     return risco(a) - risco(b)
   })
+
+  // Apenas clientes com campanhas reais no período (abas vazias excluídas automaticamente)
+  const sheets = data.map(d => d.cliente).sort()
 
   return NextResponse.json({ sheets, data })
 }

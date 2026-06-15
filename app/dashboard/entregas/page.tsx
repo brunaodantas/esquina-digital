@@ -16,6 +16,8 @@ interface Campanha {
   diasRestantes: number
   investimento: number
   status: 'ativa' | 'encerrada' | 'futura'
+  inicioStr: string
+  terminoStr: string
 }
 
 interface ClienteData {
@@ -131,14 +133,22 @@ function ProgressBar({ pct, bateu, status, track }: { pct: number; bateu: boolea
   )
 }
 
+function normData(s: string) {
+  return s ? s.replace(/\./g, '/') : ''
+}
+
 function CampanhaCard({ c, t }: { c: Campanha; t: typeof C['dark'] }) {
   const badge = statusBadge(c)
+  const periodo = c.inicioStr && c.terminoStr
+    ? `${normData(c.inicioStr)} → ${normData(c.terminoStr)}`
+    : ''
+  const detalhe = [c.canal, c.metrica, periodo].filter(Boolean).join(' · ')
   return (
     <div style={{ background: t.cardInner, border: `1px solid ${t.borderInner}`, borderRadius: 8, padding: 12, marginBottom: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 500, color: t.textSecondary }}>{c.nome}</div>
-          <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{[c.canal, c.metrica].filter(Boolean).join(' · ')}</div>
+          {detalhe && <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>{detalhe}</div>}
         </div>
         <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0, color: badge.color, background: badge.bg }}>
           {badge.label}
@@ -163,22 +173,33 @@ function CampanhaCard({ c, t }: { c: Campanha; t: typeof C['dark'] }) {
   )
 }
 
+const STATUS_ORDER: Record<string, number> = { ativa: 0, futura: 1, encerrada: 2 }
+
 function ClienteBlock({ data, t }: { data: ClienteData; t: typeof C['dark'] }) {
   const [open, setOpen] = useState(true)
-  const emRisco = data.campanhas.some(c => !c.bateu && c.pct < 80 && c.diasRestantes <= 7 && c.status === 'ativa')
+
+  // Mostra só campanhas ativas e futuras, ordenadas: ativas primeiro
+  const visiveis = data.campanhas
+    .filter(c => c.status !== 'encerrada')
+    .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
+
+  if (visiveis.length === 0) return null
+
+  const emRisco = visiveis.some(c => !c.bateu && c.pct < 80 && c.diasRestantes <= 7 && c.status === 'ativa')
+
   return (
     <div style={{ border: `1px solid ${emRisco ? '#fca5a5' : t.border}`, borderRadius: 10, overflow: 'hidden', background: t.card }}>
       <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {emRisco && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f87171', flexShrink: 0, display: 'inline-block' }} />}
           <span style={{ fontSize: 14, fontWeight: 600, color: t.textPrimary }}>{data.cliente}</span>
-          <span style={{ fontSize: 11, color: t.textMuted, marginLeft: 4 }}>{data.campanhas.length} campanha{data.campanhas.length !== 1 ? 's' : ''}</span>
+          <span style={{ fontSize: 11, color: t.textMuted, marginLeft: 4 }}>{visiveis.length} campanha{visiveis.length !== 1 ? 's' : ''}</span>
         </div>
         <span style={{ color: t.chevron, fontSize: 12 }}>{open ? '▲' : '▼'}</span>
       </button>
       {open && (
         <div style={{ padding: '0 16px 16px' }}>
-          {data.campanhas.map((c, i) => <CampanhaCard key={i} c={c} t={t} />)}
+          {visiveis.map((c, i) => <CampanhaCard key={i} c={c} t={t} />)}
         </div>
       )}
     </div>
@@ -391,8 +412,9 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
   // Dados filtrados pelo cliente selecionado
   const filtrado = (data ?? []).filter(d => !filtroCliente || d.cliente === filtroCliente)
 
+  // Alertas de risco: só campanhas ativas (encerradas excluídas)
   const emRisco = filtrado
-    .flatMap(d => d.campanhas.filter(c => !c.bateu && c.pct < 80 && c.diasRestantes <= 7 && c.status === 'ativa'))
+    .flatMap(d => d.campanhas.filter(c => c.status === 'ativa' && !c.bateu && c.pct < 80 && c.diasRestantes <= 7))
     .map(c => c.nome)
 
   return (
