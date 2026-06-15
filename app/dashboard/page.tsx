@@ -10,23 +10,6 @@ import EntregasPage from './entregas/page'
 type Tab = 'meta' | 'entregas'
 type Theme = 'dark' | 'light'
 
-const T = {
-  dark: {
-    page: '#111111', header: '#1a1a1a', border: '#333',
-    text: '#ccc', navInactive: '#aaa', navInactiveBg: '#2a2a2a', navInactiveBorder: '#333',
-    navActiveBg: '#1A3CFF', navActiveBorder: '#1A3CFF', navActiveText: '#fff',
-    logoutBorder: '#333', logoutText: '#888',
-    spinnerTrack: '#2a2a2a', themeBtn: '#2a2a2a', themeBtnText: '#aaa',
-  },
-  light: {
-    page: '#f0f2f5', header: '#ffffff', border: '#e0e0e0',
-    text: '#555', navInactive: '#555', navInactiveBg: '#f0f0f0', navInactiveBorder: '#e0e0e0',
-    navActiveBg: '#1A3CFF', navActiveBorder: '#1A3CFF', navActiveText: '#fff',
-    logoutBorder: '#e0e0e0', logoutText: '#888',
-    spinnerTrack: '#e0e0e0', themeBtn: '#f0f0f0', themeBtnText: '#555',
-  },
-}
-
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -65,69 +48,101 @@ export default function Dashboard() {
     router.push('/')
   }
 
-  const c = T[theme]
   const initials = user?.displayName?.split(' ').map(n => n[0]).slice(0, 2).join('') ?? 'U'
+
+  const btnBase: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', border: '1px solid #3a3a3a', transition: 'all 0.15s',
+  }
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: c.page }}>
-        <div style={{ width: 32, height: 32, border: `3px solid ${c.spinnerTrack}`, borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#111' }}>
+        <div style={{ width: 32, height: 32, border: '3px solid #2a2a2a', borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: c.page }}>
-      <header style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 24px', borderBottom: `1px solid ${c.border}`, background: c.header, flexShrink: 0 }}>
-        <nav style={{ display: 'flex', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#111', position: 'relative' }}>
+
+      {/* Barra de navegação fixa no topo */}
+      <div style={{
+        position: 'absolute', top: 12, left: 16, right: 16, zIndex: 9999,
+        display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'none',
+      }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto' }}>
           {(['meta', 'entregas'] as Tab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
-                background: activeTab === tab ? c.navActiveBg : c.navInactiveBg,
-                border: `1px solid ${activeTab === tab ? c.navActiveBorder : c.navInactiveBorder}`,
-                color: activeTab === tab ? c.navActiveText : c.navInactive,
-                padding: '6px 16px', borderRadius: 6,
-                cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
+                ...btnBase,
+                background: activeTab === tab ? '#1A3CFF' : '#1e1e1e',
+                border: `1px solid ${activeTab === tab ? '#1A3CFF' : '#3a3a3a'}`,
+                color: activeTab === tab ? '#fff' : '#bbb',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
               }}
             >
-              {tab === 'meta' ? 'Meta Ads' : 'Entregas'}
+              {tab === 'meta' ? '📊 Meta Ads' : '📦 Entregas'}
             </button>
           ))}
-        </nav>
+        </div>
 
         <div style={{ flex: 1 }} />
 
-        <button
-          onClick={toggleTheme}
-          title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
-          style={{
-            background: c.themeBtn, border: `1px solid ${c.border}`,
-            color: c.themeBtnText, width: 30, height: 30, borderRadius: 6,
-            cursor: 'pointer', fontSize: 15, display: 'flex',
-            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}
-        >
-          {theme === 'dark' ? '☀' : '☽'}
-        </button>
+        {/* Controles do lado direito */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, pointerEvents: 'auto' }}>
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+            style={{
+              ...btnBase,
+              background: '#1e1e1e',
+              color: '#bbb',
+              padding: '7px 10px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+            }}
+          >
+            {theme === 'dark' ? '☀' : '☽'}
+          </button>
 
-        <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#1A3CFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#fff' }}>
-          {initials}
+          <div style={{
+            ...btnBase,
+            background: '#1e1e1e',
+            color: '#bbb',
+            gap: 8,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+          }}>
+            <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#1A3CFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+              {initials}
+            </div>
+            <span style={{ fontSize: 12 }}>{user?.displayName?.split(' ')[0]}</span>
+            <button
+              onClick={handleLogout}
+              style={{ background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', fontSize: 12, padding: 0 }}
+            >
+              sair
+            </button>
+          </div>
         </div>
-        <span style={{ fontSize: 13, color: c.text }}>{user?.displayName?.split(' ')[0]}</span>
-        <button onClick={handleLogout} style={{ background: 'transparent', border: `1px solid ${c.logoutBorder}`, color: c.logoutText, padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
-          Sair
-        </button>
-      </header>
-
-      <div style={{ flex: 1, flexDirection: 'column', overflow: 'hidden', display: activeTab === 'meta' ? 'flex' : 'none' }}>
-        <iframe src="https://dashboard-meta-esquina-ebon.vercel.app/" style={{ flex: 1, border: 'none', width: '100%', height: '100%' }} title="Dashboard Meta Esquina" />
       </div>
 
-      <div style={{ flex: 1, flexDirection: 'column', overflow: 'hidden', display: activeTab === 'entregas' ? 'flex' : 'none' }}>
+      {/* Conteúdo */}
+      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'meta' ? 'block' : 'none', position: 'relative' }}>
+        <iframe
+          src="https://dashboard-meta-esquina-ebon.vercel.app/"
+          style={{ width: '100%', height: '100%', border: 'none' }}
+          title="Dashboard Meta Esquina"
+        />
+      </div>
+
+      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'entregas' ? 'flex' : 'none', flexDirection: 'column' }}>
         <EntregasPage theme={theme} />
       </div>
+
     </div>
   )
 }
