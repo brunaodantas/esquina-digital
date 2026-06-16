@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const ADS_VERSION = 'v19'
+const ADS_VERSION = 'v24'
 const BASE = `https://googleads.googleapis.com/${ADS_VERSION}`
 
 const DEV_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN ?? ''
