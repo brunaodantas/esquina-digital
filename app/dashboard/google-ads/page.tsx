@@ -82,8 +82,38 @@ function fmtNum(n: number) {
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace('.', ',') + 'k'
   return n.toLocaleString('pt-BR')
 }
+function fmtNumFull(n: number) { return n.toLocaleString('pt-BR') }
 function fmtBRL(n: number) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtPct(n: number) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
+
+function CopiavelNum({ compact, full = compact }: { compact: string; full?: string }) {
+  const [tip, setTip] = useState<'hover' | 'copied' | null>(null)
+  return (
+    <span
+      style={{ position: 'relative', cursor: 'copy', userSelect: 'none' }}
+      onMouseEnter={() => setTip('hover')}
+      onMouseLeave={() => setTip(null)}
+      onClick={() => {
+        navigator.clipboard.writeText(full)
+        setTip('copied')
+        setTimeout(() => setTip(null), 1200)
+      }}
+    >
+      {compact}
+      {tip && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', right: '50%',
+          transform: 'translateX(50%)', background: '#0f172a',
+          border: '1px solid #334155', borderRadius: 5, padding: '3px 8px',
+          fontSize: 11, whiteSpace: 'nowrap', zIndex: 200, pointerEvents: 'none',
+          color: tip === 'copied' ? '#4ade80' : '#e2e8f0', fontWeight: 400, lineHeight: '1.5',
+        }}>
+          {tip === 'copied' ? '✓ Copiado!' : full}
+        </span>
+      )}
+    </span>
+  )
+}
 function fmtDateLabel(iso: string) { const [, m, d] = iso.split('-'); return `${d}/${m}` }
 
 // ─── Period Dropdown ──────────────────────────────────────────────────────────
@@ -403,13 +433,13 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
 
   const metricCols = (item: { custo: number; cliques: number; impressoes: number; ctr: number; cpcMedio: number; conversoes: number; custoConversao: number }, share: number) => (
     <>
-      <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}>{fmtBRL(item.custo)}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{fmtNum(item.cliques)}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{fmtNum(item.impressoes)}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{fmtPct(item.ctr)}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpcMedio > 0 ? fmtBRL(item.cpcMedio) : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right', color: item.conversoes > 0 ? '#4ade80' : t.textMuted }}>{item.conversoes > 0 ? fmtNum(item.conversoes) : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.custoConversao > 0 ? fmtBRL(item.custoConversao) : '—'}</td>
+      <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.custo)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.cliques)} full={fmtNumFull(item.cliques)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressoes)} full={fmtNumFull(item.impressoes)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpcMedio > 0 ? <CopiavelNum compact={fmtBRL(item.cpcMedio)} /> : '—'}</td>
+      <td style={{ ...tdS, textAlign: 'right', color: item.conversoes > 0 ? '#4ade80' : t.textMuted }}>{item.conversoes > 0 ? <CopiavelNum compact={fmtNum(item.conversoes)} full={fmtNumFull(item.conversoes)} /> : '—'}</td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.custoConversao > 0 ? <CopiavelNum compact={fmtBRL(item.custoConversao)} /> : '—'}</td>
     </>
   )
 

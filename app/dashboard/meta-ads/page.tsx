@@ -106,8 +106,38 @@ function fmtNum(n: number) {
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace('.', ',') + 'k'
   return n.toLocaleString('pt-BR')
 }
+function fmtNumFull(n: number) { return n.toLocaleString('pt-BR') }
 function fmtBRL(n: number) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtPct(n: number) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
+
+function CopiavelNum({ compact, full = compact }: { compact: string; full?: string }) {
+  const [tip, setTip] = useState<'hover' | 'copied' | null>(null)
+  return (
+    <span
+      style={{ position: 'relative', cursor: 'copy', userSelect: 'none' }}
+      onMouseEnter={() => setTip('hover')}
+      onMouseLeave={() => setTip(null)}
+      onClick={() => {
+        navigator.clipboard.writeText(full)
+        setTip('copied')
+        setTimeout(() => setTip(null), 1200)
+      }}
+    >
+      {compact}
+      {tip && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', right: '50%',
+          transform: 'translateX(50%)', background: '#0f172a',
+          border: '1px solid #334155', borderRadius: 5, padding: '3px 8px',
+          fontSize: 11, whiteSpace: 'nowrap', zIndex: 200, pointerEvents: 'none',
+          color: tip === 'copied' ? '#4ade80' : '#e2e8f0', fontWeight: 400, lineHeight: '1.5',
+        }}>
+          {tip === 'copied' ? '✓ Copiado!' : full}
+        </span>
+      )}
+    </span>
+  )
+}
 
 // ─── Period Dropdown ───────────────────────────────────────────────────────────
 function PeriodoDropdown({ preset, custom, t, onApply }: {
@@ -505,15 +535,15 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                       </div>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
-                    <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}>{fmtBRL(c.spend)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtNum(c.impressions)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? fmtNum(c.reach) : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtNum(c.clicks)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtPct(c.ctr)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtBRL(c.cpm)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? fmtBRL(c.cpc) : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? fmtNum(c.thruplays) : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? <CopiavelNum compact={fmtNum(c.reach)} full={fmtNumFull(c.reach)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.clicks)} full={fmtNumFull(c.clicks)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? <CopiavelNum compact={fmtNum(c.thruplays)} full={fmtNumFull(c.thruplays)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? <CopiavelNum compact={c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /> : '—'}</td>
                   </tr>
                 )
               })}
@@ -555,15 +585,15 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{c.campanha}</td>
-                    <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}>{fmtBRL(c.spend)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtNum(c.impressions)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? fmtNum(c.reach) : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtNum(c.clicks)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtPct(c.ctr)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtBRL(c.cpm)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? fmtBRL(c.cpc) : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? fmtNum(c.thruplays) : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? <CopiavelNum compact={fmtNum(c.reach)} full={fmtNumFull(c.reach)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.clicks)} full={fmtNumFull(c.clicks)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? <CopiavelNum compact={fmtNum(c.thruplays)} full={fmtNumFull(c.thruplays)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? <CopiavelNum compact={c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /> : '—'}</td>
                   </tr>
                 )
               })}
@@ -602,12 +632,12 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{c.adset}</td>
-                    <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}>{fmtBRL(c.spend)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtNum(c.impressions)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtNum(c.clicks)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtPct(c.ctr)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{fmtBRL(c.cpm)}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? fmtBRL(c.cpc) : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.clicks)} full={fmtNumFull(c.clicks)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
                   </tr>
                 )
               })}
