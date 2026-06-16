@@ -431,13 +431,15 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     </span>
   )
 
-  const metricCols = (item: { custo: number; cliques: number; impressoes: number; ctr: number; cpcMedio: number; conversoes: number; custoConversao: number }, share: number) => (
+  const metricCols = (item: { custo: number; cliques: number; impressoes: number; ctr: number; cpcMedio: number; cpm: number; cpv: number; conversoes: number; custoConversao: number }, share: number) => (
     <>
       <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.custo)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.cliques)} full={fmtNumFull(item.cliques)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressoes)} full={fmtNumFull(item.impressoes)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}>{item.cpcMedio > 0 ? <CopiavelNum compact={fmtBRL(item.cpcMedio)} /> : '—'}</td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpm > 0 ? <CopiavelNum compact={fmtBRL(item.cpm)} /> : '—'}</td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpv > 0 ? <CopiavelNum compact={fmtBRL(item.cpv)} /> : '—'}</td>
       <td style={{ ...tdS, textAlign: 'right', color: item.conversoes > 0 ? '#4ade80' : t.textMuted }}>{item.conversoes > 0 ? <CopiavelNum compact={fmtNum(item.conversoes)} full={fmtNumFull(item.conversoes)} /> : '—'}</td>
       <td style={{ ...tdS, textAlign: 'right' }}>{item.custoConversao > 0 ? <CopiavelNum compact={fmtBRL(item.custoConversao)} /> : '—'}</td>
     </>
@@ -450,6 +452,8 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
       <th style={{ ...thS, textAlign: 'right' }}>IMPRESSÕES</th>
       <th style={{ ...thS, textAlign: 'right' }}>CTR</th>
       <th style={{ ...thS, textAlign: 'right' }}>CPC MÉD.</th>
+      <th style={{ ...thS, textAlign: 'right' }}>CPM</th>
+      <th style={{ ...thS, textAlign: 'right' }}>CPV</th>
       <th style={{ ...thS, textAlign: 'right' }}>CONV.</th>
       <th style={{ ...thS, textAlign: 'right' }}>CUSTO/CONV.</th>
     </>
@@ -515,7 +519,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               <tr><th style={{ ...thS, minWidth: 220 }}>CAMPANHA</th>{metricHeaders}</tr>
             </thead>
             <tbody>
-              {filtCamp.length === 0 ? emptyRow(8) : filtCamp.map(c => {
+              {filtCamp.length === 0 ? emptyRow(10) : filtCamp.map(c => {
                 const share = totalCusto > 0 ? (c.custo / totalCusto) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
@@ -545,7 +549,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               </tr>
             </thead>
             <tbody>
-              {filtGrupos.length === 0 ? emptyRow(9) : filtGrupos.map(g => (
+              {filtGrupos.length === 0 ? emptyRow(11) : filtGrupos.map(g => (
                 <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
                     <div style={{ fontWeight: 600, color: t.textPrimary }}>{g.nome}</div>
@@ -570,7 +574,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               </tr>
             </thead>
             <tbody>
-              {filtAnuncios.length === 0 ? emptyRow(10) : filtAnuncios.map(a => (
+              {filtAnuncios.length === 0 ? emptyRow(12) : filtAnuncios.map(a => (
                 <tr key={a.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
                     <div style={{ fontWeight: 600, color: t.textPrimary }}>{a.nome}</div>
@@ -679,6 +683,7 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
         date, custo: d.custo, cliques: d.cliques, impressoes: d.impressoes,
         ctr: d.impressoes > 0 ? (d.cliques / d.impressoes) * 100 : 0,
         cpcMedio: d.cliques > 0 ? d.custo / d.cliques : 0,
+        cpm: d.impressoes > 0 ? (d.custo / d.impressoes) * 1000 : 0,
       }))
   })()
 
