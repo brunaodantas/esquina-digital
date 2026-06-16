@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
   })
 
   const campaignParams = new URLSearchParams({
-    fields: `campaign_id,campaign_name,effective_status,${COMMON_METRICS}`,
+    fields: `campaign_id,campaign_name,${COMMON_METRICS}`,
     level: 'campaign',
     time_range: timeRange,
     access_token: TOKEN,
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
   })
 
   const adsetParams = new URLSearchParams({
-    fields: `adset_id,adset_name,campaign_name,effective_status,${COMMON_METRICS}`,
+    fields: `adset_id,adset_name,campaign_name,${COMMON_METRICS}`,
     level: 'adset',
     time_range: timeRange,
     access_token: TOKEN,
@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
   })
 
   const adParams = new URLSearchParams({
-    fields: 'ad_id,ad_name,adset_name,campaign_name,effective_status,spend,impressions,clicks,ctr,cpm,cpc',
+    fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,cpm,cpc',
     level: 'ad',
     time_range: timeRange,
     access_token: TOKEN,
@@ -196,6 +196,9 @@ export async function GET(req: NextRequest) {
             console.warn(`Meta [${acc.nome}] account: ${accData.error.message}`)
             return null
           }
+          if (campData.error) console.warn(`Meta [${acc.nome}] campaigns: ${campData.error.message}`)
+          if (adsetData.error) console.warn(`Meta [${acc.nome}] adsets: ${adsetData.error.message}`)
+          if (adData.error) console.warn(`Meta [${acc.nome}] ads: ${adData.error.message}`)
 
           const row = accData.data?.[0]
           if (!row || !parseFloat(row.spend || '0')) return null
