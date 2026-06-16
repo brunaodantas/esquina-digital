@@ -252,6 +252,13 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 
   const safeChartJs = chartJsText.replace(/<\/script>/g, '<\\/script>')
 
+  // Only render sections with actual data
+  const showDisplay = secoes.display && dispImpr > 0
+  const showYoutube = secoes.youtube && ytImpr > 0
+  const showTD = secoes.metaTD && finalTDImpr > 0
+  const showVP = secoes.metaVP && hasVPData && vpImpr > 0
+  const showTiktok = secoes.tiktok && tiktokImpressoes > 0
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -262,22 +269,20 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .slide-inner{max-width:960px;margin:0 auto;padding:32px 40px}
-section{background:#fff;min-height:90vh;display:flex;flex-direction:column;justify-content:flex-start}
+section{background:#fff;min-height:88vh;display:flex;flex-direction:column;justify-content:flex-start}
 /* Hero */
 #hero{background:linear-gradient(135deg,#0a0a2e 0%,#1A3CFF 100%);color:#fff}
-#hero .slide-inner{padding:40px 48px}
-.hero-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
-.hero-logo{height:36px;filter:brightness(0) invert(1)}
-.hero-meta{text-align:right}
-.hero-badge{display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.9);margin-bottom:6px}
-.hero-period{font-size:12px;color:rgba(255,255,255,0.7)}
-.hero-title{font-size:2.2rem;font-weight:800;margin-bottom:6px}
-.hero-sub{font-size:1rem;color:rgba(255,255,255,0.7);margin-bottom:36px}
+#hero .slide-inner{padding:44px 48px}
+.hero-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:28px}
+.hero-badge{display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.9);margin-right:12px}
+.hero-period{font-size:12px;color:rgba(255,255,255,0.6)}
+.hero-title{font-size:2.4rem;font-weight:800;margin-bottom:8px}
+.hero-sub{font-size:1rem;color:rgba(255,255,255,0.65);margin-bottom:36px}
 /* KPI grid */
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
 .kpi-card{background:#fff;border-radius:12px;padding:16px 18px;border:1px solid rgba(0,0,0,0.08)}
 #hero .kpi-card{background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.2)}
-.kpi-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;margin-bottom:8px}
+.kpi-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;margin-bottom:6px}
 #hero .kpi-label{color:rgba(255,255,255,0.6)}
 .kpi-value{font-size:1.8rem;font-weight:800;color:#111;line-height:1}
 #hero .kpi-value{color:#fff}
@@ -285,52 +290,60 @@ section{background:#fff;min-height:90vh;display:flex;flex-direction:column;justi
 #hero .kpi-sub{color:rgba(255,255,255,0.5)}
 /* Platform sections */
 .plat-section .slide-inner{padding:28px 40px}
-.plat-badge{display:inline-block;border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px}
-.sec-title{font-size:1.6rem;font-weight:800;margin-bottom:4px}
-.sec-sub{font-size:12px;color:#888;margin-bottom:14px}
+.plat-badge{display:inline-block;border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px}
+.sec-title{font-size:1.55rem;font-weight:800;margin-bottom:3px}
+.sec-sub{font-size:12px;color:#888;margin-bottom:12px}
 /* Chart */
-.chart-box{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:14px 16px;margin-top:14px}
-.chart-wrap{height:260px;position:relative}
-canvas{width:100%!important;height:100%!important}
+.chart-box{background:#fafafa;border:1px solid rgba(0,0,0,0.07);border-radius:10px;padding:12px 14px;margin-top:12px;overflow:hidden}
+.chart-wrap{height:220px;position:relative;overflow:hidden}
+canvas{width:100%!important;height:100%!important;display:block}
 /* Diagnóstico */
-#diag .slide-inner{padding:36px 40px}
-.diag-list{list-style:none;margin-top:16px}
-.diag-list li{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0;font-size:0.9rem;line-height:1.6}
+#diag .slide-inner{padding:32px 40px}
+.diag-list{list-style:none;margin-top:14px}
+.diag-list li{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #f0f0f0;font-size:0.9rem;line-height:1.55}
 .diag-list li::before{content:'✓';color:#00994D;font-weight:800;flex-shrink:0;min-width:14px;margin-top:1px}
 /* Conclusão */
-#concl .slide-inner{padding:36px 40px}
-.concl-list{list-style:none;margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#concl .slide-inner{padding:32px 40px}
+.concl-list{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .concl-item{background:#f8f8f8;border-radius:10px;padding:14px 16px;border-left:3px solid #1A3CFF;font-size:0.87rem;line-height:1.55;color:#333}
-/* Footer */
-#footer{background:#0a0a2e;min-height:0;flex-direction:row;align-items:center;justify-content:center;padding:32px 40px}
-#footer img{height:40px;filter:brightness(0) invert(1)}
-.footer-txt{color:rgba(255,255,255,0.6);font-size:12px;text-align:center;margin-top:10px}
+/* Footer — light, same page as conclusão */
+#footer{background:#fff;border-top:2px solid #1A3CFF;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 40px;margin-top:0}
+#footer img{height:32px;opacity:0.85}
+.footer-txt{color:#888;font-size:11px;text-align:center;margin-top:8px}
 
 /* ── Print ── */
 @media print{
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  @page{size:A4 landscape;margin:15mm}
+  @page{size:A4 landscape;margin:12mm}
   body{background:#fff}
-  section{page-break-after:always;break-after:page;min-height:0;background:#fff}
-  #footer{page-break-after:auto;break-after:auto}
+  section{page-break-after:always;break-after:page;min-height:0!important;background:#fff}
+  #concl{page-break-after:auto!important;break-after:auto!important}
+  #footer{page-break-after:auto!important;break-after:auto!important;border-top:2px solid #1A3CFF!important}
   #hero{background:linear-gradient(135deg,#0a0a2e 0%,#1A3CFF 100%)!important}
-  .slide-inner{padding:20px 28px!important}
-  #hero .slide-inner{padding:24px 32px!important}
-  .hero-title{font-size:1.6rem!important}
-  .kpi-grid{gap:10px!important;margin-top:10px!important}
-  .kpi-card{padding:10px 14px!important}
-  .kpi-value{font-size:1.4rem!important}
-  .kpi-sub{font-size:10px!important}
-  .plat-badge{margin-bottom:6px!important}
-  .sec-title{font-size:1.3rem!important;margin-bottom:2px!important}
-  .sec-sub{margin-bottom:8px!important}
-  .chart-box{padding:10px 14px!important;margin-top:8px!important}
-  .chart-wrap{height:180px!important;max-height:180px!important}
-  canvas{height:180px!important;max-height:180px!important}
-  .diag-list li{padding:8px 0!important;font-size:0.82rem!important}
-  .concl-list{gap:8px!important}
-  .concl-item{padding:10px 14px!important;font-size:0.8rem!important}
-  #footer{background:#0a0a2e!important;padding:24px 32px!important;justify-content:center!important;display:flex!important;flex-direction:column!important;align-items:center!important}
+  .slide-inner{padding:16px 24px!important}
+  #hero .slide-inner{padding:20px 28px!important}
+  .hero-top{margin-bottom:14px!important}
+  .hero-title{font-size:1.7rem!important;margin-bottom:4px!important}
+  .hero-sub{margin-bottom:16px!important}
+  .kpi-grid{gap:8px!important;margin-top:8px!important}
+  .kpi-card{padding:10px 12px!important}
+  .kpi-label{font-size:9px!important;margin-bottom:4px!important}
+  .kpi-value{font-size:1.35rem!important}
+  .kpi-sub{font-size:9px!important;margin-top:2px!important}
+  .plat-badge{margin-bottom:4px!important;padding:3px 10px!important}
+  .sec-title{font-size:1.25rem!important;margin-bottom:2px!important}
+  .sec-sub{margin-bottom:6px!important;font-size:11px!important}
+  .chart-box{padding:8px 10px!important;margin-top:6px!important}
+  .chart-wrap{height:170px!important;max-height:170px!important;overflow:hidden!important}
+  canvas{height:170px!important;max-height:170px!important}
+  .diag-list li{padding:7px 0!important;font-size:0.8rem!important}
+  #diag .slide-inner{padding:16px 24px!important}
+  #concl .slide-inner{padding:16px 24px!important}
+  .concl-list{gap:7px!important;margin-top:10px!important}
+  .concl-item{padding:10px 12px!important;font-size:0.78rem!important}
+  #footer{padding:16px 24px!important;background:#fff!important;border-top:2px solid #1A3CFF!important}
+  #footer img{height:28px!important}
+  .footer-txt{font-size:10px!important;margin-top:5px!important}
 }
 </style>
 </head>
@@ -340,57 +353,54 @@ canvas{width:100%!important;height:100%!important}
 <section id="hero">
   <div class="slide-inner">
     <div class="hero-top">
-      ${logoB64 ? `<img src="${logoB64}" alt="Esquina" class="hero-logo">` : '<div style="width:80px"></div>'}
-      <div class="hero-meta">
-        <div class="hero-badge">Boletim Semanal</div>
-        <div class="hero-period">${periodoLabel}</div>
-      </div>
+      <span class="hero-badge">Boletim Semanal</span>
+      <span class="hero-period">${periodoLabel}</span>
     </div>
     <h1 class="hero-title">${cliente}</h1>
     <p class="hero-sub">Campanha Temas Diversos · Resumo de Performance</p>
     <div class="kpi-grid">
       ${kpiCard('Impressões Totais', fmtK(totalImpr), 'Todas as plataformas')}
-      ${kpiCard(inscritosYT > 0 ? 'Novos Inscritos YouTube' : 'Visualizações YouTube', fmtK(inscritosYT > 0 ? inscritosYT : ytViews), 'No período')}
+      ${kpiCard(inscritosYT > 0 ? 'Novos Inscritos YouTube' : ytViews > 0 ? 'Visualizações YouTube' : 'YouTube', fmtK(inscritosYT > 0 ? inscritosYT : ytViews), 'No período')}
       ${kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram')}
-      ${kpiCard('Novos Seguidores', seguidoresSemana > 0 ? fmtK(seguidoresSemana) : '—', seguidoresMes > 0 ? `+${fmtK(seguidoresMes).replace('+','')} no mês` : 'Instagram')}
+      ${kpiCard('Novos Seguidores', seguidoresSemana > 0 ? fmtK(seguidoresSemana) : '—', seguidoresMes > 0 ? `+${fmtK(seguidoresMes).replace('+', '')} no mês` : 'Instagram')}
     </div>
   </div>
 </section>
 
-${secoes.display ? platformSection('display', '#1A3CFF', 'Google Display', 'Google Display', `Impressões, cliques e CTR · ${periodoLabel}`,
+${showDisplay ? platformSection('display', '#1A3CFF', 'Google Display', 'Google Display', `Impressões, cliques e CTR · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(dispImpr), 'Total no período') +
   kpiCard('Cliques', fmtK(dispCliques), 'Total no período') +
   kpiCard('CTR', fmtPct2(dispCtr), 'Taxa de clique') +
   kpiCard('Grupos Ativos', String(topDisp.length), 'Com entrega'),
   'ch-display', topDisp.length > 0) : ''}
 
-${secoes.youtube ? platformSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Impressões, visualizações e inscritos · ${periodoLabel}`,
+${showYoutube ? platformSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Impressões, visualizações e inscritos · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(ytImpr), 'Total no período') +
   kpiCard('Visualizações', fmtK(ytViews), 'Total no período') +
   kpiCard('Cliques', fmtK(ytCliques), 'Total no período') +
   kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
   'ch-youtube', topYT.length > 0) : ''}
 
-${secoes.metaTD ? platformSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
+${showTD ? platformSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(finalTDImpr), 'Total no período') +
   kpiCard('Alcance', fmtK(finalTDReach), 'Usuários únicos') +
   kpiCard('Engajamentos', fmtK(finalTDCliques), 'Cliques') +
   kpiCard('Frequência', finalTDFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x', 'Média por usuário'),
   'ch-meta-td', topTD.length > 0) : ''}
 
-${secoes.metaVP && hasVPData ? platformSection('meta-vp', '#C44A00', 'Meta — Visitas ao Perfil', 'Meta Visitas ao Perfil', `Impressões, alcance e visitas · ${periodoLabel}`,
+${showVP ? platformSection('meta-vp', '#C44A00', 'Meta — Visitas ao Perfil', 'Meta Visitas ao Perfil', `Impressões, alcance e visitas · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(vpImpr), 'Total no período') +
   kpiCard('Alcance', fmtK(vpReach), 'Usuários únicos') +
   kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram') +
   kpiCard('Frequência', vpFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x', 'Média por usuário'),
   'ch-meta-vp', topVP.length > 0) : ''}
 
-${secoes.tiktok && tiktokImpressoes > 0 ? platformSection('tiktok', '#00994D', 'TikTok', 'TikTok', `Impressões, cliques e CTR · ${periodoLabel}`,
+${showTiktok ? platformSection('tiktok', '#00994D', 'TikTok', 'TikTok', `Impressões, cliques e CTR · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(tiktokImpressoes), 'Total no período') +
   kpiCard('Cliques', fmtK(tiktokCliques), 'Destino') +
   kpiCard('CTR', fmtPct2(tiktokCtr), 'Taxa de clique') +
   kpiCard('Campanhas', '—', 'Ativas'),
-  'ch-tiktok', tiktokImpressoes > 0) : ''}
+  'ch-tiktok', true) : ''}
 
 ${secoes.diagnostico ? `
 <section id="diag">
@@ -414,12 +424,15 @@ ${secoes.conclusao ? `
       ${conclItems.map((item, i) => `<div class="concl-item"><strong>${i + 1}.</strong> ${item}</div>`).join('\n      ')}
     </div>
   </div>
-</section>` : ''}
-
-<section id="footer">
-  ${logoB64 ? `<img src="${logoB64}" alt="Esquina">` : ''}
-  <p class="footer-txt">Boletim Semanal · ${cliente} · ${periodoLabel}</p>
-</section>
+  <div id="footer">
+    ${logoB64 ? `<img src="${logoB64}" alt="Esquina">` : ''}
+    <p class="footer-txt">Boletim Semanal · ${cliente} · ${periodoLabel}</p>
+  </div>
+</section>` : `
+<div id="footer" style="background:#fff;border-top:2px solid #1A3CFF;display:flex;flex-direction:column;align-items:center;padding:20px 40px">
+  ${logoB64 ? `<img src="${logoB64}" alt="Esquina" style="height:28px;opacity:0.85">` : ''}
+  <p style="color:#888;font-size:11px;text-align:center;margin-top:8px">Boletim Semanal · ${cliente} · ${periodoLabel}</p>
+</div>`}
 
 <script>${safeChartJs}</script>
 <script>
@@ -434,9 +447,9 @@ window.addEventListener('beforeprint', function() {
     if (!chart) return;
     var wrapper = canvas.parentElement;
     var n = (chart.config.data && chart.config.data.labels) ? chart.config.data.labels.length : 0;
-    var h = chart.config.type === 'doughnut' ? 220 : n >= 5 ? 200 : n === 4 ? 175 : 160;
+    var h = chart.config.type === 'doughnut' ? 180 : n >= 5 ? 170 : n === 4 ? 155 : 145;
     wrapper.style.height = h + 'px';
-    var w = wrapper.clientWidth || 600;
+    var w = wrapper.clientWidth || 700;
     canvas.width = w; canvas.height = h;
     chart.resize(w, h); chart.draw();
   });
