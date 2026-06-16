@@ -344,12 +344,17 @@ function TrendChart({ serie, theme }: { serie: MetaDailyPoint[]; theme: Theme })
 }
 
 // ─── KPI Tile ─────────────────────────────────────────────────────────────────
-function KpiTile({ label, value, note, color, t }: { label: string; value: string; note?: string; color: string; t: typeof C['dark'] }) {
+function KpiTile({ label, value, note, color, t, delta }: { label: string; value: string; note?: string; color: string; t: typeof C['dark']; delta?: number | null }) {
   return (
     <div style={{ background: t.kpiBg, border: `1px solid ${t.kpiBorder}`, borderRadius: 10, padding: '14px 16px', borderTop: `3px solid ${color}` }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}><CopiavelNum compact={value} /></div>
       {note && <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>{note}</div>}
+      {delta != null && (
+        <div style={{ fontSize: 11, fontWeight: 700, color: delta >= 0 ? '#22c55e' : '#f87171', marginTop: 4 }}>
+          {delta > 0 ? '+' : ''}{delta.toFixed(1).replace('.', ',')}%
+        </div>
+      )}
     </div>
   )
 }
@@ -409,6 +414,21 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   const [objetivoTab, setObjetivoTab] = useState<ObjetivoTab>('todos')
   const [statusTab, setStatusTab] = useState<StatusTab>('todas')
   const [busca, setBusca] = useState('')
+  const [sortCol, setSortCol] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  function toggleSort(col: string) {
+    if (sortCol === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc') }
+    else { setSortCol(col); setSortDir('desc') }
+  }
+
+  function sortRows<T extends Record<string, any>>(rows: T[]): T[] {
+    if (!sortCol) return rows
+    return [...rows].sort((a, b) => {
+      const av = Number(a[sortCol] ?? 0), bv = Number(b[sortCol] ?? 0)
+      return sortDir === 'asc' ? av - bv : bv - av
+    })
+  }
 
   const filteredCampanhas = campanhas.filter(c => {
     if (statusTab !== 'todas' && c.status !== statusTab) return false
@@ -428,6 +448,28 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
     if (busca && !c.nome.toLowerCase().includes(busca.toLowerCase()) && !c.campanha.toLowerCase().includes(busca.toLowerCase())) return false
     return true
   })
+
+  const sortedCampanhas = sortRows(filteredCampanhas)
+  const sortedAdsets = sortRows(filteredAdsets)
+  const sortedAds = sortRows(filteredAds)
+
+  function exportCSV() {
+    let headers: string[]; let rows: (string | number)[][]
+    if (nivel === 'campanhas') {
+      headers = ['Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'Thruplays', 'Frequência']
+      rows = sortedCampanhas.map(c => [c.nome, c.status, c.spend, c.impressions, c.reach, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.thruplays, c.frequency.toFixed(4)])
+    } else if (nivel === 'conjuntos') {
+      headers = ['Conjunto', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'Thruplays', 'Frequência']
+      rows = sortedAdsets.map(c => [c.nome, c.campanha, c.status, c.spend, c.impressions, c.reach, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.thruplays, c.frequency.toFixed(4)])
+    } else {
+      headers = ['Anúncio', 'Conjunto', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
+      rows = sortedAds.map(c => [c.nome, c.adset, c.campanha, c.status, c.spend, c.impressions, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2)])
+    }
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob); const a = document.createElement('a')
+    a.href = url; a.download = `meta-ads-${nivel}.csv`; a.click(); URL.revokeObjectURL(url)
+  }
 
   const chip = (active: boolean, small?: boolean): React.CSSProperties => ({
     padding: small ? '3px 10px' : '4px 12px', borderRadius: 20,
@@ -477,7 +519,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
         </div>
       )}
 
-      {/* Status + search */}
+      {/* Status + search + export */}
       <div style={{ padding: '10px 16px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 4 }}>STATUS</span>
@@ -494,6 +536,9 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
           onChange={e => setBusca(e.target.value)}
           style={{ background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText, borderRadius: 8, padding: '5px 12px', fontSize: 13, outline: 'none', width: 200 }}
         />
+        <button onClick={exportCSV} title="Exportar CSV" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted, whiteSpace: 'nowrap' }}>
+          ↓ CSV
+        </button>
       </div>
 
       {/* Table */}
@@ -503,28 +548,23 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             <thead>
               <tr>
                 <th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>
-                <th style={{ ...thS, textAlign: 'right' }}>INVEST.</th>
-                <th style={{ ...thS, textAlign: 'right' }}>IMPR.</th>
-                <th style={{ ...thS, textAlign: 'right' }}>ALCANCE</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CLIQUES</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CTR</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CPM</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CPC</th>
-                <th style={{ ...thS, textAlign: 'right' }}>THRUPLAYS</th>
-                <th style={{ ...thS, textAlign: 'right' }}>FREQ.</th>
+                {(['spend','impressions','reach','clicks','ctr','cpm','cpc','thruplays','frequency'] as const).map((col, i) => {
+                  const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','THRUPLAYS','FREQ.']
+                  return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                })}
               </tr>
             </thead>
             <tbody>
-              {filteredCampanhas.length === 0 ? (
+              {sortedCampanhas.length === 0 ? (
                 <tr><td colSpan={10} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
-              ) : filteredCampanhas.map(c => {
+              ) : sortedCampanhas.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 const obj = classifyObjetivo(c.nome)
                 const objColor = obj === 'reconhecimento' ? '#56cfe1' : obj === 'engajamento' ? '#f59e0b' : '#74c69d'
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome.replace(/\[.*?\]/g, '').trim()}</div>
                       <div style={{ display: 'flex', gap: 4, marginBottom: share > 0 ? 5 : 0 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: objColor + '22', color: objColor, fontWeight: 600 }}>
                           {obj === 'reconhecimento' ? 'Reconhecimento' : obj === 'engajamento' ? 'Engajamento' : 'Tráfego'}
@@ -557,26 +597,21 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
               <tr>
                 <th style={{ ...thS, minWidth: 200 }}>CONJUNTO DE ANÚNCIOS</th>
                 <th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>
-                <th style={{ ...thS, textAlign: 'right' }}>INVEST.</th>
-                <th style={{ ...thS, textAlign: 'right' }}>IMPR.</th>
-                <th style={{ ...thS, textAlign: 'right' }}>ALCANCE</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CLIQUES</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CTR</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CPM</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CPC</th>
-                <th style={{ ...thS, textAlign: 'right' }}>THRUPLAYS</th>
-                <th style={{ ...thS, textAlign: 'right' }}>FREQ.</th>
+                {(['spend','impressions','reach','clicks','ctr','cpm','cpc','thruplays','frequency'] as const).map((col, i) => {
+                  const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','THRUPLAYS','FREQ.']
+                  return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                })}
               </tr>
             </thead>
             <tbody>
-              {filteredAdsets.length === 0 ? (
+              {sortedAdsets.length === 0 ? (
                 <tr><td colSpan={11} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
-              ) : filteredAdsets.map(c => {
+              ) : sortedAdsets.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome.replace(/\[.*?\]/g, '').trim()}</div>
                       <div style={{ marginBottom: share > 0 ? 5 : 0 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: c.status === 'ativo' ? '#22c55e22' : '#f59e0b22', color: c.status === 'ativo' ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>
                           {c.status === 'ativo' ? 'Ativo' : 'Pausado'}
@@ -607,23 +642,21 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
               <tr>
                 <th style={{ ...thS, minWidth: 200 }}>ANÚNCIO</th>
                 <th style={{ ...thS, minWidth: 160 }}>CONJUNTO</th>
-                <th style={{ ...thS, textAlign: 'right' }}>INVEST.</th>
-                <th style={{ ...thS, textAlign: 'right' }}>IMPR.</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CLIQUES</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CTR</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CPM</th>
-                <th style={{ ...thS, textAlign: 'right' }}>CPC</th>
+                {(['spend','impressions','clicks','ctr','cpm','cpc'] as const).map((col, i) => {
+                  const labels = ['INVEST.','IMPR.','CLIQUES','CTR','CPM','CPC']
+                  return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                })}
               </tr>
             </thead>
             <tbody>
-              {filteredAds.length === 0 ? (
+              {sortedAds.length === 0 ? (
                 <tr><td colSpan={8} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum anúncio encontrado</td></tr>
-              ) : filteredAds.map(c => {
+              ) : sortedAds.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome.replace(/\[.*?\]/g, '').trim()}</div>
                       <div style={{ marginBottom: share > 0 ? 5 : 0 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: c.status === 'ativo' ? '#22c55e22' : '#f59e0b22', color: c.status === 'ativo' ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>
                           {c.status === 'ativo' ? 'Ativo' : 'Pausado'}
@@ -660,6 +693,9 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   const [custom, setCustom] = useState({ start: '', end: '' })
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [cooldown, setCooldown] = useState(false)
+  const [comparar, setComparar] = useState(false)
+  const [prevData, setPrevData] = useState<MetaAccountData[] | null>(null)
+  const [loadingPrev, setLoadingPrev] = useState(false)
 
   const t = C[theme]
   const periodoRef = useRef(getPeriodo('mes-atual'))
@@ -687,9 +723,29 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
     cooldownRef.current = setTimeout(() => setCooldown(false), 30000)
   }
 
+  function getPrevPeriodo(p: { start: string; end: string }) {
+    const s = new Date(p.start + 'T00:00:00'), e = new Date(p.end + 'T00:00:00')
+    const days = Math.round((e.getTime() - s.getTime()) / 86400000)
+    const prevEnd = new Date(s.getTime() - 86400000)
+    const prevStart = new Date(prevEnd.getTime() - days * 86400000)
+    return { start: fmtDate(prevStart), end: fmtDate(prevEnd) }
+  }
+
+  function toggleComparar() {
+    if (comparar) { setComparar(false); setPrevData(null); return }
+    const prev = getPrevPeriodo(periodoRef.current)
+    setLoadingPrev(true); setComparar(true)
+    fetch(`/api/meta-ads?start=${prev.start}&end=${prev.end}`)
+      .then(r => r.json())
+      .then(res => { if (!res.error) setPrevData(res.data ?? []); setLoadingPrev(false) })
+      .catch(() => setLoadingPrev(false))
+  }
+
   function aplicarPeriodo(newPreset: Preset, newCustom: { start: string; end: string }) {
     const p = getPeriodo(newPreset, newCustom)
-    periodoRef.current = p; setPreset(newPreset); setCustom(newCustom); setFiltroCliente(''); fetchData(p)
+    periodoRef.current = p; setPreset(newPreset); setCustom(newCustom); setFiltroCliente('')
+    setComparar(false); setPrevData(null)
+    fetchData(p)
   }
 
   useEffect(() => {
@@ -728,6 +784,17 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   const freqMedio = selectedAccount
     ? selectedAccount.frequency
     : filtrado.length > 0 ? filtrado.reduce((s, a) => s + a.frequency, 0) / filtrado.length : 0
+
+  const prevFiltrado = comparar && prevData ? prevData.filter(d => !filtroCliente || d.nome === filtroCliente) : []
+  const pDelta = (curr: number, prev: number): number | null =>
+    comparar && prevData && prev > 0 ? ((curr - prev) / prev) * 100 : null
+  const prevSpend = prevFiltrado.reduce((s, a) => s + a.spend, 0)
+  const prevImpr = prevFiltrado.reduce((s, a) => s + a.impressions, 0)
+  const prevClicks = prevFiltrado.reduce((s, a) => s + a.clicks, 0)
+  const prevThruplays = prevFiltrado.reduce((s, a) => s + a.thruplays, 0)
+  const prevCtr = prevImpr > 0 ? (prevClicks / prevImpr) * 100 : 0
+  const prevCpm = prevSpend > 0 && prevImpr > 0 ? (prevSpend / prevImpr) * 1000 : 0
+  const prevCpc = prevClicks > 0 ? prevSpend / prevClicks : 0
 
   const allCampanhas = selectedAccount
     ? selectedAccount.campanhas
@@ -779,6 +846,13 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
           {lastUpdated ? `${String(lastUpdated.getHours()).padStart(2,'0')}:${String(lastUpdated.getMinutes()).padStart(2,'0')}` : 'Atualizar'}
         </button>
         {loading && <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: '2px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
+        <button
+          onClick={toggleComparar}
+          title="Comparar com o período anterior de mesma duração"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${comparar ? '#1A3CFF55' : t.border}`, background: comparar ? '#1A3CFF18' : t.filtroBtn, color: comparar ? '#7ba3ff' : t.textSecondary, transition: 'all 0.15s', flexShrink: 0 }}
+        >
+          ⇄ {loadingPrev ? '...' : comparar ? 'Comparando' : 'Comparar'}
+        </button>
       </div>
 
       {loading && !data ? (
@@ -794,8 +868,8 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
         <>
           {/* KPI tiles with colored top borders */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 20 }}>
-            <KpiTile label="Investimento" value={fmtBRL(totalSpend)} color={TILE_COLORS[0]} t={t} />
-            <KpiTile label="Impressões" value={fmtNum(totalImpressions)} color={TILE_COLORS[1]} t={t} />
+            <KpiTile label="Investimento" value={fmtBRL(totalSpend)} color={TILE_COLORS[0]} t={t} delta={pDelta(totalSpend, prevSpend)} />
+            <KpiTile label="Impressões" value={fmtNum(totalImpressions)} color={TILE_COLORS[1]} t={t} delta={pDelta(totalImpressions, prevImpr)} />
             <KpiTile
               label="Alcance"
               value={selectedAccount ? fmtNum(selectedAccount.reach) : '—'}
@@ -803,10 +877,10 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
               color={TILE_COLORS[2]}
               t={t}
             />
-            <KpiTile label="Cliques" value={fmtNum(totalClicks)} color={TILE_COLORS[3]} t={t} />
-            <KpiTile label="CTR Médio" value={fmtPct(ctrMedio)} color={TILE_COLORS[4]} t={t} />
-            <KpiTile label="CPM Médio" value={fmtBRL(cpmMedio)} color={TILE_COLORS[5]} t={t} />
-            <KpiTile label="CPC Médio" value={cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'} color={TILE_COLORS[6]} t={t} />
+            <KpiTile label="Cliques" value={fmtNum(totalClicks)} color={TILE_COLORS[3]} t={t} delta={pDelta(totalClicks, prevClicks)} />
+            <KpiTile label="CTR Médio" value={fmtPct(ctrMedio)} color={TILE_COLORS[4]} t={t} delta={pDelta(ctrMedio, prevCtr)} />
+            <KpiTile label="CPM Médio" value={fmtBRL(cpmMedio)} color={TILE_COLORS[5]} t={t} delta={pDelta(cpmMedio, prevCpm)} />
+            <KpiTile label="CPC Médio" value={cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'} color={TILE_COLORS[6]} t={t} delta={pDelta(cpcMedio, prevCpc)} />
             <KpiTile
               label="Frequência"
               value={freqMedio > 0 ? freqMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
@@ -819,6 +893,7 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
               value={totalThruplays > 0 ? fmtNum(totalThruplays) : '—'}
               color={TILE_COLORS[8]}
               t={t}
+              delta={pDelta(totalThruplays, prevThruplays)}
             />
             <KpiTile
               label="CPV"

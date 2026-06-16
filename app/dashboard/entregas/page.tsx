@@ -209,7 +209,7 @@ function BarsWithTooltip({ c, t }: { c: Campanha; t: typeof C['dark'] }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: c.status !== 'futura' ? 5 : 0 }}>
             <div style={{ width: 12, height: 3, borderRadius: 2, background: entregaColor, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: '#555', flex: 1, whiteSpace: 'nowrap' }}>
-              {c.metrica || 'Entrega'}
+              {(c.metrica || 'Entrega').replace(/\[.*?\]/g, '').trim()}
             </span>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#111', marginLeft: 16, whiteSpace: 'nowrap' }}>
               {fmtExact(c.entregue)}
@@ -238,22 +238,28 @@ function normData(s: string) {
 
 function NumWithTooltip({ abbrev, exact, color }: { abbrev: string; exact: string; color: string }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
-  const hasDiff = abbrev !== exact && abbrev !== '—'
+  const [copied, setCopied] = useState(false)
+  const canCopy = abbrev !== '—'
 
   return (
     <>
       <span
         onMouseEnter={e => {
-          if (!hasDiff) return
+          if (!canCopy) return
           const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
           setPos({ x: r.left + r.width / 2, y: r.top })
         }}
-        onMouseLeave={() => setPos(null)}
+        onMouseLeave={() => { setPos(null); setCopied(false) }}
+        onClick={() => {
+          if (!canCopy) return
+          navigator.clipboard.writeText(exact)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1200)
+        }}
         style={{
           fontSize: 13, fontWeight: 600, color,
-          cursor: hasDiff ? 'help' : 'default',
-          textDecoration: hasDiff ? 'underline dotted' : 'none',
-          textUnderlineOffset: '3px',
+          cursor: canCopy ? 'copy' : 'default',
+          userSelect: 'none',
           display: 'inline-block',
         }}
       >
@@ -265,13 +271,13 @@ function NumWithTooltip({ abbrev, exact, color }: { abbrev: string; exact: strin
           left: pos.x, top: pos.y - 8,
           transform: 'translate(-50%, -100%)',
           background: '#0d0d0d', border: '1px solid #444',
-          color: '#e8e8e8', fontSize: 11, fontWeight: 500,
+          color: copied ? '#4ade80' : '#e8e8e8', fontSize: 11, fontWeight: 500,
           padding: '5px 11px', borderRadius: 7, whiteSpace: 'nowrap',
           zIndex: 9999, pointerEvents: 'none',
           boxShadow: '0 8px 24px rgba(0,0,0,0.65)',
           letterSpacing: 0.2,
         }}>
-          {exact}
+          {copied ? '✓ Copiado!' : exact}
         </span>
       )}
     </>
@@ -309,27 +315,16 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
         </span>
       </div>
 
-      {/* Linha 2: tags de período e canal/métrica */}
-      {(periodoTag || canalTag) && (
+      {/* Linha 2: tag de período */}
+      {periodoTag && (
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-          {periodoTag && (
-            <span style={{
-              fontSize: 11, padding: '3px 10px', borderRadius: 20,
-              background: '#1A3CFF18', color: '#7ba3ff',
-              border: '1px solid #1A3CFF33', whiteSpace: 'nowrap',
-            }}>
-              {periodoTag}
-            </span>
-          )}
-          {canalTag && (
-            <span style={{
-              fontSize: 11, padding: '3px 10px', borderRadius: 20,
-              background: t.filtroBtn, color: t.filtroBtnText,
-              border: `1px solid ${t.borderInner}`, whiteSpace: 'nowrap',
-            }}>
-              📊 {canalTag}
-            </span>
-          )}
+          <span style={{
+            fontSize: 11, padding: '3px 10px', borderRadius: 20,
+            background: '#1A3CFF18', color: '#7ba3ff',
+            border: '1px solid #1A3CFF33', whiteSpace: 'nowrap',
+          }}>
+            {periodoTag}
+          </span>
         </div>
       )}
 
@@ -350,12 +345,12 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
           <NumWithTooltip abbrev={metaAbrev} exact={metaExact} color={t.textSecondary} />
         </div>
 
-        {/* Entregue */}
+        {/* Entregue — cor reflete o progresso da entrega */}
         <div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Entregue</div>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.8, marginBottom: 4, textTransform: 'uppercase', color: c.entregue === 0 && c.status === 'ativa' ? t.textMuted : deliveryColor(c.pct, c.bateu, c.status) }}>Entregue</div>
           <NumWithTooltip
             abbrev={entAbrev} exact={entExact}
-            color={c.entregue === 0 && c.status === 'ativa' ? t.textMuted : t.textSecondary}
+            color={c.entregue === 0 && c.status === 'ativa' ? t.textMuted : deliveryColor(c.pct, c.bateu, c.status)}
           />
         </div>
 

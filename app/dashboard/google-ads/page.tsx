@@ -175,11 +175,16 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
 }
 
 // ─── KPI Tile ─────────────────────────────────────────────────────────────────
-function KpiTile({ label, value, t }: { label: string; value: string; t: typeof C['dark'] }) {
+function KpiTile({ label, value, t, delta }: { label: string; value: string; t: typeof C['dark']; delta?: number | null }) {
   return (
     <div style={{ background: t.kpiBg, border: `1px solid ${t.kpiBorder}`, borderRadius: 10, padding: '14px 16px' }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}><CopiavelNum compact={value} /></div>
+      {delta != null && (
+        <div style={{ fontSize: 11, fontWeight: 700, color: delta >= 0 ? '#22c55e' : '#f87171', marginTop: 4 }}>
+          {delta > 0 ? '+' : ''}{delta.toFixed(1).replace('.', ',')}%
+        </div>
+      )}
     </div>
   )
 }
@@ -380,8 +385,23 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   const [tipoTab, setTipoTab] = useState<TipoTab>('todas')
   const [statusTab, setStatusTab] = useState<StatusTab>('todas')
   const [busca, setBusca] = useState('')
+  const [sortCol, setSortCol] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  useEffect(() => { setTipoTab('todas'); setStatusTab('todas'); setBusca('') }, [nivel])
+  useEffect(() => { setTipoTab('todas'); setStatusTab('todas'); setBusca(''); setSortCol(null) }, [nivel])
+
+  function toggleSort(col: string) {
+    if (sortCol === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc') }
+    else { setSortCol(col); setSortDir('desc') }
+  }
+
+  function sortRows<T extends Record<string, any>>(rows: T[]): T[] {
+    if (!sortCol) return rows
+    return [...rows].sort((a, b) => {
+      const av = Number(a[sortCol] ?? 0), bv = Number(b[sortCol] ?? 0)
+      return sortDir === 'asc' ? av - bv : bv - av
+    })
+  }
 
   const chip = (active: boolean): React.CSSProperties => ({
     padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
@@ -416,6 +436,29 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     return true
   })
 
+  const sortedCamp = sortRows(filtCamp)
+  const sortedGrupos = sortRows(filtGrupos)
+  const sortedAnuncios = sortRows(filtAnuncios)
+
+  function exportCSV() {
+    const metricKeys = ['custo','cliques','impressoes','ctr','cpcMedio','cpm','cpv','conversoes','custoConversao']
+    let headers: string[]; let rows: (string | number)[][]
+    if (nivel === 'campanhas') {
+      headers = ['Campanha','Tipo','Status','Custo','Cliques','Impressões','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      rows = sortedCamp.map(c => [c.nome, c.tipo, c.status, c.custo, c.cliques, c.impressoes, c.ctr.toFixed(4), c.cpcMedio.toFixed(2), c.cpm.toFixed(2), c.cpv.toFixed(2), c.conversoes, c.custoConversao.toFixed(2)])
+    } else if (nivel === 'grupos') {
+      headers = ['Grupo','Campanha','Status','Custo','Cliques','Impressões','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      rows = sortedGrupos.map(g => [g.nome, g.campanhaNome, g.status, g.custo, g.cliques, g.impressoes, g.ctr.toFixed(4), g.cpcMedio.toFixed(2), g.cpm.toFixed(2), g.cpv.toFixed(2), g.conversoes, g.custoConversao.toFixed(2)])
+    } else {
+      headers = ['Anúncio','Grupo','Campanha','Status','Custo','Cliques','Impressões','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      rows = sortedAnuncios.map(a => [a.nome, a.grupoNome, a.campanhaNome, a.status, a.custo, a.cliques, a.impressoes, a.ctr.toFixed(4), a.cpcMedio.toFixed(2), a.cpm.toFixed(2), a.cpv.toFixed(2), a.conversoes, a.custoConversao.toFixed(2)])
+    }
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob); const a = document.createElement('a')
+    a.href = url; a.download = `google-ads-${nivel}.csv`; a.click(); URL.revokeObjectURL(url)
+  }
+
   const thS: React.CSSProperties = {
     padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted,
     textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left',
@@ -445,17 +488,25 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     </>
   )
 
+  const METRIC_SORT_COLS: { col: string; label: string }[] = [
+    { col: 'custo', label: 'INVEST.' },
+    { col: 'cliques', label: 'CLIQUES' },
+    { col: 'impressoes', label: 'IMPRESSÕES' },
+    { col: 'ctr', label: 'CTR' },
+    { col: 'cpcMedio', label: 'CPC MÉD.' },
+    { col: 'cpm', label: 'CPM' },
+    { col: 'cpv', label: 'CPV' },
+    { col: 'conversoes', label: 'CONV.' },
+    { col: 'custoConversao', label: 'CUSTO/CONV.' },
+  ]
+
   const metricHeaders = (
     <>
-      <th style={{ ...thS, textAlign: 'right' }}>INVEST.</th>
-      <th style={{ ...thS, textAlign: 'right' }}>CLIQUES</th>
-      <th style={{ ...thS, textAlign: 'right' }}>IMPRESSÕES</th>
-      <th style={{ ...thS, textAlign: 'right' }}>CTR</th>
-      <th style={{ ...thS, textAlign: 'right' }}>CPC MÉD.</th>
-      <th style={{ ...thS, textAlign: 'right' }}>CPM</th>
-      <th style={{ ...thS, textAlign: 'right' }}>CPV</th>
-      <th style={{ ...thS, textAlign: 'right' }}>CONV.</th>
-      <th style={{ ...thS, textAlign: 'right' }}>CUSTO/CONV.</th>
+      {METRIC_SORT_COLS.map(({ col, label }) => (
+        <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>
+          {label}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+        </th>
+      ))}
     </>
   )
 
@@ -508,6 +559,9 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
             onChange={e => setBusca(e.target.value)}
             style={{ background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText, borderRadius: 8, padding: '5px 12px', fontSize: 13, outline: 'none', width: 180 }}
           />
+          <button onClick={exportCSV} title="Exportar CSV" style={{ background: 'transparent', border: `1px solid ${t.border}`, color: t.textMuted, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            ↓ CSV
+          </button>
         </div>
       </div>
 
@@ -519,12 +573,12 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               <tr><th style={{ ...thS, minWidth: 220 }}>CAMPANHA</th>{metricHeaders}</tr>
             </thead>
             <tbody>
-              {filtCamp.length === 0 ? emptyRow(10) : filtCamp.map(c => {
+              {sortedCamp.length === 0 ? emptyRow(10) : sortedCamp.map(c => {
                 const share = totalCusto > 0 ? (c.custo / totalCusto) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary }}>{c.nome}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary }}>{c.nome.replace(/\[.*?\]/g, '').trim()}</div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 3 }}>
                         <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600, background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF2a' }}>{c.tipo}</span>
                         {statusBadge(c.status)}
@@ -549,7 +603,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               </tr>
             </thead>
             <tbody>
-              {filtGrupos.length === 0 ? emptyRow(11) : filtGrupos.map(g => (
+              {sortedGrupos.length === 0 ? emptyRow(11) : sortedGrupos.map(g => (
                 <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
                     <div style={{ fontWeight: 600, color: t.textPrimary }}>{g.nome}</div>
@@ -574,7 +628,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               </tr>
             </thead>
             <tbody>
-              {filtAnuncios.length === 0 ? emptyRow(12) : filtAnuncios.map(a => (
+              {sortedAnuncios.length === 0 ? emptyRow(12) : sortedAnuncios.map(a => (
                 <tr key={a.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
                     <div style={{ fontWeight: 600, color: t.textPrimary }}>{a.nome}</div>
@@ -604,10 +658,31 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   const [custom, setCustom] = useState({ start: '', end: '' })
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [cooldown, setCooldown] = useState(false)
+  const [comparar, setComparar] = useState(false)
+  const [prevData, setPrevData] = useState<AccountData[] | null>(null)
+  const [loadingPrev, setLoadingPrev] = useState(false)
 
   const t = C[theme]
   const periodoRef = useRef(getPeriodo('mes-atual'))
   const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function getPrevPeriodo(p: { start: string; end: string }) {
+    const s = new Date(p.start + 'T00:00:00'), e = new Date(p.end + 'T00:00:00')
+    const days = Math.round((e.getTime() - s.getTime()) / 86400000)
+    const prevEnd = new Date(s.getTime() - 86400000)
+    const prevStart = new Date(prevEnd.getTime() - days * 86400000)
+    return { start: fmtDate(prevStart), end: fmtDate(prevEnd) }
+  }
+
+  function toggleComparar() {
+    if (comparar) { setComparar(false); setPrevData(null); return }
+    const prev = getPrevPeriodo(periodoRef.current)
+    setLoadingPrev(true); setComparar(true)
+    fetch(`/api/google-ads?start=${prev.start}&end=${prev.end}`)
+      .then(r => r.json())
+      .then(res => { if (!res.error) setPrevData(res.data ?? []); setLoadingPrev(false) })
+      .catch(() => setLoadingPrev(false))
+  }
 
   function fetchData(p: { start: string; end: string }) {
     setLoading(true); setError('')
@@ -633,7 +708,9 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
 
   function aplicarPeriodo(newPreset: Preset, newCustom: { start: string; end: string }) {
     const p = getPeriodo(newPreset, newCustom)
-    periodoRef.current = p; setPreset(newPreset); setCustom(newCustom); setFiltroCliente(''); fetchData(p)
+    periodoRef.current = p; setPreset(newPreset); setCustom(newCustom); setFiltroCliente('')
+    setComparar(false); setPrevData(null)
+    fetchData(p)
   }
 
   useEffect(() => {
@@ -667,6 +744,17 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   const ctrMedio = totalImpressoes > 0 ? (totalCliques / totalImpressoes) * 100 : 0
   const cpcMedio = totalCliques > 0 ? totalCusto / totalCliques : 0
   const custoConversao = totalConversoes > 0 ? totalCusto / totalConversoes : 0
+
+  const prevFiltrado = comparar && prevData ? prevData.filter(d => !filtroCliente || d.nome === filtroCliente) : []
+  const pDelta = (curr: number, prev: number): number | null =>
+    comparar && prevData && prev > 0 ? ((curr - prev) / prev) * 100 : null
+  const prevCliques = prevFiltrado.reduce((s, a) => s + a.cliques, 0)
+  const prevImpressoes = prevFiltrado.reduce((s, a) => s + a.impressoes, 0)
+  const prevCusto = prevFiltrado.reduce((s, a) => s + a.custo, 0)
+  const prevConversoes = prevFiltrado.reduce((s, a) => s + a.conversoes, 0)
+  const prevCtr = prevImpressoes > 0 ? (prevCliques / prevImpressoes) * 100 : 0
+  const prevCpc = prevCliques > 0 ? prevCusto / prevCliques : 0
+  const prevCustoConv = prevConversoes > 0 ? prevCusto / prevConversoes : 0
   const selectedAccount = filtroCliente ? filtrado[0] : null
 
   const mergedSerie: DailyPoint[] = (() => {
@@ -710,6 +798,10 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
           <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>↻</span>
           {lastUpdated ? `${String(lastUpdated.getHours()).padStart(2,'0')}:${String(lastUpdated.getMinutes()).padStart(2,'0')}` : 'Atualizar'}
         </button>
+        <button onClick={toggleComparar} title="Comparar com o período anterior de mesma duração"
+          style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${comparar ? '#1A3CFF' : t.border}`, background: comparar ? '#1A3CFF22' : t.filtroBtn, color: comparar ? '#7ba3ff' : t.textMuted, transition: 'all 0.15s', flexShrink: 0 }}>
+          ⇄ {loadingPrev ? '...' : comparar ? 'Comparando' : 'Comparar'}
+        </button>
         {loading && <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: '2px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
       </div>
 
@@ -726,13 +818,13 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
         <>
           {/* KPI tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 20 }}>
-            <KpiTile label="Cliques" value={fmtNum(totalCliques)} t={t} />
-            <KpiTile label="Impressões" value={fmtNum(totalImpressoes)} t={t} />
-            <KpiTile label="CTR Médio" value={fmtPct(ctrMedio)} t={t} />
-            <KpiTile label="CPC Médio" value={cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'} t={t} />
-            <KpiTile label="Investimento" value={fmtBRL(totalCusto)} t={t} />
-            <KpiTile label="Conversões" value={totalConversoes > 0 ? fmtNum(totalConversoes) : '—'} t={t} />
-            <KpiTile label="Custo/Conv." value={custoConversao > 0 ? fmtBRL(custoConversao) : '—'} t={t} />
+            <KpiTile label="Cliques" value={fmtNum(totalCliques)} t={t} delta={pDelta(totalCliques, prevCliques)} />
+            <KpiTile label="Impressões" value={fmtNum(totalImpressoes)} t={t} delta={pDelta(totalImpressoes, prevImpressoes)} />
+            <KpiTile label="CTR Médio" value={fmtPct(ctrMedio)} t={t} delta={pDelta(ctrMedio, prevCtr)} />
+            <KpiTile label="CPC Médio" value={cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'} t={t} delta={pDelta(cpcMedio, prevCpc)} />
+            <KpiTile label="Investimento" value={fmtBRL(totalCusto)} t={t} delta={pDelta(totalCusto, prevCusto)} />
+            <KpiTile label="Conversões" value={totalConversoes > 0 ? fmtNum(totalConversoes) : '—'} t={t} delta={pDelta(totalConversoes, prevConversoes)} />
+            <KpiTile label="Custo/Conv." value={custoConversao > 0 ? fmtBRL(custoConversao) : '—'} t={t} delta={pDelta(custoConversao, prevCustoConv)} />
           </div>
 
           {/* Trend chart */}
