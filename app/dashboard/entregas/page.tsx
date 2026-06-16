@@ -567,6 +567,7 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
 
   const t = C[theme]
   const periodoRef = useRef(getPeriodo('mes-atual'))
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function parseResponse(res: unknown) {
     if (res && typeof res === 'object' && !Array.isArray(res)) {
@@ -596,7 +597,8 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
     if (cooldown || loading) return
     setCooldown(true)
     fetchData(periodoRef.current)
-    setTimeout(() => setCooldown(false), 30000)
+    if (cooldownRef.current) clearTimeout(cooldownRef.current)
+    cooldownRef.current = setTimeout(() => setCooldown(false), 30000)
   }
 
   function aplicarPeriodo(newPreset: Preset, newCustom: { start: string; end: string }) {
@@ -634,7 +636,7 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
       }, next.getTime() - now.getTime())
     }
     let timer = scheduleNext()
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); if (cooldownRef.current) clearTimeout(cooldownRef.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

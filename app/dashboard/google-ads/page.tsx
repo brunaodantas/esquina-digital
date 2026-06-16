@@ -562,6 +562,7 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
 
   const t = C[theme]
   const periodoRef = useRef(getPeriodo('mes-atual'))
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function fetchData(p: { start: string; end: string }) {
     setLoading(true); setError('')
@@ -581,7 +582,8 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
     if (cooldown || loading) return
     setCooldown(true)
     fetchData(periodoRef.current)
-    setTimeout(() => setCooldown(false), 30000)
+    if (cooldownRef.current) clearTimeout(cooldownRef.current)
+    cooldownRef.current = setTimeout(() => setCooldown(false), 30000)
   }
 
   function aplicarPeriodo(newPreset: Preset, newCustom: { start: string; end: string }) {
@@ -607,7 +609,7 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
       }, next.getTime() - now.getTime())
     }
     let timer = scheduleNext()
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); if (cooldownRef.current) clearTimeout(cooldownRef.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -623,7 +625,7 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   const selectedAccount = filtroCliente ? filtrado[0] : null
 
   const mergedSerie: DailyPoint[] = (() => {
-    if (selectedAccount) return selectedAccount.serie
+    if (selectedAccount) return selectedAccount.serie ?? []
     const dateMap = new Map<string, { custo: number; cliques: number; impressoes: number }>()
     for (const acc of filtrado) {
       for (const pt of acc.serie) {
