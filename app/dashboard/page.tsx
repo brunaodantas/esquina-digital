@@ -100,6 +100,554 @@ function comentarioGoogle(cliques: number, impressoes: number, ctr: number, cpc:
   return linhas.join('\n')
 }
 
+// ─── Relatório Semanal ─────────────────────────────────────────────────────────
+
+interface RelSemanalParams {
+  cliente: string
+  periodoStart: string
+  periodoEnd: string
+  metaDados: any[]
+  googleDados: any[]
+  secoes: { display: boolean; youtube: boolean; metaTD: boolean; metaVP: boolean; tiktok: boolean; diagnostico: boolean; conclusao: boolean }
+  seguidoresSemana: number
+  seguidoresMes: number
+  visitasPerfil: number
+  tiktokImpressoes: number
+  tiktokCliques: number
+  chartJsText: string
+  logoB64: string
+}
+
+function buildRelatorioHTML(p: RelSemanalParams): string {
+  const { cliente, periodoStart, periodoEnd, metaDados, googleDados, secoes, seguidoresSemana, seguidoresMes, visitasPerfil, tiktokImpressoes, tiktokCliques, chartJsText, logoB64 } = p
+
+  const [, ms, ds] = periodoStart.split('-')
+  const [, me, de] = periodoEnd.split('-')
+  const periodoLabel = `${ds}/${ms} a ${de}/${me}`
+
+  function fmtK(n: number): string {
+    if (n >= 1_000_000) return '+' + (n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'M'
+    if (n >= 1_000) return '+' + (n / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'K'
+    return '+' + n.toLocaleString('pt-BR')
+  }
+  function fmtPct2(n: number): string { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
+  function cleanName(n: string) { return n.replace(/\[.*?\]/g, '').trim().slice(0, 35) }
+
+  // Google: split Display vs YouTube by tipoRaw
+  const dispCamps: any[] = googleDados.flatMap(a => (a.campanhas ?? []).filter((c: any) => c.tipoRaw === 'DISPLAY'))
+  const ytCamps: any[] = googleDados.flatMap(a => (a.campanhas ?? []).filter((c: any) => c.tipoRaw === 'VIDEO'))
+  const dispCampIds = new Set(dispCamps.map(c => c.id))
+  const ytCampIds = new Set(ytCamps.map(c => c.id))
+  const dispGroups: any[] = googleDados.flatMap(a => (a.grupos ?? []).filter((g: any) => dispCampIds.has(g.campanhaId)))
+  const ytGroups: any[] = googleDados.flatMap(a => (a.grupos ?? []).filter((g: any) => ytCampIds.has(g.campanhaId)))
+
+  const dispImpr = dispCamps.reduce((s, c) => s + c.impressoes, 0)
+  const dispCliques = dispCamps.reduce((s, c) => s + c.cliques, 0)
+  const dispCtr = dispImpr > 0 ? (dispCliques / dispImpr) * 100 : 0
+
+  const ytImpr = ytCamps.reduce((s, c) => s + c.impressoes, 0)
+  const ytViews = ytCamps.reduce((s, c) => s + c.videoViews, 0)
+  const ytCliques = ytCamps.reduce((s, c) => s + c.cliques, 0)
+  const ytConv = ytCamps.reduce((s, c) => s + c.conversoes, 0)
+
+  // Meta: split TD vs VP by campaign name
+  const isVP = (nome: string) => /\bvp\b|visita|perfil/i.test(nome)
+  const metaCamps: any[] = metaDados.flatMap(a => a.campanhas ?? [])
+  const tdCamps = metaCamps.filter(c => !isVP(c.nome))
+  const vpCamps = metaCamps.filter(c => isVP(c.nome))
+
+  const tdImpr = tdCamps.reduce((s, c) => s + c.impressions, 0)
+  const tdReach = tdCamps.reduce((s, c) => s + c.reach, 0)
+  const tdCliques = tdCamps.reduce((s, c) => s + c.clicks, 0)
+  const tdFreq = tdReach > 0 ? tdImpr / tdReach : 0
+
+  const vpImpr = vpCamps.reduce((s, c) => s + c.impressions, 0)
+  const vpReach = vpCamps.reduce((s, c) => s + c.reach, 0)
+  const vpFreq = vpReach > 0 ? vpImpr / vpReach : 0
+
+  // If no VP campaigns found, use all Meta as TD
+  const hasVPData = vpCamps.length > 0
+  const finalTDCamps = hasVPData ? tdCamps : metaCamps
+  const finalTDImpr = hasVPData ? tdImpr : metaCamps.reduce((s, c) => s + c.impressions, 0)
+  const finalTDReach = hasVPData ? tdReach : metaCamps.reduce((s, c) => s + c.reach, 0)
+  const finalTDCliques = hasVPData ? tdCliques : metaCamps.reduce((s, c) => s + c.clicks, 0)
+  const finalTDFreq = finalTDReach > 0 ? finalTDImpr / finalTDReach : 0
+
+  const tiktokCtr = tiktokImpressoes > 0 && tiktokCliques > 0 ? (tiktokCliques / tiktokImpressoes) * 100 : 0
+
+  // Hero KPIs
+  const totalImpr = dispImpr + ytImpr + finalTDImpr + vpImpr + tiktokImpressoes
+  const inscritosYT = ytConv > 0 ? ytConv : 0
+
+  // Top items for charts
+  const topDisp = [...dispGroups].sort((a, b) => b.cliques - a.cliques).slice(0, 5)
+  const topYT = [...ytCamps].sort((a, b) => b.videoViews - a.videoViews).slice(0, 5)
+  const topTD = [...finalTDCamps].sort((a, b) => b.impressions - a.impressions).slice(0, 5)
+  const topVP = [...vpCamps].sort((a, b) => b.impressions - a.impressions).slice(0, 5)
+
+  // Build chart config JSON (for inline <script>)
+  function barChartJson(labels: string[], data: number[], color: string): string {
+    return JSON.stringify({
+      type: 'bar',
+      data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 4 }] },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#fff', titleColor: '#111', bodyColor: '#333', borderColor: '#ddd', borderWidth: 1 } },
+        scales: { x: { grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#666' } }, y: { grid: { display: false }, ticks: { color: '#555', font: { size: 11 } } } }
+      }
+    })
+  }
+
+  const chartScripts: string[] = []
+  if (secoes.display && topDisp.length > 0) {
+    chartScripts.push(`new Chart(document.getElementById('ch-display'), ${barChartJson(topDisp.map(g => cleanName(g.nome)), topDisp.map(g => g.cliques), '#1A3CFF')});`)
+  }
+  if (secoes.youtube && topYT.length > 0) {
+    chartScripts.push(`new Chart(document.getElementById('ch-youtube'), ${barChartJson(topYT.map(c => cleanName(c.nome)), topYT.map(c => c.videoViews), '#FF4444')});`)
+  }
+  if (secoes.metaTD && topTD.length > 0) {
+    chartScripts.push(`new Chart(document.getElementById('ch-meta-td'), ${barChartJson(topTD.map(c => cleanName(c.nome)), topTD.map(c => c.impressions), '#7B2FBE')});`)
+  }
+  if (secoes.metaVP && hasVPData && topVP.length > 0) {
+    chartScripts.push(`new Chart(document.getElementById('ch-meta-vp'), ${barChartJson(topVP.map(c => cleanName(c.nome)), topVP.map(c => c.impressions), '#C44A00')});`)
+  }
+  if (secoes.tiktok && tiktokImpressoes > 0) {
+    chartScripts.push(`new Chart(document.getElementById('ch-tiktok'), ${JSON.stringify({ type: 'bar', data: { labels: ['Impressões', 'Cliques'], datasets: [{ data: [tiktokImpressoes, tiktokCliques], backgroundColor: ['#00994D', '#00994D88'], borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#fff', titleColor: '#111', bodyColor: '#333', borderColor: '#ddd', borderWidth: 1 } }, scales: { x: { grid: { display: false }, ticks: { color: '#666' } }, y: { grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#555' } } } } })});`)
+  }
+
+  function kpiCard(label: string, value: string, sub?: string): string {
+    return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`
+  }
+
+  function platformSection(id: string, color: string, badgeLabel: string, title: string, subtitle: string, kpis: string, chartId: string | null, hasChart: boolean): string {
+    return `
+<section id="${id}" class="plat-section">
+  <div class="slide-inner">
+    <div class="plat-badge" style="background:${color}20;color:${color}">${badgeLabel}</div>
+    <h2 class="sec-title">${title}</h2>
+    <p class="sec-sub">${subtitle}</p>
+    <div class="kpi-grid">${kpis}</div>
+    ${hasChart && chartId ? `<div class="chart-box"><div class="chart-wrap"><canvas id="${chartId}"></canvas></div></div>` : ''}
+  </div>
+</section>`
+  }
+
+  // Diagnóstico bullets (auto-generated from data)
+  const diagItems: string[] = []
+  if (dispImpr > 0) diagItems.push(`Google Display entregou <strong>${fmtK(dispImpr)}</strong> impressões com CTR de <strong>${fmtPct2(dispCtr)}</strong> no período.`)
+  if (ytViews > 0) diagItems.push(`YouTube registrou <strong>${fmtK(ytViews)}</strong> visualizações${inscritosYT > 0 ? ` e <strong>${fmtK(inscritosYT)}</strong> novos inscritos` : ''}.`)
+  if (finalTDImpr > 0) diagItems.push(`Meta Temas Diversos alcançou <strong>${fmtK(finalTDReach)}</strong> pessoas com frequência de <strong>${finalTDFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x</strong>.`)
+  if (vpImpr > 0) diagItems.push(`Meta Visitas ao Perfil gerou <strong>${fmtK(vpImpr)}</strong> impressões${visitasPerfil > 0 ? ` e <strong>${fmtK(visitasPerfil)}</strong> visitas ao perfil` : ''}.`)
+  if (tiktokImpressoes > 0) diagItems.push(`TikTok registrou <strong>${fmtK(tiktokImpressoes)}</strong> impressões com CTR de <strong>${fmtPct2(tiktokCtr)}</strong>.`)
+  if (seguidoresSemana > 0) diagItems.push(`Instagram cresceu <strong>${fmtK(seguidoresSemana)}</strong> seguidores na semana${seguidoresMes > 0 ? `, acumulando <strong>${fmtK(seguidoresMes)}</strong> novos no mês` : ''}.`)
+  if (diagItems.length === 0) diagItems.push(`Campanha ativa no período de ${periodoLabel}.`)
+
+  // Conclusão items (generic)
+  const conclItems = [
+    'Manter frequência de publicação e testes A/B de criativos nas campanhas ativas.',
+    'Monitorar CTR e ajustar segmentações de audiência para o próximo período.',
+    'Avaliar desempenho por grupo de anúncio e reforçar os mais eficientes.',
+    'Consolidar aprendizados de alcance e engajamento para a próxima semana.',
+  ]
+
+  const safeChartJs = chartJsText.replace(/<\/script>/g, '<\\/script>')
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boletim Semanal — ${cliente} — ${periodoLabel}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.slide-inner{max-width:960px;margin:0 auto;padding:32px 40px}
+section{background:#fff;min-height:90vh;display:flex;flex-direction:column;justify-content:flex-start}
+/* Hero */
+#hero{background:linear-gradient(135deg,#0a0a2e 0%,#1A3CFF 100%);color:#fff}
+#hero .slide-inner{padding:40px 48px}
+.hero-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
+.hero-logo{height:36px;filter:brightness(0) invert(1)}
+.hero-meta{text-align:right}
+.hero-badge{display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.9);margin-bottom:6px}
+.hero-period{font-size:12px;color:rgba(255,255,255,0.7)}
+.hero-title{font-size:2.2rem;font-weight:800;margin-bottom:6px}
+.hero-sub{font-size:1rem;color:rgba(255,255,255,0.7);margin-bottom:36px}
+/* KPI grid */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+.kpi-card{background:#fff;border-radius:12px;padding:16px 18px;border:1px solid rgba(0,0,0,0.08)}
+#hero .kpi-card{background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.2)}
+.kpi-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;margin-bottom:8px}
+#hero .kpi-label{color:rgba(255,255,255,0.6)}
+.kpi-value{font-size:1.8rem;font-weight:800;color:#111;line-height:1}
+#hero .kpi-value{color:#fff}
+.kpi-sub{font-size:11px;color:#aaa;margin-top:4px}
+#hero .kpi-sub{color:rgba(255,255,255,0.5)}
+/* Platform sections */
+.plat-section .slide-inner{padding:28px 40px}
+.plat-badge{display:inline-block;border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px}
+.sec-title{font-size:1.6rem;font-weight:800;margin-bottom:4px}
+.sec-sub{font-size:12px;color:#888;margin-bottom:14px}
+/* Chart */
+.chart-box{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:14px 16px;margin-top:14px}
+.chart-wrap{height:260px;position:relative}
+canvas{width:100%!important;height:100%!important}
+/* Diagnóstico */
+#diag .slide-inner{padding:36px 40px}
+.diag-list{list-style:none;margin-top:16px}
+.diag-list li{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0;font-size:0.9rem;line-height:1.6}
+.diag-list li::before{content:'✓';color:#00994D;font-weight:800;flex-shrink:0;min-width:14px;margin-top:1px}
+/* Conclusão */
+#concl .slide-inner{padding:36px 40px}
+.concl-list{list-style:none;margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.concl-item{background:#f8f8f8;border-radius:10px;padding:14px 16px;border-left:3px solid #1A3CFF;font-size:0.87rem;line-height:1.55;color:#333}
+/* Footer */
+#footer{background:#0a0a2e;min-height:0;flex-direction:row;align-items:center;justify-content:center;padding:32px 40px}
+#footer img{height:40px;filter:brightness(0) invert(1)}
+.footer-txt{color:rgba(255,255,255,0.6);font-size:12px;text-align:center;margin-top:10px}
+
+/* ── Print ── */
+@media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  @page{size:A4 landscape;margin:15mm}
+  body{background:#fff}
+  section{page-break-after:always;break-after:page;min-height:0;background:#fff}
+  #footer{page-break-after:auto;break-after:auto}
+  #hero{background:linear-gradient(135deg,#0a0a2e 0%,#1A3CFF 100%)!important}
+  .slide-inner{padding:20px 28px!important}
+  #hero .slide-inner{padding:24px 32px!important}
+  .hero-title{font-size:1.6rem!important}
+  .kpi-grid{gap:10px!important;margin-top:10px!important}
+  .kpi-card{padding:10px 14px!important}
+  .kpi-value{font-size:1.4rem!important}
+  .kpi-sub{font-size:10px!important}
+  .plat-badge{margin-bottom:6px!important}
+  .sec-title{font-size:1.3rem!important;margin-bottom:2px!important}
+  .sec-sub{margin-bottom:8px!important}
+  .chart-box{padding:10px 14px!important;margin-top:8px!important}
+  .chart-wrap{height:180px!important;max-height:180px!important}
+  canvas{height:180px!important;max-height:180px!important}
+  .diag-list li{padding:8px 0!important;font-size:0.82rem!important}
+  .concl-list{gap:8px!important}
+  .concl-item{padding:10px 14px!important;font-size:0.8rem!important}
+  #footer{background:#0a0a2e!important;padding:24px 32px!important;justify-content:center!important;display:flex!important;flex-direction:column!important;align-items:center!important}
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="slide-inner">
+    <div class="hero-top">
+      ${logoB64 ? `<img src="${logoB64}" alt="Esquina" class="hero-logo">` : '<div style="width:80px"></div>'}
+      <div class="hero-meta">
+        <div class="hero-badge">Boletim Semanal</div>
+        <div class="hero-period">${periodoLabel}</div>
+      </div>
+    </div>
+    <h1 class="hero-title">${cliente}</h1>
+    <p class="hero-sub">Campanha Temas Diversos · Resumo de Performance</p>
+    <div class="kpi-grid">
+      ${kpiCard('Impressões Totais', fmtK(totalImpr), 'Todas as plataformas')}
+      ${kpiCard(inscritosYT > 0 ? 'Novos Inscritos YouTube' : 'Visualizações YouTube', fmtK(inscritosYT > 0 ? inscritosYT : ytViews), 'No período')}
+      ${kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram')}
+      ${kpiCard('Novos Seguidores', seguidoresSemana > 0 ? fmtK(seguidoresSemana) : '—', seguidoresMes > 0 ? `+${fmtK(seguidoresMes).replace('+','')} no mês` : 'Instagram')}
+    </div>
+  </div>
+</section>
+
+${secoes.display ? platformSection('display', '#1A3CFF', 'Google Display', 'Google Display', `Impressões, cliques e CTR · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(dispImpr), 'Total no período') +
+  kpiCard('Cliques', fmtK(dispCliques), 'Total no período') +
+  kpiCard('CTR', fmtPct2(dispCtr), 'Taxa de clique') +
+  kpiCard('Grupos Ativos', String(topDisp.length), 'Com entrega'),
+  'ch-display', topDisp.length > 0) : ''}
+
+${secoes.youtube ? platformSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Impressões, visualizações e inscritos · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(ytImpr), 'Total no período') +
+  kpiCard('Visualizações', fmtK(ytViews), 'Total no período') +
+  kpiCard('Cliques', fmtK(ytCliques), 'Total no período') +
+  kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
+  'ch-youtube', topYT.length > 0) : ''}
+
+${secoes.metaTD ? platformSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(finalTDImpr), 'Total no período') +
+  kpiCard('Alcance', fmtK(finalTDReach), 'Usuários únicos') +
+  kpiCard('Engajamentos', fmtK(finalTDCliques), 'Cliques') +
+  kpiCard('Frequência', finalTDFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x', 'Média por usuário'),
+  'ch-meta-td', topTD.length > 0) : ''}
+
+${secoes.metaVP && hasVPData ? platformSection('meta-vp', '#C44A00', 'Meta — Visitas ao Perfil', 'Meta Visitas ao Perfil', `Impressões, alcance e visitas · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(vpImpr), 'Total no período') +
+  kpiCard('Alcance', fmtK(vpReach), 'Usuários únicos') +
+  kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram') +
+  kpiCard('Frequência', vpFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x', 'Média por usuário'),
+  'ch-meta-vp', topVP.length > 0) : ''}
+
+${secoes.tiktok && tiktokImpressoes > 0 ? platformSection('tiktok', '#00994D', 'TikTok', 'TikTok', `Impressões, cliques e CTR · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(tiktokImpressoes), 'Total no período') +
+  kpiCard('Cliques', fmtK(tiktokCliques), 'Destino') +
+  kpiCard('CTR', fmtPct2(tiktokCtr), 'Taxa de clique') +
+  kpiCard('Campanhas', '—', 'Ativas'),
+  'ch-tiktok', tiktokImpressoes > 0) : ''}
+
+${secoes.diagnostico ? `
+<section id="diag">
+  <div class="slide-inner">
+    <div class="plat-badge" style="background:#00994D20;color:#00994D">Diagnóstico</div>
+    <h2 class="sec-title">Destaques do Período</h2>
+    <p class="sec-sub">${periodoLabel}</p>
+    <ul class="diag-list">
+      ${diagItems.map(item => `<li><span>${item}</span></li>`).join('\n      ')}
+    </ul>
+  </div>
+</section>` : ''}
+
+${secoes.conclusao ? `
+<section id="concl">
+  <div class="slide-inner">
+    <div class="plat-badge" style="background:#1A3CFF20;color:#1A3CFF">Conclusão</div>
+    <h2 class="sec-title">Próximos Passos</h2>
+    <p class="sec-sub">Recomendações operacionais para o próximo período</p>
+    <div class="concl-list">
+      ${conclItems.map((item, i) => `<div class="concl-item"><strong>${i + 1}.</strong> ${item}</div>`).join('\n      ')}
+    </div>
+  </div>
+</section>` : ''}
+
+<section id="footer">
+  ${logoB64 ? `<img src="${logoB64}" alt="Esquina">` : ''}
+  <p class="footer-txt">Boletim Semanal · ${cliente} · ${periodoLabel}</p>
+</section>
+
+<script>${safeChartJs}</script>
+<script>
+Chart.defaults.animation = false;
+Chart.defaults.color = '#666666';
+Chart.defaults.borderColor = 'rgba(0,0,0,0.06)';
+${chartScripts.join('\n')}
+
+window.addEventListener('beforeprint', function() {
+  document.querySelectorAll('canvas').forEach(function(canvas) {
+    var chart = Chart.getChart(canvas);
+    if (!chart) return;
+    var wrapper = canvas.parentElement;
+    var n = (chart.config.data && chart.config.data.labels) ? chart.config.data.labels.length : 0;
+    var h = chart.config.type === 'doughnut' ? 220 : n >= 5 ? 200 : n === 4 ? 175 : 160;
+    wrapper.style.height = h + 'px';
+    var w = wrapper.clientWidth || 600;
+    canvas.width = w; canvas.height = h;
+    chart.resize(w, h); chart.draw();
+  });
+});
+</script>
+</body>
+</html>`
+}
+
+function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
+  const [clienteInput, setClienteInput2] = useState('')
+  const [clienteSelecionado, setClienteSelecionado2] = useState<string | null>(null)
+  const [todosNomes2, setTodosNomes2] = useState<string[]>([])
+  const [showSugestoes2, setShowSugestoes2] = useState(false)
+  const [loadingNomes2, setLoadingNomes2] = useState(true)
+  const [secoes, setSecoes] = useState({ display: true, youtube: true, metaTD: true, metaVP: true, tiktok: false, diagnostico: true, conclusao: true })
+  const [periodoStart, setPeriodoStart] = useState('')
+  const [periodoEnd, setPeriodoEnd] = useState('')
+  const [seguidoresSemana, setSeguidoresSemana] = useState('')
+  const [seguidoresMes, setSeguidoresMes] = useState('')
+  const [visitasPerfil, setVisitasPerfil] = useState('')
+  const [tiktokImpressoes, setTiktokImpressoes] = useState('')
+  const [tiktokCliques, setTiktokCliques] = useState('')
+  const [gerando, setGerando] = useState(false)
+  const [erro, setErro] = useState('')
+
+  const podeGerar = !!clienteSelecionado && !!periodoStart && !!periodoEnd
+
+  useEffect(() => {
+    // Default: last 7 days
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const start = new Date(hoje); start.setDate(start.getDate() - 6)
+    setPeriodoStart(start.toISOString().slice(0, 10))
+    setPeriodoEnd(hoje.toISOString().slice(0, 10))
+  }, [])
+
+  useEffect(() => {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const start = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
+    const end = hoje.toISOString().slice(0, 10)
+    Promise.all([
+      fetch(`/api/meta-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
+      fetch(`/api/google-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
+    ]).then(([meta, google]) => {
+      const merged = [...new Set([...(meta.data ?? []).map((a: any) => a.nome), ...(google.data ?? []).map((a: any) => a.nome)])].sort()
+      setTodosNomes2(merged as string[])
+      setLoadingNomes2(false)
+    })
+  }, [])
+
+  const sugestoes2 = clienteInput.trim() ? todosNomes2.filter(n => n.toLowerCase().includes(clienteInput.toLowerCase())) : todosNomes2
+
+  function toggleSecao(k: keyof typeof secoes) { setSecoes(p => ({ ...p, [k]: !p[k] })) }
+
+  async function gerar() {
+    if (!clienteSelecionado || !periodoStart || !periodoEnd) return
+    setGerando(true); setErro('')
+    try {
+      const [metaRes, googleRes, chartJsText, logoData] = await Promise.all([
+        fetch(`/api/meta-ads?start=${periodoStart}&end=${periodoEnd}`).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`/api/google-ads?start=${periodoStart}&end=${periodoEnd}`).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch('https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js').then(r => r.text()).catch(() => ''),
+        fetch('/logo-esquina.png').then(r => r.arrayBuffer()).then(buf => {
+          let binary = ''
+          new Uint8Array(buf).forEach(b => { binary += String.fromCharCode(b) })
+          return `data:image/png;base64,${btoa(binary)}`
+        }).catch(() => ''),
+      ])
+
+      const metaDados = (metaRes.data ?? []).filter((a: any) => a.nome === clienteSelecionado)
+      const googleDados = (googleRes.data ?? []).filter((a: any) => a.nome === clienteSelecionado)
+
+      const html = buildRelatorioHTML({
+        cliente: clienteSelecionado,
+        periodoStart, periodoEnd,
+        metaDados, googleDados, secoes,
+        seguidoresSemana: Number(seguidoresSemana) || 0,
+        seguidoresMes: Number(seguidoresMes) || 0,
+        visitasPerfil: Number(visitasPerfil) || 0,
+        tiktokImpressoes: Number(tiktokImpressoes) || 0,
+        tiktokCliques: Number(tiktokCliques) || 0,
+        chartJsText,
+        logoB64: logoData,
+      })
+
+      const newWin = window.open('', '_blank')
+      if (!newWin) { setErro('Popup bloqueado pelo navegador. Permita popups neste site e tente novamente.'); setGerando(false); return }
+      newWin.document.write(html)
+      newWin.document.close()
+      setTimeout(() => { try { newWin.print() } catch {} }, 1500)
+      onClose()
+    } catch (e) {
+      console.error(e)
+      setErro('Erro ao gerar o relatório. Verifique a conexão e tente novamente.')
+    } finally {
+      setGerando(false)
+    }
+  }
+
+  const inputStyle = { width: '100%', background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#e8e8e8', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }
+  const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: '#555', textTransform: 'uppercase' as const, letterSpacing: 0.8, marginBottom: 8, display: 'block' }
+
+  const SECOES_LABELS: Array<[keyof typeof secoes, string]> = [
+    ['display', 'Google Display'],
+    ['youtube', 'YouTube'],
+    ['metaTD', 'Meta Temas Diversos'],
+    ['metaVP', 'Meta Visitas ao Perfil'],
+    ['tiktok', 'TikTok'],
+    ['diagnostico', 'Diagnóstico'],
+    ['conclusao', 'Conclusão'],
+  ]
+
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 14, padding: 28, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto' }}>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8e8' }}>Relatório Semanal</div>
+            <div style={{ fontSize: 12, color: '#555', marginTop: 3 }}>Gera slides HTML com print automático (A4 paisagem)</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 0, marginTop: -2 }}>×</button>
+        </div>
+
+        {/* Cliente */}
+        <div style={{ marginBottom: 16, position: 'relative' }}>
+          <span style={labelStyle}>Cliente <span style={{ color: '#f87171' }}>*</span></span>
+          <input
+            placeholder={loadingNomes2 ? 'Carregando...' : 'Buscar cliente...'}
+            value={clienteInput}
+            disabled={loadingNomes2}
+            autoComplete="off"
+            onChange={e => { setClienteInput2(e.target.value); setClienteSelecionado2(null); setShowSugestoes2(true) }}
+            onFocus={() => setShowSugestoes2(true)}
+            onBlur={() => setTimeout(() => setShowSugestoes2(false), 150)}
+            style={{ ...inputStyle, background: clienteSelecionado ? '#0f2e1a' : '#1a1a1a', border: `1px solid ${clienteSelecionado ? '#22c55e55' : '#2a2a2a'}` }}
+          />
+          {clienteSelecionado && <div style={{ fontSize: 11, color: '#4ade80', marginTop: 4 }}>✓ {clienteSelecionado}</div>}
+          {showSugestoes2 && sugestoes2.length > 0 && !clienteSelecionado && (
+            <div style={{ position: 'absolute', top: 'calc(100% - 4px)', left: 0, right: 0, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 8, zIndex: 100, maxHeight: 180, overflowY: 'auto', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              {sugestoes2.map(nome => (
+                <div key={nome} onMouseDown={() => { setClienteSelecionado2(nome); setClienteInput2(nome); setShowSugestoes2(false) }}
+                  style={{ padding: '8px 12px', fontSize: 13, color: '#ddd', cursor: 'pointer', borderBottom: '1px solid #222' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#2a2a2a')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  {nome}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Período */}
+        <div style={{ marginBottom: 16 }}>
+          <span style={labelStyle}>Período <span style={{ color: '#f87171' }}>*</span></span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="date" value={periodoStart} onChange={e => setPeriodoStart(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+            <input type="date" value={periodoEnd} onChange={e => setPeriodoEnd(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+          </div>
+        </div>
+
+        {/* Seções */}
+        <div style={{ marginBottom: 16 }}>
+          <span style={labelStyle}>Seções</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {SECOES_LABELS.map(([key, label]) => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', background: secoes[key] ? '#1a2a1a' : '#1a1a1a', border: `1px solid ${secoes[key] ? '#2a4a2a' : '#2a2a2a'}`, borderRadius: 7, padding: '7px 10px', transition: 'all 0.15s' }}>
+                <input type="checkbox" checked={secoes[key]} onChange={() => toggleSecao(key)} style={{ accentColor: '#22c55e', width: 14, height: 14 }} />
+                <span style={{ fontSize: 12, color: secoes[key] ? '#86efac' : '#666', fontWeight: 500 }}>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Dados manuais */}
+        <div style={{ marginBottom: 20 }}>
+          <span style={labelStyle}>Dados manuais</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {[
+              ['Seguidores novos (semana)', seguidoresSemana, setSeguidoresSemana],
+              ['Seguidores novos (mês)', seguidoresMes, setSeguidoresMes],
+              ['Visitas ao perfil', visitasPerfil, setVisitasPerfil],
+              ['TikTok – Impressões', tiktokImpressoes, setTiktokImpressoes],
+              ['TikTok – Cliques', tiktokCliques, setTiktokCliques],
+            ].map(([label, val, setter]) => (
+              <div key={label as string}>
+                <div style={{ fontSize: 10, color: '#555', marginBottom: 4 }}>{label as string}</div>
+                <input
+                  type="number" placeholder="0"
+                  value={val as string}
+                  onChange={e => (setter as React.Dispatch<React.SetStateAction<string>>)(e.target.value)}
+                  style={{ ...inputStyle, padding: '7px 10px', fontSize: 12 }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {erro && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 12 }}>{erro}</div>}
+
+        <button onClick={gerar} disabled={gerando || !podeGerar}
+          style={{ width: '100%', padding: '11px 0', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: gerando || !podeGerar ? 'not-allowed' : 'pointer', border: 'none', background: gerando || !podeGerar ? '#252525' : '#1A3CFF', color: gerando || !podeGerar ? '#555' : '#fff', transition: 'all 0.15s' }}>
+          {gerando ? 'Buscando dados e gerando...' : 'Gerar Relatório (PDF)'}
+        </button>
+        <div style={{ fontSize: 11, color: '#555', marginTop: 8, textAlign: 'center' }}>Abre em nova aba → aciona impressão automática → salvar como PDF</div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Modal ─────────────────────────────────────────────────────────────────────
 function RelatorioModal({ onClose }: { onClose: () => void }) {
   const [clienteInput, setClienteInput] = useState('')
@@ -511,6 +1059,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('meta')
   const [theme, setTheme] = useState<Theme>('dark')
   const [showRelatorio, setShowRelatorio] = useState(false)
+  const [showRelatorioSemanal, setShowRelatorioSemanal] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -570,6 +1119,9 @@ export default function Dashboard() {
         <button onClick={() => setShowRelatorio(true)} title="Gerar relatório para WhatsApp" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a4a2a', transition: 'all 0.15s', background: '#1a2e1a', color: '#4ade80', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>✉</span> Relatório WA
         </button>
+        <button onClick={() => setShowRelatorioSemanal(true)} title="Gerar boletim semanal PDF" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a3a4a', transition: 'all 0.15s', background: '#1a2030', color: '#7ba3ff', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14 }}>📄</span> Boletim PDF
+        </button>
 
         <div style={{ flex: 1 }} />
 
@@ -593,6 +1145,7 @@ export default function Dashboard() {
       </div>
 
       {showRelatorio && <RelatorioModal onClose={() => setShowRelatorio(false)} />}
+      {showRelatorioSemanal && <RelatorioSemanalModal onClose={() => setShowRelatorioSemanal(false)} />}
     </div>
   )
 }
