@@ -41,6 +41,17 @@ Next.js dashboard at `digital-esquina.vercel.app`. Three pages: Entregas, Meta A
 Google Ads e Entregas atualizam automaticamente no próximo horário par (1h, 3h, 5h… BRT).
 Cache da API: 30 min para Google Ads e Meta Ads; 1800s para Entregas (Sheets).
 
+### Botão Relatório WA (dashboard/page.tsx)
+Quarto botão no header do dashboard (cor verde, ícone ✉). Abre um modal com:
+- **Redes**: toggle Meta Ads / Google Ads (botões que ativam/desativam)
+- **Período**: dropdown com presets (Este mês, Mês passado, Últimos 7/14/30 dias, Personalizado)
+- **Incluir valores financeiros**: toggle que controla se Investimento, CPM, CPC e Custo/Conv. aparecem
+- **Gerar Relatório**: busca `/api/meta-ads` e `/api/google-ads` em paralelo, monta mensagem formatada para WhatsApp (markdown do WA: `*negrito*`, `_itálico_`)
+- **Copiar texto**: copia para o clipboard com feedback "✓ Copiado!"
+- **Abrir no WhatsApp**: abre `https://wa.me/?text=...` (usuário escolhe o destinatário)
+
+Frequência Meta Ads calculada como `impressões / alcance` (matematicamente correto ao agregar múltiplas contas).
+
 ## Deploy
 Push para `main` no GitHub dispara deploy automático na Vercel (conta `bruno@esquina.online`).
 
