@@ -236,15 +236,27 @@ function TrendChart({ serie, theme }: { serie: MetaDailyPoint[]; theme: Theme })
       chartRef.current?.destroy()
       const labels = serie.map(p => { const [, m, d] = p.date.split('-'); return `${d}/${m}` })
       const allBarData = barMetrics.map(k => serie.map(p => (p[k] as number) ?? 0))
-      const maxBar = Math.max(...allBarData.flat(), 1)
 
       const barDatasets = barMetrics.map((k, i) => {
         const opt = META_BAR_OPTIONS.find(o => o.key === k)!
-        return { type: 'bar' as const, label: opt.label, data: allBarData[i], backgroundColor: opt.color + '99', borderColor: opt.color, borderWidth: 1, borderRadius: 3, yAxisID: 'y' }
+        return { type: 'bar' as const, label: opt.label, data: allBarData[i], backgroundColor: opt.color + '99', borderColor: opt.color, borderWidth: 1, borderRadius: 3, yAxisID: `yBar${i}` }
       })
       const lineDatasets = lineMetrics.map(k => {
         const opt = META_LINE_OPTIONS.find(o => o.key === k)!
-        return { type: 'line' as const, label: opt.label, data: serie.map(p => (p[k] as number) ?? 0), borderColor: opt.color, backgroundColor: opt.color + '22', borderWidth: 2, pointRadius: serie.length > 30 ? 0 : 3, pointBackgroundColor: opt.color, tension: 0.3, yAxisID: 'y2' }
+        return { type: 'line' as const, label: opt.label, data: serie.map(p => (p[k] as number) ?? 0), borderColor: opt.color, backgroundColor: opt.color + '22', borderWidth: 2, pointRadius: serie.length > 30 ? 0 : 3, pointBackgroundColor: opt.color, tension: 0.3, yAxisID: 'yLine' }
+      })
+
+      // Eixo independente por barra — evita que métricas com escalas diferentes se ofusquem
+      const barScales: Record<string, any> = {}
+      barMetrics.forEach((k, i) => {
+        const opt = META_BAR_OPTIONS.find(o => o.key === k)!
+        const maxVal = Math.max(...allBarData[i], 1)
+        barScales[`yBar${i}`] = {
+          type: 'linear', position: 'left', display: i === 0,
+          max: maxVal * 1.15,
+          grid: { color: i === 0 ? t.borderInner : 'transparent' },
+          ticks: { color: opt.color, font: { size: 10 }, callback: (v: any) => fmtMetaBarVal(Number(v), k) },
+        }
       })
 
       chartRef.current = new Chart(canvasRef.current!, {
@@ -269,8 +281,8 @@ function TrendChart({ serie, theme }: { serie: MetaDailyPoint[]; theme: Theme })
           },
           scales: {
             x: { ticks: { color: t.textMuted, font: { size: 10 }, maxTicksLimit: serie.length > 30 ? 8 : 15 }, grid: { color: t.borderInner } },
-            y: { type: 'linear' as const, position: 'left' as const, max: maxBar * 1.15, ticks: { color: primaryBar.color, font: { size: 10 }, callback: (v: any) => fmtMetaBarVal(Number(v), barMetrics[0]) }, grid: { color: t.borderInner } },
-            y2: { type: 'linear' as const, position: 'right' as const, ticks: { color: primaryLine.color, font: { size: 10 }, callback: (v: any) => fmtMetaLineVal(Number(v), lineMetrics[0]) }, grid: { drawOnChartArea: false } },
+            ...barScales,
+            yLine: { type: 'linear' as const, position: 'right' as const, ticks: { color: primaryLine.color, font: { size: 10 }, callback: (v: any) => fmtMetaLineVal(Number(v), lineMetrics[0]) }, grid: { drawOnChartArea: false } },
           },
         },
       })
