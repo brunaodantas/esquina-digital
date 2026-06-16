@@ -181,11 +181,12 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     L.push(cabecalho)
     L.push('')
 
-    // ── Visão Geral (consolidado) ──
+    // ── Visão Geral (consolidado Meta + Google) ──
     const totalImpr = metaImpr + gImpr
     const totalCliques = metaClicks + gCliques
     const totalInvest = metaSpend + gCusto
-    L.push('* Visão Geral')
+    const labelVG = redes.meta && redes.google ? '* Visão Geral (Meta + Google)' : '* Visão Geral'
+    L.push(labelVG)
     L.push(`Impressões: ${fmtN(totalImpr)}`)
     if (redes.meta && metaReach > 0) L.push(`Alcance: ${fmtN(metaReach)}`)
     L.push(`Cliques: ${fmtN(totalCliques)}`)
@@ -202,16 +203,20 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       } else {
         L.push('📊 Desempenho Meta Ads')
         L.push(`Impressões: ${fmtN(metaImpr)}`)
-        if (metaReach > 0) L.push(`Alcance: ${fmtN(metaReach)}`)
         L.push(`Cliques: ${fmtN(metaClicks)}`)
         L.push(`CTR: ${fmtPctn(metaCtr)}`)
-        if (metaFreq > 0) L.push(`Frequência: ${fmtF(metaFreq)}`)
         if (metaThru > 0) L.push(`ThruPlays: ${fmtN(metaThru)}`)
         if (incluirValores) {
           L.push(`Investimento: ${fmtBRLn(metaSpend)}`)
           if (metaCpm > 0) L.push(`CPM: ${fmtBRLn(metaCpm)}`)
           if (metaCpc > 0) L.push(`CPC: ${fmtBRLn(metaCpc)}`)
         }
+        L.push('')
+
+        // Audiência Meta
+        L.push('👥 Audiência')
+        if (metaReach > 0) L.push(`Alcance: ${fmtN(metaReach)}`)
+        if (metaFreq > 0) L.push(`Frequência: ${fmtF(metaFreq)}`)
         L.push('')
 
         if (top3Meta.length > 0) {
@@ -249,6 +254,12 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           if (gCpc > 0) L.push(`CPC: ${fmtBRLn(gCpc)}`)
           if (gCustoConv > 0) L.push(`Custo/Conv.: ${fmtBRLn(gCustoConv)}`)
         }
+        L.push('')
+
+        // Audiência Google (sem reach nativo — usa impressões como proxy de exposição)
+        L.push('👥 Audiência')
+        L.push(`Exposição: ${fmtN(gImpr)} impressões`)
+        if (gConv > 0) L.push(`Taxa de conversão: ${fmtPctn((gConv / gCliques) * 100)}`)
         L.push('')
 
         if (top3Google.length > 0) {
