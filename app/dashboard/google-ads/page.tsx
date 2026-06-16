@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { AccountData } from '@/app/api/google-ads/route'
+import type { AccountData, CampaignData, DailyPoint } from '@/app/api/google-ads/route'
 
 type Theme = 'dark' | 'light'
 type Preset = 'personalizado' | 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'ytd-2026'
+type TipoTab = 'todas' | 'pesquisa' | 'display' | 'pmax' | 'video' | 'outros'
+type StatusTab = 'todas' | 'ativo' | 'pausado'
 
 const C = {
   dark: {
@@ -20,6 +22,9 @@ const C = {
     inputBg: '#111', inputBorder: '#333', inputText: '#ccc',
     selectBg: '#1e1e1e', selectBorder: '#333', selectText: '#ccc',
     kpiBg: '#161616', kpiBorder: '#222',
+    tabActive: '#1A3CFF1A', tableBorder: '#1e1e1e',
+    tableHover: '#ffffff06',
+    chipBg: '#222', chipActive: '#1A3CFF',
   },
   light: {
     page: '#f0f2f5', card: '#ffffff', cardInner: '#f8f8f8',
@@ -34,6 +39,9 @@ const C = {
     inputBg: '#f8f8f8', inputBorder: '#e0e0e0', inputText: '#333',
     selectBg: '#f8f8f8', selectBorder: '#e0e0e0', selectText: '#333',
     kpiBg: '#ffffff', kpiBorder: '#e8e8e8',
+    tabActive: '#1A3CFF12', tableBorder: '#f0f0f0',
+    tableHover: '#00000004',
+    chipBg: '#e8e8e8', chipActive: '#1A3CFF',
   },
 }
 
@@ -45,6 +53,15 @@ const PRESETS: { key: Preset; label: string }[] = [
   { key: 'ultimos-14', label: 'Últimos 14 dias' },
   { key: 'ultimos-30', label: 'Últimos 30 dias' },
   { key: 'ytd-2026', label: '2026 (YTD)' },
+]
+
+const TIPO_TABS: { key: TipoTab; label: string }[] = [
+  { key: 'todas', label: 'Todas' },
+  { key: 'pesquisa', label: 'Pesquisa' },
+  { key: 'display', label: 'Display' },
+  { key: 'pmax', label: 'Perf. Max' },
+  { key: 'video', label: 'Vídeo' },
+  { key: 'outros', label: 'Outros' },
 ]
 
 function fmtDate(d: Date) { return d.toISOString().slice(0, 10) }
@@ -72,21 +89,20 @@ function fmtNum(n: number): string {
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace('.', ',') + 'k'
   return n.toLocaleString('pt-BR')
 }
-
 function fmtBRL(n: number): string {
   return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
 function fmtPct(n: number): string {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
 }
+function fmtDateLabel(iso: string): string {
+  const [, m, d] = iso.split('-')
+  return `${d}/${m}`
+}
 
-function PeriodoDropdown({
-  preset, custom, t, onApply,
-}: {
-  preset: Preset
-  custom: { start: string; end: string }
-  t: typeof C['dark']
+// ─── Period Dropdown ──────────────────────────────────────────────────────────
+function PeriodoDropdown({ preset, custom, t, onApply }: {
+  preset: Preset; custom: { start: string; end: string }; t: typeof C['dark']
   onApply: (preset: Preset, custom: { start: string; end: string }) => void
 }) {
   const [aberto, setAberto] = useState(false)
@@ -99,41 +115,29 @@ function PeriodoDropdown({
     onApply(tempPreset, tempCustom)
     setAberto(false)
   }
-
-  function abrir() {
-    setTempPreset(preset)
-    setTempCustom(custom)
-    setAberto(true)
-  }
+  function abrir() { setTempPreset(preset); setTempCustom(custom); setAberto(true) }
 
   const inputStyle: React.CSSProperties = {
     background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText,
-    borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%',
-    outline: 'none', colorScheme: 'dark',
+    borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', outline: 'none', colorScheme: 'dark',
   }
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
-      <button
-        onClick={aberto ? () => setAberto(false) : abrir}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-          background: t.filtroBtn, border: `1px solid ${t.border}`, color: t.textSecondary,
-          cursor: 'pointer',
-        }}
-      >
+      <button onClick={aberto ? () => setAberto(false) : abrir} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+        background: t.filtroBtn, border: `1px solid ${t.border}`, color: t.textSecondary, cursor: 'pointer',
+      }}>
         📅 {label} <span style={{ fontSize: 10, color: t.textMuted }}>▼</span>
       </button>
-
       {aberto && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setAberto(false)} />
           <div style={{
             position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 999,
             background: t.dropBg, border: `1px solid ${t.dropBorder}`,
-            borderRadius: 12, padding: 16, minWidth: 380,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+            borderRadius: 12, padding: 16, minWidth: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
           }}>
             <div style={{ display: 'flex', gap: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
@@ -153,7 +157,6 @@ function PeriodoDropdown({
                   </div>
                 ))}
               </div>
-
               {tempPreset === 'personalizado' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, paddingTop: 28 }}>
                   <div>
@@ -167,14 +170,9 @@ function PeriodoDropdown({
                 </div>
               )}
             </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${t.dropBorder}` }}>
-              <button onClick={() => setAberto(false)} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: 'transparent', border: `1px solid ${t.border}`, color: t.textMuted, cursor: 'pointer' }}>
-                Cancelar
-              </button>
-              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: '#1A3CFF', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>
-                Aplicar
-              </button>
+              <button onClick={() => setAberto(false)} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: 'transparent', border: `1px solid ${t.border}`, color: t.textMuted, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: '#1A3CFF', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Aplicar</button>
             </div>
           </div>
         </>
@@ -183,100 +181,328 @@ function PeriodoDropdown({
   )
 }
 
-function KpiTile({ label, value, sub, t }: { label: string; value: string; sub?: string; t: typeof C['dark'] }) {
+// ─── KPI Tile ─────────────────────────────────────────────────────────────────
+function KpiTile({ label, value, t }: { label: string; value: string; t: typeof C['dark'] }) {
   return (
     <div style={{ background: t.kpiBg, border: `1px solid ${t.kpiBorder}`, borderRadius: 10, padding: '14px 16px' }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>{sub}</div>}
     </div>
   )
 }
 
-function MetricRow({ label, value, t }: { label: string; value: string; t: typeof C['dark'] }) {
+// ─── Trend Chart (Chart.js) ────────────────────────────────────────────────────
+function TrendChart({ serie, theme }: { serie: DailyPoint[]; theme: Theme }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const chartRef = useRef<any>(null)
+  const t = C[theme]
+
+  useEffect(() => {
+    if (!canvasRef.current || serie.length === 0) return
+
+    const run = async () => {
+      const { Chart, registerables } = await import('chart.js')
+      Chart.register(...registerables)
+
+      if (chartRef.current) {
+        chartRef.current.destroy()
+        chartRef.current = null
+      }
+
+      const labels = serie.map(p => fmtDateLabel(p.date))
+      const custoData = serie.map(p => p.custo)
+      const cpcData = serie.map(p => p.cpcMedio)
+      const maxCusto = Math.max(...custoData, 1)
+
+      chartRef.current = new Chart(canvasRef.current!, {
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'bar' as const,
+              label: 'Investimento',
+              data: custoData,
+              backgroundColor: '#1A3CFF99',
+              borderColor: '#1A3CFF',
+              borderWidth: 1,
+              borderRadius: 3,
+              yAxisID: 'y',
+            },
+            {
+              type: 'line' as const,
+              label: 'CPC Médio',
+              data: cpcData,
+              borderColor: '#f59e0b',
+              backgroundColor: '#f59e0b33',
+              borderWidth: 2,
+              pointRadius: serie.length > 30 ? 0 : 3,
+              pointBackgroundColor: '#f59e0b',
+              tension: 0.3,
+              yAxisID: 'y2',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              labels: { color: t.textMuted, font: { size: 11 }, boxWidth: 12, padding: 16 },
+            },
+            tooltip: {
+              backgroundColor: t.dropBg,
+              titleColor: t.textPrimary,
+              bodyColor: t.textSecondary,
+              borderColor: t.border,
+              borderWidth: 1,
+              callbacks: {
+                label: (ctx: any) => {
+                  if (ctx.datasetIndex === 0) return `  Investimento: ${fmtBRL(ctx.raw)}`
+                  return `  CPC Médio: ${fmtBRL(ctx.raw)}`
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: t.textMuted, font: { size: 10 },
+                maxTicksLimit: serie.length > 30 ? 8 : 15,
+              },
+              grid: { color: t.borderInner },
+            },
+            y: {
+              type: 'linear' as const,
+              position: 'left' as const,
+              ticks: {
+                color: t.textMuted, font: { size: 10 },
+                callback: (v: any) => `R$${Number(v) >= 1000 ? (Number(v) / 1000).toFixed(0) + 'k' : Number(v).toFixed(0)}`,
+              },
+              grid: { color: t.borderInner },
+              max: maxCusto * 1.15,
+            },
+            y2: {
+              type: 'linear' as const,
+              position: 'right' as const,
+              ticks: {
+                color: '#f59e0b', font: { size: 10 },
+                callback: (v: any) => `R$${Number(v).toFixed(2)}`,
+              },
+              grid: { drawOnChartArea: false },
+            },
+          },
+        },
+      })
+    }
+
+    run()
+    return () => {
+      chartRef.current?.destroy()
+      chartRef.current = null
+    }
+  }, [serie, theme]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${t.borderInner}` }}>
-      <span style={{ fontSize: 12, color: t.textMuted }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 600, color: t.textSecondary }}>{value}</span>
+    <div style={{ background: C[theme].card, border: `1px solid ${C[theme].border}`, borderRadius: 12, padding: '16px 20px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C[theme].textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>
+        TENDÊNCIA — INVESTIMENTO VS CPC MÉDIO
+      </div>
+      <div style={{ height: 260, position: 'relative' }}>
+        {serie.length === 0
+          ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C[theme].textMuted, fontSize: 13 }}>Sem dados de série temporal</div>
+          : <canvas ref={canvasRef} />
+        }
+      </div>
     </div>
   )
 }
 
+// ─── Campaign Table ────────────────────────────────────────────────────────────
+function CampaignTable({ campanhas, totalCusto, t }: { campanhas: CampaignData[]; totalCusto: number; t: typeof C['dark'] }) {
+  const [tipoTab, setTipoTab] = useState<TipoTab>('todas')
+  const [statusTab, setStatusTab] = useState<StatusTab>('todas')
+  const [busca, setBusca] = useState('')
+
+  const filtradas = campanhas.filter(c => {
+    if (statusTab === 'ativo' && c.status !== 'ativo') return false
+    if (statusTab === 'pausado' && c.status !== 'pausado') return false
+    if (tipoTab === 'pesquisa' && c.tipoRaw !== 'SEARCH') return false
+    if (tipoTab === 'display' && c.tipoRaw !== 'DISPLAY') return false
+    if (tipoTab === 'pmax' && !['MULTI_CHANNEL', 'PERFORMANCE_MAX'].includes(c.tipoRaw)) return false
+    if (tipoTab === 'video' && c.tipoRaw !== 'VIDEO') return false
+    if (tipoTab === 'outros' && ['SEARCH', 'DISPLAY', 'MULTI_CHANNEL', 'PERFORMANCE_MAX', 'VIDEO'].includes(c.tipoRaw)) return false
+    if (busca && !c.nome.toLowerCase().includes(busca.toLowerCase())) return false
+    return true
+  })
+
+  const chipStyle = (active: boolean): React.CSSProperties => ({
+    padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+    cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+    background: active ? '#1A3CFF' : t.chipBg,
+    color: active ? '#fff' : t.textMuted,
+  })
+
+  const thStyle: React.CSSProperties = {
+    padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left',
+    borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap',
+  }
+  const tdStyle: React.CSSProperties = {
+    padding: '10px 12px', fontSize: 13, color: t.textSecondary,
+    borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle',
+  }
+
+  return (
+    <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12 }}>
+      {/* Header */}
+      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          {/* Tipo tabs */}
+          <div style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'wrap' }}>
+            {TIPO_TABS.map(tab => (
+              <button key={tab.key} onClick={() => setTipoTab(tab.key)} style={chipStyle(tipoTab === tab.key)}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Status */}
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 4 }}>STATUS</span>
+            {(['todas', 'ativo', 'pausado'] as StatusTab[]).map(s => (
+              <button key={s} onClick={() => setStatusTab(s)} style={chipStyle(statusTab === s)}>
+                {s === 'todas' ? 'Todas' : s === 'ativo' ? 'Ativas' : 'Pausadas'}
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <input
+            placeholder="Filtrar por nome..."
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            style={{
+              background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText,
+              borderRadius: 8, padding: '5px 12px', fontSize: 13, outline: 'none', width: 180,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ ...thStyle, minWidth: 220 }}>CAMPANHA</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>INVEST.</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>CLIQUES</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>IMPRESSÕES</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>CTR</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>CPC MÉD.</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>CONV.</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>CUSTO/CONV.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtradas.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: t.emptyText, padding: 28 }}>
+                  Nenhuma campanha encontrada
+                </td>
+              </tr>
+            ) : filtradas.map(c => {
+              const share = totalCusto > 0 ? (c.custo / totalCusto) * 100 : 0
+              return (
+                <tr key={c.id} style={{ transition: 'background 0.1s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <td style={tdStyle}>
+                    <div style={{ fontWeight: 600, color: t.textPrimary, fontSize: 13 }}>{c.nome}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                      <span style={{
+                        fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
+                        background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF2a',
+                      }}>{c.tipo}</span>
+                      <span style={{
+                        fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
+                        background: c.status === 'ativo' ? '#00cc6618' : '#66666618',
+                        color: c.status === 'ativo' ? '#4ade80' : '#888',
+                        border: `1px solid ${c.status === 'ativo' ? '#00cc6630' : '#66666630'}`,
+                      }}>{c.status === 'ativo' ? 'Ativa' : 'Pausada'}</span>
+                    </div>
+                    {share > 0 && (
+                      <div style={{ marginTop: 5, height: 2, background: t.barTrack, borderRadius: 2 }}>
+                        <div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} />
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}>{fmtBRL(c.custo)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtNum(c.cliques)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtNum(c.impressoes)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtPct(c.ctr)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{c.cpcMedio > 0 ? fmtBRL(c.cpcMedio) : '—'}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', color: c.conversoes > 0 ? '#4ade80' : t.textMuted }}>
+                    {c.conversoes > 0 ? fmtNum(c.conversoes) : '—'}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    {c.custoConversao > 0 ? fmtBRL(c.custoConversao) : '—'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Account Card (all-accounts view) ─────────────────────────────────────────
 function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: number; t: typeof C['dark'] }) {
   const [open, setOpen] = useState(true)
   const sharePct = totalCusto > 0 ? (acc.custo / totalCusto) * 100 : 0
-
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden', background: t.card }}>
-      {/* Header */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          width: '100%', padding: '14px 16px', background: 'transparent',
-          border: 'none', cursor: 'pointer', textAlign: 'left',
-        }}
-      >
+      <button onClick={() => setOpen(o => !o)} style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: t.textPrimary }}>{acc.nome}</span>
-          <span style={{
-            fontSize: 11, padding: '2px 9px', borderRadius: 20,
-            background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF33',
-          }}>
+          <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF33' }}>
             {fmtBRL(acc.custo)}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {sharePct > 0 && (
-            <span style={{ fontSize: 11, color: t.textMuted }}>{fmtPct(sharePct)} do total</span>
-          )}
+          {sharePct > 0 && <span style={{ fontSize: 11, color: t.textMuted }}>{fmtPct(sharePct)} do total</span>}
           <span style={{ color: t.chevron, fontSize: 12 }}>{open ? '▲' : '▼'}</span>
         </div>
       </button>
-
-      {/* Cost share bar */}
       {sharePct > 0 && (
         <div style={{ height: 2, background: t.barTrack, margin: '0 16px' }}>
           <div style={{ width: `${Math.min(100, sharePct)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} />
         </div>
       )}
-
-      {/* Metrics */}
       {open && (
         <div style={{ padding: '12px 16px 16px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 16px' }}>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Cliques</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary }}>{fmtNum(acc.cliques)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Impressões</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary }}>{fmtNum(acc.impressoes)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>CTR</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary }}>{fmtPct(acc.ctr)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>CPC Médio</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary }}>{acc.cpcMedio > 0 ? fmtBRL(acc.cpcMedio) : '—'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Custo</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#60a5fa' }}>{fmtBRL(acc.custo)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Conversões</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: acc.conversoes > 0 ? '#4ade80' : t.textMuted }}>
-                {acc.conversoes > 0 ? fmtNum(acc.conversoes) : '—'}
+            {[
+              { label: 'Cliques', value: fmtNum(acc.cliques) },
+              { label: 'Impressões', value: fmtNum(acc.impressoes) },
+              { label: 'CTR', value: fmtPct(acc.ctr) },
+              { label: 'CPC Médio', value: acc.cpcMedio > 0 ? fmtBRL(acc.cpcMedio) : '—' },
+              { label: 'Custo', value: fmtBRL(acc.custo), highlight: '#60a5fa' },
+              { label: 'Conversões', value: acc.conversoes > 0 ? fmtNum(acc.conversoes) : '—', highlight: acc.conversoes > 0 ? '#4ade80' : undefined },
+              { label: 'Custo/Conv.', value: acc.custoConversao > 0 ? fmtBRL(acc.custoConversao) : '—' },
+            ].map(m => (
+              <div key={m.label}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{m.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: m.highlight ?? t.textPrimary }}>{m.value}</div>
               </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>Custo/Conv.</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: t.textPrimary }}>
-                {acc.custoConversao > 0 ? fmtBRL(acc.custoConversao) : '—'}
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
@@ -284,6 +510,7 @@ function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: num
   )
 }
 
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   const [data, setData] = useState<AccountData[] | null>(null)
   const [nomes, setNomes] = useState<string[]>([])
@@ -323,6 +550,29 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
     const p = getPeriodo('mes-atual')
     periodoRef.current = p
     fetchData(p)
+
+    const scheduleNext = (): ReturnType<typeof setTimeout> => {
+      const now = new Date()
+      const nextEvenHour = (Math.floor(now.getHours() / 2) * 2 + 2) % 24
+      const next = new Date(now)
+      next.setHours(nextEvenHour, 1, 0, 0)
+      if (next <= now) next.setDate(next.getDate() + 1)
+      return setTimeout(() => {
+        const cur = periodoRef.current
+        fetch(`/api/google-ads?start=${cur.start}&end=${cur.end}`)
+          .then(r => r.json())
+          .then(res => {
+            if (!res.error) {
+              setData(res.data ?? [])
+              if ((res.nomes ?? []).length > 0) setNomes(res.nomes)
+            }
+          })
+          .catch(() => {})
+        timer = scheduleNext()
+      }, next.getTime() - now.getTime())
+    }
+    let timer = scheduleNext()
+    return () => clearTimeout(timer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -331,8 +581,6 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   }
 
   const filtrado = (data ?? []).filter(d => !filtroCliente || d.nome === filtroCliente)
-
-  // Summary totals
   const totalCliques = filtrado.reduce((s, a) => s + a.cliques, 0)
   const totalImpressoes = filtrado.reduce((s, a) => s + a.impressoes, 0)
   const totalCusto = filtrado.reduce((s, a) => s + a.custo, 0)
@@ -341,13 +589,33 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   const cpcMedio = totalCliques > 0 ? totalCusto / totalCliques : 0
   const custoConversao = totalConversoes > 0 ? totalCusto / totalConversoes : 0
 
+  const selectedAccount = filtroCliente ? filtrado[0] : null
+
+  // Merge daily series across all filtered accounts (when all selected)
+  const mergedSerie: DailyPoint[] = (() => {
+    if (selectedAccount) return selectedAccount.serie
+    const dateMap = new Map<string, { custo: number; cliques: number }>()
+    for (const acc of filtrado) {
+      for (const pt of acc.serie) {
+        const ex = dateMap.get(pt.date) ?? { custo: 0, cliques: 0 }
+        const clq = pt.cpcMedio > 0 ? pt.custo / pt.cpcMedio : 0
+        dateMap.set(pt.date, { custo: ex.custo + pt.custo, cliques: ex.cliques + clq })
+      }
+    }
+    return Array.from(dateMap.entries()).sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, d]) => ({ date, custo: d.custo, cpcMedio: d.cliques > 0 ? d.custo / d.cliques : 0 }))
+  })()
+
+  const allCampanhas: CampaignData[] = selectedAccount
+    ? selectedAccount.campanhas
+    : filtrado.flatMap(a => a.campanhas).sort((a, b) => b.custo - a.custo)
+
   return (
     <div style={{ padding: '20px 24px 40px', overflowY: 'auto', height: '100%', boxSizing: 'border-box', background: t.page }}>
 
-      {/* Controles */}
+      {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <PeriodoDropdown preset={preset} custom={custom} t={t} onApply={aplicarPeriodo} />
-
         <select
           value={filtroCliente}
           onChange={e => setFiltroCliente(e.target.value)}
@@ -359,13 +627,12 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
           <option value="">Todas as contas</option>
           {nomes.map(n => <option key={n} value={n}>{n}</option>)}
         </select>
-
         {loading && (
           <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: '2px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
         )}
       </div>
 
-      {/* Conteúdo */}
+      {/* States */}
       {loading && !data ? (
         <div style={center}>
           <div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -381,7 +648,7 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
         </div>
       ) : (
         <>
-          {/* KPI summary */}
+          {/* KPI tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 20 }}>
             <KpiTile label="Cliques" value={fmtNum(totalCliques)} t={t} />
             <KpiTile label="Impressões" value={fmtNum(totalImpressoes)} t={t} />
@@ -389,19 +656,36 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
             <KpiTile label="CPC Médio" value={cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'} t={t} />
             <KpiTile label="Investimento" value={fmtBRL(totalCusto)} t={t} />
             <KpiTile label="Conversões" value={totalConversoes > 0 ? fmtNum(totalConversoes) : '—'} t={t} />
-            <KpiTile
-              label="Custo/Conv."
-              value={custoConversao > 0 ? fmtBRL(custoConversao) : '—'}
-              t={t}
-            />
+            <KpiTile label="Custo/Conv." value={custoConversao > 0 ? fmtBRL(custoConversao) : '—'} t={t} />
           </div>
 
-          {/* Account cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {filtrado.map(acc => (
-              <AccountCard key={acc.id} acc={acc} totalCusto={totalCusto} t={t} />
-            ))}
-          </div>
+          {/* Trend Chart */}
+          {mergedSerie.length > 1 && (
+            <div style={{ marginBottom: 20 }}>
+              <TrendChart serie={mergedSerie} theme={theme} />
+            </div>
+          )}
+
+          {/* Account cards OR campaign table */}
+          {!filtroCliente ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {filtrado.map(acc => (
+                <AccountCard key={acc.id} acc={acc} totalCusto={totalCusto} t={t} />
+              ))}
+            </div>
+          ) : (
+            <CampaignTable campanhas={allCampanhas} totalCusto={totalCusto} t={t} />
+          )}
+
+          {/* When "all accounts" but user might want table too — show after cards */}
+          {!filtroCliente && allCampanhas.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
+                TODAS AS CAMPANHAS
+              </div>
+              <CampaignTable campanhas={allCampanhas} totalCusto={totalCusto} t={t} />
+            </div>
+          )}
         </>
       )}
     </div>
