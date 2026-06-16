@@ -130,16 +130,16 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
     if (n >= 1_000) return '+' + (n / 1_000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'K'
     return '+' + n.toLocaleString('pt-BR')
   }
-  function fmtPct2(n: number): string { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
-  function cleanName(n: string) { return n.replace(/\[.*?\]/g, '').trim().slice(0, 35) }
+  function fmtF2(n: number): string { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+  function fmtPct2(n: number): string { return fmtF2(n) + '%' }
+  function cleanName(n: string) { return n.replace(/\[.*?\]/g, '').trim().slice(0, 32) }
 
-  // Google: split Display vs YouTube by tipoRaw
+  // ── Google: split Display vs YouTube ──
   const dispCamps: any[] = googleDados.flatMap(a => (a.campanhas ?? []).filter((c: any) => c.tipoRaw === 'DISPLAY'))
   const ytCamps: any[] = googleDados.flatMap(a => (a.campanhas ?? []).filter((c: any) => c.tipoRaw === 'VIDEO'))
   const dispCampIds = new Set(dispCamps.map(c => c.id))
   const ytCampIds = new Set(ytCamps.map(c => c.id))
   const dispGroups: any[] = googleDados.flatMap(a => (a.grupos ?? []).filter((g: any) => dispCampIds.has(g.campanhaId)))
-  const ytGroups: any[] = googleDados.flatMap(a => (a.grupos ?? []).filter((g: any) => ytCampIds.has(g.campanhaId)))
 
   const dispImpr = dispCamps.reduce((s, c) => s + c.impressoes, 0)
   const dispCliques = dispCamps.reduce((s, c) => s + c.cliques, 0)
@@ -150,7 +150,7 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   const ytCliques = ytCamps.reduce((s, c) => s + c.cliques, 0)
   const ytConv = ytCamps.reduce((s, c) => s + c.conversoes, 0)
 
-  // Meta: split TD vs VP by campaign name
+  // ── Meta: split TD vs VP ──
   const isVP = (nome: string) => /\bvp\b|visita|perfil/i.test(nome)
   const metaCamps: any[] = metaDados.flatMap(a => a.campanhas ?? [])
   const tdCamps = metaCamps.filter(c => !isVP(c.nome))
@@ -159,90 +159,161 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   const tdImpr = tdCamps.reduce((s, c) => s + c.impressions, 0)
   const tdReach = tdCamps.reduce((s, c) => s + c.reach, 0)
   const tdCliques = tdCamps.reduce((s, c) => s + c.clicks, 0)
-  const tdFreq = tdReach > 0 ? tdImpr / tdReach : 0
 
   const vpImpr = vpCamps.reduce((s, c) => s + c.impressions, 0)
   const vpReach = vpCamps.reduce((s, c) => s + c.reach, 0)
-  const vpFreq = vpReach > 0 ? vpImpr / vpReach : 0
 
-  // If no VP campaigns found, use all Meta as TD
   const hasVPData = vpCamps.length > 0
   const finalTDCamps = hasVPData ? tdCamps : metaCamps
   const finalTDImpr = hasVPData ? tdImpr : metaCamps.reduce((s, c) => s + c.impressions, 0)
   const finalTDReach = hasVPData ? tdReach : metaCamps.reduce((s, c) => s + c.reach, 0)
   const finalTDCliques = hasVPData ? tdCliques : metaCamps.reduce((s, c) => s + c.clicks, 0)
   const finalTDFreq = finalTDReach > 0 ? finalTDImpr / finalTDReach : 0
+  const vpFreq = vpReach > 0 ? vpImpr / vpReach : 0
 
   const tiktokCtr = tiktokImpressoes > 0 && tiktokCliques > 0 ? (tiktokCliques / tiktokImpressoes) * 100 : 0
 
-  // Hero KPIs
   const totalImpr = dispImpr + ytImpr + finalTDImpr + vpImpr + tiktokImpressoes
-  const inscritosYT = ytConv > 0 ? ytConv : 0
+  const inscritosYT = ytConv
 
-  // Top items for charts
+  // ── Audience: Meta (account-level) ──
+  const audG = new Map<string, number>()
+  const audI = new Map<string, number>()
+  const audD = new Map<string, number>()
+  for (const acc of metaDados) {
+    for (const i of acc.audiencia?.genero ?? []) audG.set(i.label, (audG.get(i.label) ?? 0) + i.impressions)
+    for (const i of acc.audiencia?.idade ?? []) audI.set(i.label, (audI.get(i.label) ?? 0) + i.impressions)
+    for (const i of acc.audiencia?.dispositivos ?? []) audD.set(i.label, (audD.get(i.label) ?? 0) + i.impressions)
+  }
+  function toItems(map: Map<string, number>, limit: number) {
+    const total = [...map.values()].reduce((s, v) => s + v, 0)
+    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit)
+      .map(([l, v]) => ({ l, pct: total > 0 ? Math.round(v / total * 100) : 0 }))
+  }
+  const genItems = toItems(audG, 2)
+  const ageItems = toItems(audI, 4)
+  const devItems = toItems(audD, 3)
+
+  // ── Audience: Google cities ──
+  const cidMap = new Map<string, number>()
+  for (const acc of googleDados) for (const c of acc.cidades ?? []) cidMap.set(c.nome, (cidMap.get(c.nome) ?? 0) + c.cliques)
+  const topCidades = [...cidMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+
+  // ── Top items for charts ──
   const topDisp = [...dispGroups].sort((a, b) => b.cliques - a.cliques).slice(0, 5)
   const topYT = [...ytCamps].sort((a, b) => b.videoViews - a.videoViews).slice(0, 5)
   const topTD = [...finalTDCamps].sort((a, b) => b.impressions - a.impressions).slice(0, 5)
   const topVP = [...vpCamps].sort((a, b) => b.impressions - a.impressions).slice(0, 5)
 
-  // Build chart config JSON (for inline <script>)
+  // ── HTML helpers ──
+  function kpiCard(label: string, value: string, sub?: string): string {
+    return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`
+  }
+
+  function miniBar(label: string, pct: number, color: string): string {
+    return `<div class="aud-row"><span class="aud-name">${label}</span><div class="aud-bar"><div class="aud-fill" style="width:${pct}%;background:${color}"></div></div><span class="aud-pct">${pct}%</span></div>`
+  }
+
+  function metaAudHtml(color: string): string {
+    if (!genItems.length && !ageItems.length) return '<p class="aud-empty">Sem dados de audiência disponíveis</p>'
+    let h = ''
+    if (genItems.length) h += `<div class="aud-sec"><div class="aud-sec-title">Gênero</div>${genItems.map(i => miniBar(i.l, i.pct, color)).join('')}</div>`
+    if (ageItems.length) h += `<div class="aud-sec"><div class="aud-sec-title">Faixa Etária</div>${ageItems.map(i => miniBar(i.l, i.pct, color + 'aa')).join('')}</div>`
+    if (devItems.length) h += `<div class="aud-sec"><div class="aud-sec-title">Dispositivos</div>${devItems.map(i => miniBar(i.l, i.pct, color + '66')).join('')}</div>`
+    return h
+  }
+
+  function googleAudHtml(color: string): string {
+    if (!topCidades.length) return '<p class="aud-empty">Sem dados de localização disponíveis</p>'
+    const max = topCidades[0][1] || 1
+    let h = `<div class="aud-sec"><div class="aud-sec-title">Top Cidades por Cliques</div>`
+    topCidades.forEach(([nome, cliques]) => {
+      h += `<div class="aud-row"><span class="aud-name" style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nome}</span><div class="aud-bar"><div class="aud-fill" style="width:${Math.round(cliques / max * 100)}%;background:${color}"></div></div><span class="aud-pct">${fmtK(cliques)}</span></div>`
+    })
+    h += '</div>'
+    return h
+  }
+
+  // ── Analysis texts ──
+  function analysisMeta(impr: number, reach: number, clicks: number, freq: number): string {
+    const ctr = impr > 0 ? (clicks / impr) * 100 : 0
+    const freqNote = freq < 1.3 ? 'baixa saturação, com espaço para ampliar alcance' : freq <= 2.5 ? 'frequência adequada, sem sinais de saturação' : 'frequência acima de 2,5x — considerar ampliar segmentação'
+    return `Alcançou ${fmtK(reach)} usuários únicos com frequência média de ${fmtF2(freq)}x (${freqNote}). CTR de ${fmtPct2(ctr)} indica ${ctr >= 0.8 ? 'boa receptividade dos criativos' : 'oportunidade de otimização de criativos e segmentação'}.`
+  }
+
+  function analysisDisplay(): string {
+    return `Google Display entregou ${fmtK(dispImpr)} impressões com ${fmtK(dispCliques)} cliques e CTR de ${fmtPct2(dispCtr)}. ${dispCtr >= 0.4 ? 'Índice de cliques dentro da faixa esperada para campanhas de display programático.' : 'CTR abaixo da média — recomendado revisar criativos e segmentações de público.'}`
+  }
+
+  function analysisYoutube(): string {
+    const vtr = ytImpr > 0 ? (ytViews / ytImpr) * 100 : 0
+    return `YouTube registrou ${fmtK(ytViews)} visualizações em ${fmtK(ytImpr)} impressões (VTR de ${fmtPct2(vtr)})${inscritosYT > 0 ? `, gerando ${fmtK(inscritosYT)} novos inscritos` : ''}. ${vtr >= 25 ? 'Taxa de visualização acima da média, indicando boa adequação do conteúdo ao público.' : 'VTR dentro da faixa esperada para formatos in-stream.'}`
+  }
+
+  function analysisVP(): string {
+    return `${visitasPerfil > 0 ? `Gerou ${fmtK(visitasPerfil)} visitas ao perfil` : `Entregou ${fmtK(vpImpr)} impressões`} com alcance de ${fmtK(vpReach)} usuários únicos. Frequência de ${fmtF2(vpFreq)}x indica ${vpFreq <= 2.5 ? 'boa distribuição de exposição sem saturação' : 'frequência elevada — avaliar rotação de criativos'}.`
+  }
+
+  function analysisTiktok(): string {
+    return `TikTok registrou ${fmtK(tiktokImpressoes)} impressões e ${fmtK(tiktokCliques)} cliques com CTR de ${fmtPct2(tiktokCtr)}. ${tiktokCtr >= 1.0 ? 'CTR acima da média para a plataforma, indicando boa performance dos criativos.' : 'CTR dentro da faixa esperada para campanhas de awareness no TikTok.'}`
+  }
+
+  // ── Chart configs ──
   function barChartJson(labels: string[], data: number[], color: string): string {
     return JSON.stringify({
       type: 'bar',
       data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 4 }] },
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#fff', titleColor: '#111', bodyColor: '#333', borderColor: '#ddd', borderWidth: 1 } },
-        scales: { x: { grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#666' } }, y: { grid: { display: false }, ticks: { color: '#555', font: { size: 11 } } } }
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#fff', titleColor: '#111', bodyColor: '#333', borderColor: '#e0e0e0', borderWidth: 1 } },
+        scales: { x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#888', font: { size: 10 } } }, y: { grid: { display: false }, ticks: { color: '#555', font: { size: 10 } } } }
       }
     })
   }
 
   const chartScripts: string[] = []
-  if (secoes.display && topDisp.length > 0) {
-    chartScripts.push(`new Chart(document.getElementById('ch-display'), ${barChartJson(topDisp.map(g => cleanName(g.nome)), topDisp.map(g => g.cliques), '#1A3CFF')});`)
-  }
-  if (secoes.youtube && topYT.length > 0) {
-    chartScripts.push(`new Chart(document.getElementById('ch-youtube'), ${barChartJson(topYT.map(c => cleanName(c.nome)), topYT.map(c => c.videoViews), '#FF4444')});`)
-  }
-  if (secoes.metaTD && topTD.length > 0) {
-    chartScripts.push(`new Chart(document.getElementById('ch-meta-td'), ${barChartJson(topTD.map(c => cleanName(c.nome)), topTD.map(c => c.impressions), '#7B2FBE')});`)
-  }
-  if (secoes.metaVP && hasVPData && topVP.length > 0) {
-    chartScripts.push(`new Chart(document.getElementById('ch-meta-vp'), ${barChartJson(topVP.map(c => cleanName(c.nome)), topVP.map(c => c.impressions), '#C44A00')});`)
-  }
-  if (secoes.tiktok && tiktokImpressoes > 0) {
-    chartScripts.push(`new Chart(document.getElementById('ch-tiktok'), ${JSON.stringify({ type: 'bar', data: { labels: ['Impressões', 'Cliques'], datasets: [{ data: [tiktokImpressoes, tiktokCliques], backgroundColor: ['#00994D', '#00994D88'], borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#fff', titleColor: '#111', bodyColor: '#333', borderColor: '#ddd', borderWidth: 1 } }, scales: { x: { grid: { display: false }, ticks: { color: '#666' } }, y: { grid: { color: 'rgba(0,0,0,0.06)' }, ticks: { color: '#555' } } } } })});`)
-  }
+  if (dispImpr > 0 && topDisp.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-display'),${barChartJson(topDisp.map(g => cleanName(g.nome)), topDisp.map(g => g.cliques), '#1A3CFF')});`)
+  if (ytImpr > 0 && topYT.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-youtube'),${barChartJson(topYT.map(c => cleanName(c.nome)), topYT.map(c => c.videoViews), '#FF4444')});`)
+  if (finalTDImpr > 0 && topTD.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-meta-td'),${barChartJson(topTD.map(c => cleanName(c.nome)), topTD.map(c => c.impressions), '#7B2FBE')});`)
+  if (hasVPData && topVP.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-meta-vp'),${barChartJson(topVP.map(c => cleanName(c.nome)), topVP.map(c => c.impressions), '#C44A00')});`)
+  if (tiktokImpressoes > 0) chartScripts.push(`new Chart(document.getElementById('ch-tiktok'),${JSON.stringify({ type: 'bar', data: { labels: ['Impressões', 'Cliques'], datasets: [{ data: [tiktokImpressoes, tiktokCliques], backgroundColor: ['#00994D', '#00994D66'], borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#888', font: { size: 10 } } }, y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#555', font: { size: 10 } } } } } })});`)
 
-  function kpiCard(label: string, value: string, sub?: string): string {
-    return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`
-  }
-
-  function platformSection(id: string, color: string, badgeLabel: string, title: string, subtitle: string, kpis: string, chartId: string | null, hasChart: boolean): string {
+  // ── Full section template ──
+  function fullSection(id: string, color: string, badge: string, title: string, subtitle: string, kpis: string, chartId: string, chartLabel: string, audHtml: string, analysis: string): string {
     return `
 <section id="${id}" class="plat-section">
   <div class="slide-inner">
-    <div class="plat-badge" style="background:${color}20;color:${color}">${badgeLabel}</div>
-    <h2 class="sec-title">${title}</h2>
-    <p class="sec-sub">${subtitle}</p>
+    <div class="sec-head">
+      <div class="plat-badge" style="background:${color}18;color:${color}">${badge}</div>
+      <h2 class="sec-title">${title}</h2>
+      <p class="sec-sub">${subtitle}</p>
+    </div>
     <div class="kpi-grid">${kpis}</div>
-    ${hasChart && chartId ? `<div class="chart-box"><div class="chart-wrap"><canvas id="${chartId}"></canvas></div></div>` : ''}
+    <div class="main-grid">
+      <div class="chart-col">
+        <div class="col-head">${chartLabel}</div>
+        <div class="chart-wrap"><canvas id="${chartId}"></canvas></div>
+      </div>
+      <div class="aud-col">
+        <div class="col-head">Perfil de Audiência</div>
+        ${audHtml}
+      </div>
+    </div>
+    <div class="analysis" style="border-left-color:${color}"><strong>Análise —</strong> ${analysis}</div>
   </div>
 </section>`
   }
 
-  // Diagnóstico bullets (auto-generated from data)
+  // ── Diagnóstico bullets ──
   const diagItems: string[] = []
   if (dispImpr > 0) diagItems.push(`Google Display entregou <strong>${fmtK(dispImpr)}</strong> impressões com CTR de <strong>${fmtPct2(dispCtr)}</strong> no período.`)
   if (ytViews > 0) diagItems.push(`YouTube registrou <strong>${fmtK(ytViews)}</strong> visualizações${inscritosYT > 0 ? ` e <strong>${fmtK(inscritosYT)}</strong> novos inscritos` : ''}.`)
-  if (finalTDImpr > 0) diagItems.push(`Meta Temas Diversos alcançou <strong>${fmtK(finalTDReach)}</strong> pessoas com frequência de <strong>${finalTDFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x</strong>.`)
+  if (finalTDImpr > 0) diagItems.push(`Meta Temas Diversos alcançou <strong>${fmtK(finalTDReach)}</strong> usuários únicos com frequência de <strong>${fmtF2(finalTDFreq)}x</strong>.`)
   if (vpImpr > 0) diagItems.push(`Meta Visitas ao Perfil gerou <strong>${fmtK(vpImpr)}</strong> impressões${visitasPerfil > 0 ? ` e <strong>${fmtK(visitasPerfil)}</strong> visitas ao perfil` : ''}.`)
   if (tiktokImpressoes > 0) diagItems.push(`TikTok registrou <strong>${fmtK(tiktokImpressoes)}</strong> impressões com CTR de <strong>${fmtPct2(tiktokCtr)}</strong>.`)
   if (seguidoresSemana > 0) diagItems.push(`Instagram cresceu <strong>${fmtK(seguidoresSemana)}</strong> seguidores na semana${seguidoresMes > 0 ? `, acumulando <strong>${fmtK(seguidoresMes)}</strong> novos no mês` : ''}.`)
-  if (diagItems.length === 0) diagItems.push(`Campanha ativa no período de ${periodoLabel}.`)
+  if (!diagItems.length) diagItems.push(`Campanha ativa no período de ${periodoLabel}.`)
 
-  // Conclusão items (generic)
   const conclItems = [
     'Manter frequência de publicação e testes A/B de criativos nas campanhas ativas.',
     'Monitorar CTR e ajustar segmentações de audiência para o próximo período.',
@@ -252,98 +323,126 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 
   const safeChartJs = chartJsText.replace(/<\/script>/g, '<\\/script>')
 
-  // Only render sections with actual data
   const showDisplay = secoes.display && dispImpr > 0
   const showYoutube = secoes.youtube && ytImpr > 0
   const showTD = secoes.metaTD && finalTDImpr > 0
   const showVP = secoes.metaVP && hasVPData && vpImpr > 0
   const showTiktok = secoes.tiktok && tiktokImpressoes > 0
 
+  // ── Chips plataformas ativas no hero ──
+  const activeChips: string[] = []
+  if (showDisplay) activeChips.push(`<span class="hero-chip" style="border-color:#1A3CFF40;color:#6688ff">Display</span>`)
+  if (showYoutube) activeChips.push(`<span class="hero-chip" style="border-color:#FF444440;color:#ff7777">YouTube</span>`)
+  if (showTD) activeChips.push(`<span class="hero-chip" style="border-color:#7B2FBE40;color:#a86fe0">Meta TD</span>`)
+  if (showVP) activeChips.push(`<span class="hero-chip" style="border-color:#C44A0040;color:#e07040">Meta VP</span>`)
+  if (showTiktok) activeChips.push(`<span class="hero-chip" style="border-color:#00994D40;color:#33cc77">TikTok</span>`)
+
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Boletim Semanal — ${cliente} — ${periodoLabel}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.slide-inner{max-width:960px;margin:0 auto;padding:32px 40px}
-section{background:#fff;min-height:88vh;display:flex;flex-direction:column;justify-content:flex-start}
-/* Hero */
-#hero{background:linear-gradient(135deg,#0a0a2e 0%,#1A3CFF 100%);color:#fff}
-#hero .slide-inner{padding:44px 48px}
-.hero-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:28px}
-.hero-badge{display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.9);margin-right:12px}
-.hero-period{font-size:12px;color:rgba(255,255,255,0.6)}
-.hero-title{font-size:2.4rem;font-weight:800;margin-bottom:8px}
-.hero-sub{font-size:1rem;color:rgba(255,255,255,0.65);margin-bottom:36px}
-/* KPI grid */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
-.kpi-card{background:#fff;border-radius:12px;padding:16px 18px;border:1px solid rgba(0,0,0,0.08)}
-#hero .kpi-card{background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.2)}
-.kpi-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#888;margin-bottom:6px}
-#hero .kpi-label{color:rgba(255,255,255,0.6)}
-.kpi-value{font-size:1.8rem;font-weight:800;color:#111;line-height:1}
-#hero .kpi-value{color:#fff}
-.kpi-sub{font-size:11px;color:#aaa;margin-top:4px}
-#hero .kpi-sub{color:rgba(255,255,255,0.5)}
-/* Platform sections */
-.plat-section .slide-inner{padding:28px 40px}
-.plat-badge{display:inline-block;border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px}
-.sec-title{font-size:1.55rem;font-weight:800;margin-bottom:3px}
-.sec-sub{font-size:12px;color:#888;margin-bottom:12px}
-/* Chart */
-.chart-box{background:#fafafa;border:1px solid rgba(0,0,0,0.07);border-radius:10px;padding:12px 14px;margin-top:12px;overflow:hidden}
-.chart-wrap{height:220px;position:relative;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+/* ── Every section fills exactly one page ── */
+section{height:100vh;overflow:hidden;display:flex;flex-direction:column;background:#fff}
+
+/* ── HERO ── */
+#hero{background:linear-gradient(140deg,#060620 0%,#0d1a6e 50%,#1A3CFF 100%)}
+#hero .slide-inner{padding:44px 52px;display:flex;flex-direction:column;flex:1}
+.hero-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:auto}
+.hero-badge{background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.28);border-radius:20px;padding:5px 15px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.88)}
+.hero-period{font-size:12px;color:rgba(255,255,255,0.55);margin-top:6px}
+.hero-body{margin-bottom:auto}
+.hero-title{font-size:2.6rem;font-weight:800;color:#fff;margin-bottom:8px;line-height:1.1}
+.hero-sub{font-size:1rem;color:rgba(255,255,255,0.6);margin-bottom:18px}
+.hero-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px}
+.hero-chip{border:1px solid;border-radius:16px;padding:3px 12px;font-size:11px;font-weight:600}
+#hero .kpi-grid{margin-top:0}
+#hero .kpi-card{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:16px 18px}
+#hero .kpi-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:rgba(255,255,255,0.55);margin-bottom:6px}
+#hero .kpi-value{font-size:1.8rem;font-weight:800;color:#fff;line-height:1}
+#hero .kpi-sub{font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px}
+
+/* ── KPI grid ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kpi-card{background:#fff;border-radius:10px;padding:14px 16px;border:1px solid rgba(0,0,0,0.08)}
+.kpi-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#999;margin-bottom:5px}
+.kpi-value{font-size:1.6rem;font-weight:800;color:#111;line-height:1}
+.kpi-sub{font-size:10px;color:#bbb;margin-top:3px}
+
+/* ── Platform sections ── */
+.plat-section .slide-inner{padding:24px 36px;display:flex;flex-direction:column;flex:1;gap:0}
+.sec-head{margin-bottom:10px}
+.plat-badge{display:inline-block;border-radius:16px;padding:3px 12px;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px}
+.sec-title{font-size:1.5rem;font-weight:800;margin-bottom:2px;line-height:1.1}
+.sec-sub{font-size:11px;color:#999}
+.kpi-row{margin:10px 0}
+
+/* ── Main grid: chart + audience ── */
+.main-grid{display:flex;gap:14px;flex:1;min-height:0;margin:10px 0}
+.chart-col{flex:3;display:flex;flex-direction:column;min-height:0}
+.aud-col{flex:2;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.col-head{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#aaa;margin-bottom:8px;flex-shrink:0}
+.chart-wrap{flex:1;position:relative;overflow:hidden;background:#fafafa;border:1px solid rgba(0,0,0,0.06);border-radius:8px;padding:8px}
 canvas{width:100%!important;height:100%!important;display:block}
-/* Diagnóstico */
-#diag .slide-inner{padding:32px 40px}
-.diag-list{list-style:none;margin-top:14px}
-.diag-list li{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #f0f0f0;font-size:0.9rem;line-height:1.55}
-.diag-list li::before{content:'✓';color:#00994D;font-weight:800;flex-shrink:0;min-width:14px;margin-top:1px}
-/* Conclusão */
-#concl .slide-inner{padding:32px 40px}
-.concl-list{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.concl-item{background:#f8f8f8;border-radius:10px;padding:14px 16px;border-left:3px solid #1A3CFF;font-size:0.87rem;line-height:1.55;color:#333}
-/* Footer — light, same page as conclusão */
-#footer{background:#fff;border-top:2px solid #1A3CFF;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 40px;margin-top:0}
-#footer img{height:32px;opacity:0.85}
-.footer-txt{color:#888;font-size:11px;text-align:center;margin-top:8px}
+
+/* ── Audience bars ── */
+.aud-sec{margin-bottom:12px}
+.aud-sec-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#bbb;margin-bottom:6px}
+.aud-row{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.aud-name{font-size:10px;color:#555;width:82px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aud-bar{flex:1;height:5px;background:#f0f0f0;border-radius:3px;overflow:hidden}
+.aud-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.aud-pct{font-size:10px;color:#999;width:30px;text-align:right;flex-shrink:0}
+.aud-empty{font-size:11px;color:#ccc;font-style:italic;margin-top:8px}
+
+/* ── Analysis box ── */
+.analysis{border-left:3px solid #ccc;border-radius:0 6px 6px 0;padding:9px 13px;background:#f9f9fb;font-size:11px;line-height:1.65;color:#444;flex-shrink:0}
+
+/* ── Diagnóstico ── */
+#diag .slide-inner{padding:28px 40px;display:flex;flex-direction:column;flex:1}
+.diag-cols{display:flex;gap:28px;flex:1;margin-top:14px}
+.diag-left,.diag-right{flex:1;display:flex;flex-direction:column}
+.diag-list{list-style:none}
+.diag-list li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:0.85rem;line-height:1.55}
+.diag-list li::before{content:'✓';color:#00994D;font-weight:800;flex-shrink:0;margin-top:1px}
+.concl-list{display:flex;flex-direction:column;gap:8px}
+.concl-item{background:#f8f8f8;border-radius:8px;padding:11px 14px;border-left:3px solid #1A3CFF;font-size:0.82rem;line-height:1.5;color:#333}
+
+/* ── Footer strip (inside last section) ── */
+.footer-strip{border-top:2px solid #1A3CFF;display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 40px;margin-top:auto}
+.footer-strip img{height:28px;opacity:0.8}
+.footer-strip p{font-size:10px;color:#aaa}
 
 /* ── Print ── */
 @media print{
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  @page{size:A4 landscape;margin:12mm}
-  body{background:#fff}
-  section{page-break-after:always;break-after:page;min-height:0!important;background:#fff}
-  #concl{page-break-after:auto!important;break-after:auto!important}
-  #footer{page-break-after:auto!important;break-after:auto!important;border-top:2px solid #1A3CFF!important}
-  #hero{background:linear-gradient(135deg,#0a0a2e 0%,#1A3CFF 100%)!important}
-  .slide-inner{padding:16px 24px!important}
-  #hero .slide-inner{padding:20px 28px!important}
-  .hero-top{margin-bottom:14px!important}
-  .hero-title{font-size:1.7rem!important;margin-bottom:4px!important}
-  .hero-sub{margin-bottom:16px!important}
-  .kpi-grid{gap:8px!important;margin-top:8px!important}
-  .kpi-card{padding:10px 12px!important}
-  .kpi-label{font-size:9px!important;margin-bottom:4px!important}
-  .kpi-value{font-size:1.35rem!important}
-  .kpi-sub{font-size:9px!important;margin-top:2px!important}
-  .plat-badge{margin-bottom:4px!important;padding:3px 10px!important}
-  .sec-title{font-size:1.25rem!important;margin-bottom:2px!important}
-  .sec-sub{margin-bottom:6px!important;font-size:11px!important}
-  .chart-box{padding:8px 10px!important;margin-top:6px!important}
-  .chart-wrap{height:170px!important;max-height:170px!important;overflow:hidden!important}
-  canvas{height:170px!important;max-height:170px!important}
-  .diag-list li{padding:7px 0!important;font-size:0.8rem!important}
-  #diag .slide-inner{padding:16px 24px!important}
-  #concl .slide-inner{padding:16px 24px!important}
-  .concl-list{gap:7px!important;margin-top:10px!important}
-  .concl-item{padding:10px 12px!important;font-size:0.78rem!important}
-  #footer{padding:16px 24px!important;background:#fff!important;border-top:2px solid #1A3CFF!important}
-  #footer img{height:28px!important}
-  .footer-txt{font-size:10px!important;margin-top:5px!important}
+  @page{size:A4 landscape;margin:10mm}
+  section{height:190mm!important;overflow:hidden!important;page-break-after:always;break-after:page}
+  #hero{background:linear-gradient(140deg,#060620 0%,#0d1a6e 50%,#1A3CFF 100%)!important}
+  #diag{page-break-after:auto!important;break-after:auto!important}
+  #hero .slide-inner{padding:28px 36px!important}
+  .plat-section .slide-inner{padding:16px 24px!important}
+  #diag .slide-inner{padding:20px 28px!important}
+  .hero-title{font-size:1.8rem!important}
+  .hero-chips{margin-bottom:18px!important}
+  .kpi-grid{gap:8px!important}
+  .kpi-card{padding:9px 11px!important}
+  .kpi-value{font-size:1.25rem!important}
+  .kpi-sub{font-size:9px!important}
+  #hero .kpi-value{font-size:1.5rem!important}
+  .kpi-row{margin:8px 0!important}
+  .sec-title{font-size:1.2rem!important}
+  .main-grid{margin:8px 0!important;gap:10px!important}
+  .analysis{padding:7px 10px!important;font-size:10px!important}
+  .aud-row{margin-bottom:4px!important}
+  .aud-sec{margin-bottom:8px!important}
+  .diag-list li{padding:6px 0!important;font-size:0.78rem!important}
+  .concl-item{padding:8px 11px!important;font-size:0.76rem!important}
+  .footer-strip{padding:10px 28px!important}
 }
 </style>
 </head>
@@ -353,103 +452,93 @@ canvas{width:100%!important;height:100%!important;display:block}
 <section id="hero">
   <div class="slide-inner">
     <div class="hero-top">
-      <span class="hero-badge">Boletim Semanal</span>
-      <span class="hero-period">${periodoLabel}</span>
+      <div class="hero-badge">Boletim Semanal</div>
+      <div class="hero-period">${periodoLabel}</div>
     </div>
-    <h1 class="hero-title">${cliente}</h1>
-    <p class="hero-sub">Campanha Temas Diversos · Resumo de Performance</p>
+    <div class="hero-body">
+      <h1 class="hero-title">${cliente}</h1>
+      <p class="hero-sub">Campanha Temas Diversos · Resumo de Performance</p>
+      <div class="hero-chips">${activeChips.join('')}</div>
+    </div>
     <div class="kpi-grid">
       ${kpiCard('Impressões Totais', fmtK(totalImpr), 'Todas as plataformas')}
-      ${kpiCard(inscritosYT > 0 ? 'Novos Inscritos YouTube' : ytViews > 0 ? 'Visualizações YouTube' : 'YouTube', fmtK(inscritosYT > 0 ? inscritosYT : ytViews), 'No período')}
+      ${kpiCard(inscritosYT > 0 ? 'Novos Inscritos YT' : 'Visualizações YouTube', fmtK(inscritosYT > 0 ? inscritosYT : ytViews), 'No período')}
       ${kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram')}
       ${kpiCard('Novos Seguidores', seguidoresSemana > 0 ? fmtK(seguidoresSemana) : '—', seguidoresMes > 0 ? `+${fmtK(seguidoresMes).replace('+', '')} no mês` : 'Instagram')}
     </div>
   </div>
 </section>
 
-${showDisplay ? platformSection('display', '#1A3CFF', 'Google Display', 'Google Display', `Impressões, cliques e CTR · ${periodoLabel}`,
-  kpiCard('Impressões', fmtK(dispImpr), 'Total no período') +
-  kpiCard('Cliques', fmtK(dispCliques), 'Total no período') +
-  kpiCard('CTR', fmtPct2(dispCtr), 'Taxa de clique') +
-  kpiCard('Grupos Ativos', String(topDisp.length), 'Com entrega'),
-  'ch-display', topDisp.length > 0) : ''}
+${showDisplay ? fullSection('display', '#1A3CFF', 'Google Display', 'Google Display', `Impressões, cliques e CTR · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(dispImpr), 'Total') + kpiCard('Cliques', fmtK(dispCliques), 'Total') + kpiCard('CTR', fmtPct2(dispCtr), 'Taxa de clique') + kpiCard('Grupos Ativos', String(topDisp.length), 'Com entrega'),
+  'ch-display', 'Grupos de Anúncio por Cliques', googleAudHtml('#1A3CFF'), analysisDisplay()) : ''}
 
-${showYoutube ? platformSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Impressões, visualizações e inscritos · ${periodoLabel}`,
-  kpiCard('Impressões', fmtK(ytImpr), 'Total no período') +
-  kpiCard('Visualizações', fmtK(ytViews), 'Total no período') +
-  kpiCard('Cliques', fmtK(ytCliques), 'Total no período') +
-  kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
-  'ch-youtube', topYT.length > 0) : ''}
+${showYoutube ? fullSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Visualizações, cliques e inscritos · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(ytImpr), 'Total') + kpiCard('Visualizações', fmtK(ytViews), 'Total') + kpiCard('Cliques', fmtK(ytCliques), 'Total') + kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
+  'ch-youtube', 'Campanhas por Visualizações', googleAudHtml('#FF4444'), analysisYoutube()) : ''}
 
-${showTD ? platformSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
-  kpiCard('Impressões', fmtK(finalTDImpr), 'Total no período') +
-  kpiCard('Alcance', fmtK(finalTDReach), 'Usuários únicos') +
-  kpiCard('Engajamentos', fmtK(finalTDCliques), 'Cliques') +
-  kpiCard('Frequência', finalTDFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x', 'Média por usuário'),
-  'ch-meta-td', topTD.length > 0) : ''}
+${showTD ? fullSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(finalTDImpr), 'Total') + kpiCard('Alcance', fmtK(finalTDReach), 'Únicos') + kpiCard('Engajamentos', fmtK(finalTDCliques), 'Cliques') + kpiCard('Frequência', fmtF2(finalTDFreq) + 'x', 'Média'),
+  'ch-meta-td', 'Campanhas por Impressões', metaAudHtml('#7B2FBE'), analysisMeta(finalTDImpr, finalTDReach, finalTDCliques, finalTDFreq)) : ''}
 
-${showVP ? platformSection('meta-vp', '#C44A00', 'Meta — Visitas ao Perfil', 'Meta Visitas ao Perfil', `Impressões, alcance e visitas · ${periodoLabel}`,
-  kpiCard('Impressões', fmtK(vpImpr), 'Total no período') +
-  kpiCard('Alcance', fmtK(vpReach), 'Usuários únicos') +
-  kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram') +
-  kpiCard('Frequência', vpFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x', 'Média por usuário'),
-  'ch-meta-vp', topVP.length > 0) : ''}
+${showVP ? fullSection('meta-vp', '#C44A00', 'Meta — Visitas ao Perfil', 'Meta Visitas ao Perfil', `Impressões, alcance e visitas · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(vpImpr), 'Total') + kpiCard('Alcance', fmtK(vpReach), 'Únicos') + kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram') + kpiCard('Frequência', fmtF2(vpFreq) + 'x', 'Média'),
+  'ch-meta-vp', 'Campanhas por Impressões', metaAudHtml('#C44A00'), analysisVP()) : ''}
 
-${showTiktok ? platformSection('tiktok', '#00994D', 'TikTok', 'TikTok', `Impressões, cliques e CTR · ${periodoLabel}`,
-  kpiCard('Impressões', fmtK(tiktokImpressoes), 'Total no período') +
-  kpiCard('Cliques', fmtK(tiktokCliques), 'Destino') +
-  kpiCard('CTR', fmtPct2(tiktokCtr), 'Taxa de clique') +
-  kpiCard('Campanhas', '—', 'Ativas'),
-  'ch-tiktok', true) : ''}
+${showTiktok ? fullSection('tiktok', '#00994D', 'TikTok', 'TikTok', `Impressões, cliques e CTR · ${periodoLabel}`,
+  kpiCard('Impressões', fmtK(tiktokImpressoes), 'Total') + kpiCard('Cliques', fmtK(tiktokCliques), 'Destino') + kpiCard('CTR', fmtPct2(tiktokCtr), 'Taxa de clique') + kpiCard('—', '—', ''),
+  'ch-tiktok', 'Impressões vs Cliques', '<p class="aud-empty">Dados demográficos via TikTok Ads Manager</p>', analysisTiktok()) : ''}
 
-${secoes.diagnostico ? `
+${secoes.diagnostico || secoes.conclusao ? `
 <section id="diag">
   <div class="slide-inner">
-    <div class="plat-badge" style="background:#00994D20;color:#00994D">Diagnóstico</div>
-    <h2 class="sec-title">Destaques do Período</h2>
-    <p class="sec-sub">${periodoLabel}</p>
-    <ul class="diag-list">
-      ${diagItems.map(item => `<li><span>${item}</span></li>`).join('\n      ')}
-    </ul>
-  </div>
-</section>` : ''}
-
-${secoes.conclusao ? `
-<section id="concl">
-  <div class="slide-inner">
-    <div class="plat-badge" style="background:#1A3CFF20;color:#1A3CFF">Conclusão</div>
-    <h2 class="sec-title">Próximos Passos</h2>
-    <p class="sec-sub">Recomendações operacionais para o próximo período</p>
-    <div class="concl-list">
-      ${conclItems.map((item, i) => `<div class="concl-item"><strong>${i + 1}.</strong> ${item}</div>`).join('\n      ')}
+    <div class="sec-head">
+      <div class="plat-badge" style="background:#1A3CFF10;color:#1A3CFF">Diagnóstico & Conclusão</div>
+      <h2 class="sec-title">Destaques e Próximos Passos</h2>
+      <p class="sec-sub">${periodoLabel}</p>
+    </div>
+    <div class="diag-cols">
+      ${secoes.diagnostico ? `
+      <div class="diag-left">
+        <div class="col-head">Destaques do Período</div>
+        <ul class="diag-list">
+          ${diagItems.map(item => `<li><span>${item}</span></li>`).join('\n          ')}
+        </ul>
+      </div>` : ''}
+      ${secoes.conclusao ? `
+      <div class="diag-right">
+        <div class="col-head">Recomendações Operacionais</div>
+        <div class="concl-list">
+          ${conclItems.map((item, i) => `<div class="concl-item"><strong>${i + 1}.</strong> ${item}</div>`).join('\n          ')}
+        </div>
+      </div>` : ''}
+    </div>
+    <div class="footer-strip">
+      ${logoB64 ? `<img src="${logoB64}" alt="Esquina">` : ''}
+      <p>Boletim Semanal · ${cliente} · ${periodoLabel}</p>
     </div>
   </div>
-  <div id="footer">
-    ${logoB64 ? `<img src="${logoB64}" alt="Esquina">` : ''}
-    <p class="footer-txt">Boletim Semanal · ${cliente} · ${periodoLabel}</p>
-  </div>
 </section>` : `
-<div id="footer" style="background:#fff;border-top:2px solid #1A3CFF;display:flex;flex-direction:column;align-items:center;padding:20px 40px">
-  ${logoB64 ? `<img src="${logoB64}" alt="Esquina" style="height:28px;opacity:0.85">` : ''}
-  <p style="color:#888;font-size:11px;text-align:center;margin-top:8px">Boletim Semanal · ${cliente} · ${periodoLabel}</p>
+<div style="border-top:2px solid #1A3CFF;display:flex;align-items:center;justify-content:center;gap:14px;padding:20px 40px">
+  ${logoB64 ? `<img src="${logoB64}" alt="Esquina" style="height:24px;opacity:0.8">` : ''}
+  <p style="font-size:10px;color:#aaa">Boletim Semanal · ${cliente} · ${periodoLabel}</p>
 </div>`}
 
 <script>${safeChartJs}</script>
 <script>
 Chart.defaults.animation = false;
-Chart.defaults.color = '#666666';
-Chart.defaults.borderColor = 'rgba(0,0,0,0.06)';
+Chart.defaults.color = '#888';
+Chart.defaults.borderColor = 'rgba(0,0,0,0.05)';
 ${chartScripts.join('\n')}
 
 window.addEventListener('beforeprint', function() {
-  document.querySelectorAll('canvas').forEach(function(canvas) {
+  document.querySelectorAll('.chart-wrap canvas').forEach(function(canvas) {
     var chart = Chart.getChart(canvas);
     if (!chart) return;
-    var wrapper = canvas.parentElement;
-    var n = (chart.config.data && chart.config.data.labels) ? chart.config.data.labels.length : 0;
-    var h = chart.config.type === 'doughnut' ? 180 : n >= 5 ? 170 : n === 4 ? 155 : 145;
-    wrapper.style.height = h + 'px';
-    var w = wrapper.clientWidth || 700;
+    var wrap = canvas.closest('.chart-wrap');
+    var h = wrap ? wrap.clientHeight : 220;
+    if (h < 80) h = 180;
+    var w = wrap ? wrap.clientWidth - 16 : 500;
     canvas.width = w; canvas.height = h;
     chart.resize(w, h); chart.draw();
   });
