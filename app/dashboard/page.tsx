@@ -331,11 +331,18 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 
   // ── Chips plataformas ativas no hero ──
   const activeChips: string[] = []
-  if (showDisplay) activeChips.push(`<span class="hero-chip" style="border-color:#1A3CFF40;color:#6688ff">Display</span>`)
-  if (showYoutube) activeChips.push(`<span class="hero-chip" style="border-color:#FF444440;color:#ff7777">YouTube</span>`)
-  if (showTD) activeChips.push(`<span class="hero-chip" style="border-color:#7B2FBE40;color:#a86fe0">Meta TD</span>`)
-  if (showVP) activeChips.push(`<span class="hero-chip" style="border-color:#C44A0040;color:#e07040">Meta VP</span>`)
-  if (showTiktok) activeChips.push(`<span class="hero-chip" style="border-color:#00994D40;color:#33cc77">TikTok</span>`)
+  if (showDisplay) activeChips.push(`<span class="hero-chip" style="border-color:#1A3CFF60;color:#6688ff">Google Display</span>`)
+  if (showYoutube) activeChips.push(`<span class="hero-chip" style="border-color:#FF444460;color:#ff7777">YouTube</span>`)
+  if (showTD) activeChips.push(`<span class="hero-chip" style="border-color:#7B2FBE60;color:#a86fe0">Meta Ads</span>`)
+  if (showVP) activeChips.push(`<span class="hero-chip" style="border-color:#C44A0060;color:#e07040">Visitas ao Perfil</span>`)
+  if (showTiktok) activeChips.push(`<span class="hero-chip" style="border-color:#00994D60;color:#33cc77">TikTok</span>`)
+
+  const platformasLabel = [
+    showDisplay ? 'Display' : '',
+    showYoutube ? 'YouTube' : '',
+    (showTD || showVP) ? 'Meta' : '',
+    showTiktok ? 'TikTok' : '',
+  ].filter(Boolean).join(' · ')
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -359,7 +366,11 @@ section{height:100vh;overflow:hidden;display:flex;flex-direction:column;backgrou
 .hero-title{font-size:2.6rem;font-weight:800;color:#fff;margin-bottom:8px;line-height:1.1}
 .hero-sub{font-size:1rem;color:rgba(255,255,255,0.6);margin-bottom:18px}
 .hero-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:32px}
-.hero-chip{border:1px solid;border-radius:16px;padding:3px 12px;font-size:11px;font-weight:600}
+.hero-chip{border:1px solid;border-radius:20px;padding:6px 18px;font-size:13px;font-weight:600}
+.hero-info{display:flex;gap:32px;margin-top:auto;border-top:1px solid rgba(255,255,255,0.12);padding-top:14px}
+.hero-info-item{display:flex;flex-direction:column;gap:3px}
+.hero-info-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:rgba(255,255,255,0.45)}
+.hero-info-value{font-size:13px;font-weight:600;color:rgba(255,255,255,0.85)}
 #hero .kpi-grid{margin-top:0}
 #hero .kpi-card{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:16px 18px}
 #hero .kpi-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:rgba(255,255,255,0.55);margin-bottom:6px}
@@ -458,13 +469,18 @@ canvas{width:100%!important;height:100%!important;display:block}
     <div class="hero-body">
       <h1 class="hero-title">${cliente}</h1>
       <p class="hero-sub">Campanha Temas Diversos · Resumo de Performance</p>
-      <div class="hero-chips">${activeChips.join('')}</div>
+        <div class="hero-chips">${activeChips.join('')}</div>
     </div>
     <div class="kpi-grid">
       ${kpiCard('Impressões Totais', fmtK(totalImpr), 'Todas as plataformas')}
       ${kpiCard(inscritosYT > 0 ? 'Novos Inscritos YT' : 'Visualizações YouTube', fmtK(inscritosYT > 0 ? inscritosYT : ytViews), 'No período')}
       ${kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram')}
       ${kpiCard('Novos Seguidores', seguidoresSemana > 0 ? fmtK(seguidoresSemana) : '—', seguidoresMes > 0 ? `+${fmtK(seguidoresMes).replace('+', '')} no mês` : 'Instagram')}
+    </div>
+    <div class="hero-info">
+      <div class="hero-info-item"><span class="hero-info-label">Período</span><span class="hero-info-value">${periodoLabel}</span></div>
+      <div class="hero-info-item"><span class="hero-info-label">Plataformas</span><span class="hero-info-value">${platformasLabel}</span></div>
+      <div class="hero-info-item"><span class="hero-info-label">Agência</span><span class="hero-info-value">Esquina</span></div>
     </div>
   </div>
 </section>
