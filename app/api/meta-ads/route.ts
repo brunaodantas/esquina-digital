@@ -25,6 +25,71 @@ const ACCOUNTS = [
   { id: '467072400573584',  nome: 'SENAI CIMATEC',                moeda: 'BRL' },
 ]
 
+function parseThruplays(actions: any[]): number {
+  if (!Array.isArray(actions)) return 0
+  const v = actions.find((a: any) => a.action_type === 'video_view')
+  return v ? parseInt(v.value ?? '0', 10) : 0
+}
+
+export interface MetaDailyPoint {
+  date: string
+  spend: number
+  impressions: number
+  reach: number
+  clicks: number
+  cpm: number
+  ctr: number
+  cpc: number
+  frequency: number
+  thruplays: number
+  cpv: number
+}
+
+export interface MetaCampaignData {
+  id: string
+  nome: string
+  status: string
+  spend: number
+  impressions: number
+  reach: number
+  clicks: number
+  ctr: number
+  cpm: number
+  cpc: number
+  frequency: number
+  thruplays: number
+}
+
+export interface MetaAdSetData {
+  id: string
+  nome: string
+  campanha: string
+  status: string
+  spend: number
+  impressions: number
+  reach: number
+  clicks: number
+  ctr: number
+  cpm: number
+  cpc: number
+  frequency: number
+  thruplays: number
+}
+
+export interface MetaAdData {
+  id: string
+  nome: string
+  adset: string
+  campanha: string
+  status: string
+  spend: number
+  impressions: number
+  clicks: number
+  ctr: number
+  cpm: number
+  cpc: number
+}
+
 export interface MetaAccountData {
   id: string
   nome: string
@@ -37,6 +102,11 @@ export interface MetaAccountData {
   cpm: number
   cpc: number
   frequency: number
+  thruplays: number
+  campanhas: MetaCampaignData[]
+  adsets: MetaAdSetData[]
+  ads: MetaAdData[]
+  serie: MetaDailyPoint[]
 }
 
 let _cache: { key: string; ts: number; data: MetaAccountData[]; nomes: string[] } | null = null
@@ -64,10 +134,45 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
 
-  const params = new URLSearchParams({
-    fields: 'spend,impressions,reach,clicks,ctr,cpm,cpc,frequency',
+  const timeRange = JSON.stringify({ since: start, until: end })
+  const COMMON_METRICS = 'spend,impressions,reach,clicks,ctr,cpm,cpc,frequency,video_thruplay_watched_actions'
+
+  const accountParams = new URLSearchParams({
+    fields: COMMON_METRICS,
     level: 'account',
-    time_range: JSON.stringify({ since: start, until: end }),
+    time_range: timeRange,
+    access_token: TOKEN,
+  })
+
+  const campaignParams = new URLSearchParams({
+    fields: `campaign_id,campaign_name,effective_status,${COMMON_METRICS}`,
+    level: 'campaign',
+    time_range: timeRange,
+    access_token: TOKEN,
+    limit: '200',
+  })
+
+  const adsetParams = new URLSearchParams({
+    fields: `adset_id,adset_name,campaign_name,effective_status,${COMMON_METRICS}`,
+    level: 'adset',
+    time_range: timeRange,
+    access_token: TOKEN,
+    limit: '500',
+  })
+
+  const adParams = new URLSearchParams({
+    fields: 'ad_id,ad_name,adset_name,campaign_name,effective_status,spend,impressions,clicks,ctr,cpm,cpc',
+    level: 'ad',
+    time_range: timeRange,
+    access_token: TOKEN,
+    limit: '500',
+  })
+
+  const dailyParams = new URLSearchParams({
+    fields: 'spend,impressions,reach,clicks,cpm,frequency,video_thruplay_watched_actions',
+    level: 'account',
+    time_range: timeRange,
+    time_increment: '1',
     access_token: TOKEN,
   })
 
@@ -75,16 +180,109 @@ export async function GET(req: NextRequest) {
     await Promise.all(
       ACCOUNTS.map(async (acc) => {
         try {
-          const res = await fetch(`${API}/act_${acc.id}/insights?${params}`, {
-            next: { revalidate: 0 },
-          })
-          const d = await res.json()
-          if (d.error) {
-            console.warn(`Meta [${acc.nome}]: ${d.error.message}`)
+          const [accRes, campRes, adsetRes, adRes, dailyRes] = await Promise.all([
+            fetch(`${API}/act_${acc.id}/insights?${accountParams}`, { next: { revalidate: 0 } }),
+            fetch(`${API}/act_${acc.id}/insights?${campaignParams}`, { next: { revalidate: 0 } }),
+            fetch(`${API}/act_${acc.id}/insights?${adsetParams}`, { next: { revalidate: 0 } }),
+            fetch(`${API}/act_${acc.id}/insights?${adParams}`, { next: { revalidate: 0 } }),
+            fetch(`${API}/act_${acc.id}/insights?${dailyParams}`, { next: { revalidate: 0 } }),
+          ])
+
+          const [accData, campData, adsetData, adData, dailyData] = await Promise.all([
+            accRes.json(), campRes.json(), adsetRes.json(), adRes.json(), dailyRes.json()
+          ])
+
+          if (accData.error) {
+            console.warn(`Meta [${acc.nome}] account: ${accData.error.message}`)
             return null
           }
-          const row = d.data?.[0]
+
+          const row = accData.data?.[0]
           if (!row || !parseFloat(row.spend || '0')) return null
+
+          function mapStatus(s: string): string {
+            if (s === 'ACTIVE') return 'ativo'
+            if (s === 'PAUSED' || s === 'CAMPAIGN_PAUSED' || s === 'ADSET_PAUSED') return 'pausado'
+            return 'ativo'
+          }
+
+          const campanhas: MetaCampaignData[] = (campData.data ?? [])
+            .filter((c: any) => parseFloat(c.spend || '0') > 0)
+            .map((c: any): MetaCampaignData => ({
+              id: c.campaign_id ?? '',
+              nome: c.campaign_name ?? '',
+              status: mapStatus(c.effective_status ?? 'ACTIVE'),
+              spend: parseFloat(c.spend || '0'),
+              impressions: parseInt(c.impressions || '0', 10),
+              reach: parseInt(c.reach || '0', 10),
+              clicks: parseInt(c.clicks || '0', 10),
+              ctr: parseFloat(c.ctr || '0'),
+              cpm: parseFloat(c.cpm || '0'),
+              cpc: parseFloat(c.cpc || '0'),
+              frequency: parseFloat(c.frequency || '0'),
+              thruplays: parseThruplays(c.video_thruplay_watched_actions),
+            }))
+            .sort((a: MetaCampaignData, b: MetaCampaignData) => b.spend - a.spend)
+
+          const adsets: MetaAdSetData[] = (adsetData.data ?? [])
+            .filter((c: any) => parseFloat(c.spend || '0') > 0)
+            .map((c: any): MetaAdSetData => ({
+              id: c.adset_id ?? '',
+              nome: c.adset_name ?? '',
+              campanha: c.campaign_name ?? '',
+              status: mapStatus(c.effective_status ?? 'ACTIVE'),
+              spend: parseFloat(c.spend || '0'),
+              impressions: parseInt(c.impressions || '0', 10),
+              reach: parseInt(c.reach || '0', 10),
+              clicks: parseInt(c.clicks || '0', 10),
+              ctr: parseFloat(c.ctr || '0'),
+              cpm: parseFloat(c.cpm || '0'),
+              cpc: parseFloat(c.cpc || '0'),
+              frequency: parseFloat(c.frequency || '0'),
+              thruplays: parseThruplays(c.video_thruplay_watched_actions),
+            }))
+            .sort((a: MetaAdSetData, b: MetaAdSetData) => b.spend - a.spend)
+
+          const ads: MetaAdData[] = (adData.data ?? [])
+            .filter((c: any) => parseFloat(c.spend || '0') > 0)
+            .map((c: any): MetaAdData => ({
+              id: c.ad_id ?? '',
+              nome: c.ad_name ?? '',
+              adset: c.adset_name ?? '',
+              campanha: c.campaign_name ?? '',
+              status: mapStatus(c.effective_status ?? 'ACTIVE'),
+              spend: parseFloat(c.spend || '0'),
+              impressions: parseInt(c.impressions || '0', 10),
+              clicks: parseInt(c.clicks || '0', 10),
+              ctr: parseFloat(c.ctr || '0'),
+              cpm: parseFloat(c.cpm || '0'),
+              cpc: parseFloat(c.cpc || '0'),
+            }))
+            .sort((a: MetaAdData, b: MetaAdData) => b.spend - a.spend)
+
+          const serie: MetaDailyPoint[] = (dailyData.data ?? [])
+            .filter((d: any) => d.date_start)
+            .map((d: any): MetaDailyPoint => {
+              const spend = parseFloat(d.spend || '0')
+              const impressions = parseInt(d.impressions || '0', 10)
+              const reach = parseInt(d.reach || '0', 10)
+              const clicks = parseInt(d.clicks || '0', 10)
+              const thruplays = parseThruplays(d.video_thruplay_watched_actions)
+              return {
+                date: d.date_start,
+                spend,
+                impressions,
+                reach,
+                clicks,
+                cpm: parseFloat(d.cpm || '0'),
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cpc: clicks > 0 ? spend / clicks : 0,
+                frequency: parseFloat(d.frequency || '0'),
+                thruplays,
+                cpv: thruplays > 0 ? spend / thruplays : 0,
+              }
+            })
+            .sort((a: MetaDailyPoint, b: MetaDailyPoint) => a.date.localeCompare(b.date))
 
           return {
             id: acc.id,
@@ -98,6 +296,11 @@ export async function GET(req: NextRequest) {
             cpm: parseFloat(row.cpm || '0'),
             cpc: parseFloat(row.cpc || '0'),
             frequency: parseFloat(row.frequency || '0'),
+            thruplays: parseThruplays(row.video_thruplay_watched_actions),
+            campanhas,
+            adsets,
+            ads,
+            serie,
           } as MetaAccountData
         } catch (e) {
           console.error(`Skipping ${acc.nome}:`, e)

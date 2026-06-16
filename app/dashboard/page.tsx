@@ -7,6 +7,7 @@ import { auth, db } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 import EntregasPage from './entregas/page'
 import GoogleAdsPage from './google-ads/page'
+import MetaAdsPage from './meta-ads/page'
 
 type Tab = 'meta' | 'entregas' | 'google-ads'
 type Theme = 'dark' | 'light'
@@ -141,11 +142,7 @@ export default function Dashboard() {
 
       {/* Conteúdo */}
       <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'meta' ? 'flex' : 'none', flexDirection: 'column' }}>
-        <iframe
-          src="https://dashboard-meta-esquina-ebon.vercel.app/"
-          style={{ flex: 1, border: 'none', width: '100%', height: '100%' }}
-          title="Dashboard Meta Esquina"
-        />
+        <MetaAdsPage theme={theme} />
       </div>
 
       <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'entregas' ? 'flex' : 'none', flexDirection: 'column' }}>

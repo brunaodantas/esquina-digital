@@ -562,6 +562,8 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
   const [filtroCliente, setFiltroCliente] = useState('')
   const [preset, setPreset] = useState<Preset>('mes-atual')
   const [custom, setCustom] = useState({ start: '', end: '' })
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [cooldown, setCooldown] = useState(false)
 
   const t = C[theme]
   const periodoRef = useRef(getPeriodo('mes-atual'))
@@ -584,9 +586,17 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
         const parsed = parseResponse(res)
         setData(parsed.data)
         if (parsed.sheets.length > 0) setSheets(parsed.sheets)
+        setLastUpdated(new Date())
         setLoading(false)
       })
       .catch(() => { setError('Erro ao carregar dados.'); setLoading(false) })
+  }
+
+  function handleManualRefresh() {
+    if (cooldown || loading) return
+    setCooldown(true)
+    fetchData(periodoRef.current)
+    setTimeout(() => setCooldown(false), 30000)
   }
 
   function aplicarPeriodo(newPreset: Preset, newCustom: { start: string; end: string }) {
@@ -617,6 +627,7 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
             const parsed = parseResponse(res)
             setData(parsed.data)
             if (parsed.sheets.length > 0) setSheets(parsed.sheets)
+            setLastUpdated(new Date())
           })
           .catch(() => {})
         timer = scheduleNext()
@@ -656,6 +667,16 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
           <option value="">Todos os clientes</option>
           {sheets.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+
+        <button
+          onClick={handleManualRefresh}
+          disabled={cooldown || loading}
+          title={cooldown ? 'Aguarde 30s para atualizar novamente' : 'Atualizar dados'}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: cooldown || loading ? 'not-allowed' : 'pointer', border: `1px solid ${t.border}`, background: t.filtroBtn, color: cooldown || loading ? t.textMuted : t.filtroBtnText, transition: 'all 0.15s', flexShrink: 0 }}
+        >
+          <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>↻</span>
+          {lastUpdated ? `${String(lastUpdated.getHours()).padStart(2,'0')}:${String(lastUpdated.getMinutes()).padStart(2,'0')}` : 'Atualizar'}
+        </button>
 
         {loading && (
           <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: '2px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
