@@ -176,7 +176,7 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
     if (inicio > periodoFim || termino < periodoStart) continue
 
     const status: 'ativa' | 'encerrada' | 'futura' =
-      hoje > termino ? 'encerrada' : hoje < inicio ? 'futura' : 'ativa'
+      hoje >= termino ? 'encerrada' : hoje < inicio ? 'futura' : 'ativa'
 
     const meta = iMeta >= 0 ? parseNum(row[iMeta]) : 0
     let entregue = iEntregue >= 0 ? parseNum(row[iEntregue]) : 0
@@ -186,8 +186,13 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
       const falta = parseNum(row[iQuantoFalta])
       if (falta > 0) entregue = Math.max(0, meta - falta)
     }
-    // Ocultar campanhas sem nenhum dado relevante
-    if (meta === 0 && entregue === 0) continue
+    // Ocultar campanhas encerradas sem nenhum dado — ativas/futuras sem entrega ainda são válidas
+    if (meta === 0 && entregue === 0 && status === 'encerrada') continue
+
+    // Para períodos atuais: ocultar campanhas encerradas que começaram antes do período selecionado
+    // (campanhas do mês anterior que apenas sobreponham levemente este mês)
+    const isPeriodoAtual = hoje >= periodoStart && hoje <= periodoFim
+    if (isPeriodoAtual && status === 'encerrada' && inicio < periodoStart) continue
 
     // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA com milhões de impressões)
     // entregue=1 com meta acima de 2M é sinal de coluna errada
