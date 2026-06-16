@@ -1207,6 +1207,7 @@ export default function Dashboard() {
   }, [router])
 
   async function handleLogout() {
+    document.cookie = '__session=; path=/; max-age=0'
     await signOut(auth)
     router.push('/')
   }

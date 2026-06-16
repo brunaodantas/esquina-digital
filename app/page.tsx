@@ -50,6 +50,7 @@ export default function Home() {
     const ref = doc(db, 'users', u.uid)
     const snap = await getDoc(ref)
     if (snap.exists() && snap.data().status === 'aprovado') {
+      document.cookie = '__session=1; path=/; max-age=86400; SameSite=Strict'
       router.push('/dashboard')
     } else if (snap.exists() && snap.data().status === 'pendente') {
       setUser(u)
