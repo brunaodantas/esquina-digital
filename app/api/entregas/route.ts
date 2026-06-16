@@ -189,9 +189,9 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
     // Ocultar campanhas sem nenhum dado relevante
     if (meta === 0 && entregue === 0) continue
 
-    // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA)
-    // entregue=1 com meta grande é sinal de coluna errada
-    if (entregue === 1 && meta > 1000) continue
+    // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA com milhões de impressões)
+    // entregue=1 com meta acima de 2M é sinal de coluna errada
+    if (entregue === 1 && meta > 2_000_000) continue
 
     const pct = meta > 0 ? Math.round((entregue / meta) * 1000) / 10 : 0
     const bateu = iBateu >= 0 ? (row[iBateu] ?? '').toString().toUpperCase().includes('BATEU') : pct >= 100
