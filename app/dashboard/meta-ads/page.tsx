@@ -402,6 +402,63 @@ function AccountCard({ acc, totalSpend, t }: { acc: MetaAccountData; totalSpend:
   )
 }
 
+// ─── Audiência Section ─────────────────────────────────────────────────────────
+function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typeof C['dark'] }) {
+  function aggregate(key: 'genero' | 'idade' | 'dispositivos') {
+    const map = new Map<string, { impressions: number; reach: number; clicks: number; spend: number }>()
+    for (const acc of filtrado) {
+      for (const item of acc.audiencia?.[key] ?? []) {
+        const ex = map.get(item.label) ?? { impressions: 0, reach: 0, clicks: 0, spend: 0 }
+        map.set(item.label, { impressions: ex.impressions + item.impressions, reach: ex.reach + item.reach, clicks: ex.clicks + item.clicks, spend: ex.spend + item.spend })
+      }
+    }
+    const items = Array.from(map.entries()).map(([label, v]) => ({ label, ...v, pct: 0 }))
+    const total = items.reduce((s, i) => s + i.impressions, 0)
+    items.forEach(i => { i.pct = total > 0 ? Math.round((i.impressions / total) * 1000) / 10 : 0 })
+    return items.sort((a, b) => b.impressions - a.impressions)
+  }
+
+  const genero = aggregate('genero')
+  const idade = aggregate('idade')
+  const dispositivos = aggregate('dispositivos')
+  if (!genero.length && !idade.length && !dispositivos.length) return null
+
+  const barColors = ['#4dabf7', '#c77dff', '#56cfe1', '#74c69d', '#ffd166', '#ff9f1c']
+
+  function BreakdownGroup({ title, items }: { title: string; items: ReturnType<typeof aggregate> }) {
+    if (!items.length) return null
+    return (
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.map((item, i) => (
+            <div key={item.label}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: t.textSecondary }}>{item.label}</span>
+                <span style={{ fontSize: 12, color: t.textMuted }}>{item.pct.toFixed(1).replace('.', ',')}%</span>
+              </div>
+              <div style={{ height: 6, background: t.barTrack, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${item.pct}%`, background: barColors[i % barColors.length], borderRadius: 3, transition: 'width 0.4s ease' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 16 }}>Audiência</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28 }}>
+        <BreakdownGroup title="Gênero" items={genero} />
+        <BreakdownGroup title="Idade" items={idade} />
+        <BreakdownGroup title="Dispositivos" items={dispositivos} />
+      </div>
+    </div>
+  )
+}
+
 // ─── Meta Data Table ───────────────────────────────────────────────────────────
 function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   campanhas: MetaCampaignData[]
@@ -467,8 +524,11 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
     }
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob); const a = document.createElement('a')
-    a.href = url; a.download = `meta-ads-${nivel}.csv`; a.click(); URL.revokeObjectURL(url)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `meta-ads-${nivel}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 100)
   }
 
   const chip = (active: boolean, small?: boolean): React.CSSProperties => ({
@@ -913,6 +973,9 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
               {filtrado.map(acc => <AccountCard key={acc.id} acc={acc} totalSpend={totalSpend} t={t} />)}
             </div>
           )}
+
+          {/* Audiência breakdown */}
+          <AudienciaSection filtrado={filtrado} t={t} />
 
           {/* Data table with Campanhas / Conjuntos / Anúncios */}
           <MetaDataTable

@@ -129,6 +129,14 @@ export interface DailyPoint {
   cpm: number
 }
 
+export interface GeoCidadeData {
+  nome: string
+  criterionId: string
+  cliques: number
+  impressoes: number
+  custo: number
+}
+
 export interface AccountData {
   id: string
   nome: string
@@ -146,6 +154,7 @@ export interface AccountData {
   grupos: AdGroupData[]
   anuncios: AdData[]
   serie: DailyPoint[]
+  cidades: GeoCidadeData[]
 }
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
@@ -205,7 +214,7 @@ export async function GET(req: NextRequest) {
       await Promise.all(
         accounts.map(async (acc: { id: string; nome: string }) => {
           try {
-            const [campRows, agRows, adRows, dailyRows] = await Promise.all([
+            const [campRows, agRows, adRows, dailyRows, geoRows] = await Promise.all([
               gaql(acc.id,
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
@@ -240,6 +249,16 @@ export async function GET(req: NextRequest) {
                    AND campaign.status != 'REMOVED'
                  ORDER BY segments.date`,
                 token),
+              gaql(acc.id,
+                `SELECT geographic_view.resource_name, geographic_view.country_criterion_id,
+                   geographic_view.location_type, metrics.clicks, metrics.impressions, metrics.cost_micros
+                 FROM geographic_view
+                 WHERE segments.date BETWEEN '${start}' AND '${end}'
+                   AND metrics.clicks > 0
+                   AND geographic_view.location_type = 'CITY'
+                 ORDER BY metrics.clicks DESC
+                 LIMIT 20`,
+                token).catch(() => []),
             ])
 
             // ── Campaigns ──────────────────────────────────────────────
@@ -350,6 +369,49 @@ export async function GET(req: NextRequest) {
 
             if (custoMicros === 0) return null
 
+            // ── Cidades ────────────────────────────────────────────────
+            const cidadesRaw: { criterionId: string; cliques: number; impressoes: number; custo: number }[] = []
+            for (const row of geoRows) {
+              const res = row.geographicView?.resourceName ?? ''
+              const criterionId = res.split('~')[1] ?? row.geographicView?.countrycriterionId ?? ''
+              if (!criterionId) continue
+              cidadesRaw.push({
+                criterionId,
+                cliques: Number(row.metrics?.clicks ?? 0),
+                impressoes: Number(row.metrics?.impressions ?? 0),
+                custo: Number(row.metrics?.costMicros ?? 0) / 1_000_000,
+              })
+            }
+
+            let cidades: GeoCidadeData[] = []
+            if (cidadesRaw.length > 0) {
+              try {
+                const ids = [...new Set(cidadesRaw.map(c => c.criterionId))].slice(0, 20)
+                const idList = ids.map(id => `'geoTargetConstants/${id}'`).join(',')
+                const nameRows = await gaql(acc.id,
+                  `SELECT geo_target_constant.id, geo_target_constant.name
+                   FROM geo_target_constant
+                   WHERE geo_target_constant.resource_name IN (${idList})`,
+                  token
+                ).catch(() => [])
+                const nameMap = new Map<string, string>()
+                for (const nr of nameRows) {
+                  const id = String(nr.geoTargetConstant?.id ?? '')
+                  const name = (nr.geoTargetConstant?.name ?? '').trim()
+                  if (id && name) nameMap.set(id, name)
+                }
+                cidades = cidadesRaw.map(c => ({
+                  nome: nameMap.get(c.criterionId) ?? `ID ${c.criterionId}`,
+                  criterionId: c.criterionId,
+                  cliques: c.cliques,
+                  impressoes: c.impressoes,
+                  custo: c.custo,
+                })).filter(c => c.cliques > 0)
+              } catch (_) {
+                cidades = []
+              }
+            }
+
             const custo = custoMicros / 1_000_000
             return {
               id: acc.id, nome: acc.nome, cliques, impressoes, videoViews: 0, custo, conversoes,
@@ -358,6 +420,7 @@ export async function GET(req: NextRequest) {
               grupos: Array.from(agMap.values()).filter(g => g.custo > 0).sort((a, b) => b.custo - a.custo),
               anuncios: Array.from(adMap.values()).filter(a => a.custo > 0).sort((a, b) => b.custo - a.custo),
               serie,
+              cidades,
             } as AccountData
           } catch (e) {
             console.error(`Skipping ${acc.id} (${acc.nome}):`, e)

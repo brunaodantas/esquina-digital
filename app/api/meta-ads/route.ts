@@ -91,6 +91,21 @@ export interface MetaAdData {
   cpc: number
 }
 
+export interface MetaBreakdownItem {
+  label: string
+  impressions: number
+  reach: number
+  clicks: number
+  spend: number
+  pct: number
+}
+
+export interface MetaAudiencia {
+  genero: MetaBreakdownItem[]
+  idade: MetaBreakdownItem[]
+  dispositivos: MetaBreakdownItem[]
+}
+
 export interface MetaAccountData {
   id: string
   nome: string
@@ -108,6 +123,7 @@ export interface MetaAccountData {
   adsets: MetaAdSetData[]
   ads: MetaAdData[]
   serie: MetaDailyPoint[]
+  audiencia: MetaAudiencia
 }
 
 let _cache: { key: string; ts: number; data: MetaAccountData[]; nomes: string[] } | null = null
@@ -177,20 +193,46 @@ export async function GET(req: NextRequest) {
     access_token: TOKEN,
   })
 
+  const BREAKDOWN_FIELDS = 'impressions,reach,clicks,spend'
+  const generoParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'gender', time_range: timeRange, access_token: TOKEN })
+  const idadeParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'age', time_range: timeRange, access_token: TOKEN })
+  const dispositivoParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'device_platform', time_range: timeRange, access_token: TOKEN })
+
+  const GENERO_LABEL: Record<string, string> = { male: 'Masculino', female: 'Feminino', unknown: 'Desconhecido' }
+  const DEVICE_LABEL: Record<string, string> = { mobile: 'Mobile', desktop: 'Desktop', connected_tv: 'Smart TV', unknown: 'Outros' }
+
+  function mapBreakdown(data: any[], key: string, labelMap?: Record<string, string>): MetaBreakdownItem[] {
+    const items: MetaBreakdownItem[] = (data ?? []).map((d: any) => ({
+      label: labelMap ? (labelMap[d[key]] ?? d[key]) : d[key],
+      impressions: parseInt(d.impressions || '0', 10),
+      reach: parseInt(d.reach || '0', 10),
+      clicks: parseInt(d.clicks || '0', 10),
+      spend: parseFloat(d.spend || '0'),
+      pct: 0,
+    }))
+    const totalImpr = items.reduce((s, i) => s + i.impressions, 0)
+    items.forEach(i => { i.pct = totalImpr > 0 ? Math.round((i.impressions / totalImpr) * 1000) / 10 : 0 })
+    return items.sort((a, b) => b.impressions - a.impressions)
+  }
+
   const results = (
     await Promise.all(
       ACCOUNTS.map(async (acc) => {
         try {
-          const [accRes, campRes, adsetRes, adRes, dailyRes] = await Promise.all([
+          const [accRes, campRes, adsetRes, adRes, dailyRes, generoRes, idadeRes, dispositivoRes] = await Promise.all([
             fetch(`${API}/act_${acc.id}/insights?${accountParams}`, { next: { revalidate: 0 } }),
             fetch(`${API}/act_${acc.id}/insights?${campaignParams}`, { next: { revalidate: 0 } }),
             fetch(`${API}/act_${acc.id}/insights?${adsetParams}`, { next: { revalidate: 0 } }),
             fetch(`${API}/act_${acc.id}/insights?${adParams}`, { next: { revalidate: 0 } }),
             fetch(`${API}/act_${acc.id}/insights?${dailyParams}`, { next: { revalidate: 0 } }),
+            fetch(`${API}/act_${acc.id}/insights?${generoParams}`, { next: { revalidate: 0 } }),
+            fetch(`${API}/act_${acc.id}/insights?${idadeParams}`, { next: { revalidate: 0 } }),
+            fetch(`${API}/act_${acc.id}/insights?${dispositivoParams}`, { next: { revalidate: 0 } }),
           ])
 
-          const [accData, campData, adsetData, adData, dailyData] = await Promise.all([
-            accRes.json(), campRes.json(), adsetRes.json(), adRes.json(), dailyRes.json()
+          const [accData, campData, adsetData, adData, dailyData, generoData, idadeData, dispositivoData] = await Promise.all([
+            accRes.json(), campRes.json(), adsetRes.json(), adRes.json(), dailyRes.json(),
+            generoRes.json(), idadeRes.json(), dispositivoRes.json(),
           ])
 
           if (accData.error) {
@@ -306,6 +348,11 @@ export async function GET(req: NextRequest) {
             adsets,
             ads,
             serie,
+            audiencia: {
+              genero: mapBreakdown(generoData.data ?? [], 'gender', GENERO_LABEL),
+              idade: mapBreakdown(idadeData.data ?? [], 'age'),
+              dispositivos: mapBreakdown(dispositivoData.data ?? [], 'device_platform', DEVICE_LABEL),
+            },
           } as MetaAccountData
         } catch (e) {
           console.error(`Skipping ${acc.nome}:`, e)

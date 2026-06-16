@@ -102,7 +102,11 @@ function comentarioGoogle(cliques: number, impressoes: number, ctr: number, cpc:
 
 // ─── Modal ─────────────────────────────────────────────────────────────────────
 function RelatorioModal({ onClose }: { onClose: () => void }) {
-  const [cliente, setCliente] = useState('')
+  const [clienteInput, setClienteInput] = useState('')
+  const [clienteSelecionado, setClienteSelecionado] = useState<string | null>(null)
+  const [todosNomes, setTodosNomes] = useState<string[]>([])
+  const [showSugestoes, setShowSugestoes] = useState(false)
+  const [loadingNomes, setLoadingNomes] = useState(true)
   const [redes, setRedes] = useState({ meta: true, google: false })
   const [preset, setPreset] = useState<PresetWA>('mes-atual')
   const [custom, setCustom] = useState({ start: '', end: '' })
@@ -113,9 +117,31 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
   const [erro, setErro] = useState('')
 
   const periodo = getPeriodoWA(preset, custom)
-  const podeGerar = (redes.meta || redes.google) && (preset !== 'personalizado' || (!!custom.start && !!custom.end))
+  const podeGerar = !!clienteSelecionado && (redes.meta || redes.google) && (preset !== 'personalizado' || (!!custom.start && !!custom.end))
+
+  // Carrega nomes dos dois APIs ao abrir o modal (usa cache de 30min do servidor)
+  useEffect(() => {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const start = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
+    const end = hoje.toISOString().slice(0, 10)
+    Promise.all([
+      fetch(`/api/meta-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
+      fetch(`/api/google-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
+    ]).then(([meta, google]) => {
+      const metaNomes: string[] = (meta.data ?? []).map((a: any) => a.nome)
+      const googleNomes: string[] = (google.data ?? []).map((a: any) => a.nome)
+      const merged = [...new Set([...metaNomes, ...googleNomes])].sort()
+      setTodosNomes(merged)
+      setLoadingNomes(false)
+    })
+  }, [])
+
+  const sugestoes = clienteInput.trim()
+    ? todosNomes.filter(n => n.toLowerCase().includes(clienteInput.toLowerCase()))
+    : todosNomes
 
   async function gerarRelatorio() {
+    if (!clienteSelecionado) return
     setLoading(true); setMensagem(''); setErro('')
 
     let metaDados: any[] = []
@@ -126,7 +152,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       fetches.push(
         fetch(`/api/meta-ads?start=${periodo.start}&end=${periodo.end}`)
           .then(r => r.json())
-          .then(res => { if (!res.error) metaDados = res.data ?? [] })
+          .then(res => { if (!res.error) metaDados = (res.data ?? []).filter((a: any) => a.nome === clienteSelecionado) })
           .catch(() => setErro('Erro ao buscar dados do Meta Ads.'))
       )
     }
@@ -134,8 +160,8 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       fetches.push(
         fetch(`/api/google-ads?start=${periodo.start}&end=${periodo.end}`)
           .then(r => r.json())
-          .then(res => { if (!res.error) googleDados = res.data ?? [] })
-          .catch(() => setErro(e => e || 'Erro ao buscar dados do Google Ads.'))
+          .then(res => { if (!res.error) googleDados = (res.data ?? []).filter((a: any) => a.nome === clienteSelecionado) })
+          .catch(() => setErro(prev => prev || 'Erro ao buscar dados do Google Ads.'))
       )
     }
 
@@ -152,6 +178,22 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     const metaCpc = metaClicks > 0 ? metaSpend / metaClicks : 0
     const metaFreq = metaReach > 0 ? metaImpr / metaReach : 0
 
+    // Audiência Meta: agrega por breakdown entre as contas filtradas
+    const audGenero = new Map<string, number>()
+    const audIdade = new Map<string, number>()
+    const audDisp = new Map<string, number>()
+    for (const acc of metaDados) {
+      for (const item of acc.audiencia?.genero ?? []) audGenero.set(item.label, (audGenero.get(item.label) ?? 0) + item.impressions)
+      for (const item of acc.audiencia?.idade ?? []) audIdade.set(item.label, (audIdade.get(item.label) ?? 0) + item.impressions)
+      for (const item of acc.audiencia?.dispositivos ?? []) audDisp.set(item.label, (audDisp.get(item.label) ?? 0) + item.impressions)
+    }
+    function fmtBreakdown(map: Map<string, number>): string[] {
+      const total = Array.from(map.values()).reduce((s, v) => s + v, 0)
+      return Array.from(map.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([label, v]) => `${label}: ${total > 0 ? Math.round((v / total) * 100) : 0}%`)
+    }
+
     // ── Totais Google ──
     const gCusto = googleDados.reduce((s: number, a: any) => s + (a.custo ?? 0), 0)
     const gCliques = googleDados.reduce((s: number, a: any) => s + (a.cliques ?? 0), 0)
@@ -160,6 +202,13 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     const gCtr = gImpr > 0 ? (gCliques / gImpr) * 100 : 0
     const gCpc = gCliques > 0 ? gCusto / gCliques : 0
     const gCustoConv = gConv > 0 ? gCusto / gConv : 0
+
+    // Cidades Google: agrega cliques por cidade entre as contas filtradas
+    const cidadesMap = new Map<string, number>()
+    for (const acc of googleDados) {
+      for (const c of acc.cidades ?? []) cidadesMap.set(c.nome, (cidadesMap.get(c.nome) ?? 0) + c.cliques)
+    }
+    const topCidades = Array.from(cidadesMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
     // ── Top 3 criativos Meta (por impressões) ──
     const allMetaAds: any[] = metaDados.flatMap((a: any) => a.ads ?? [])
@@ -171,11 +220,8 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     allGoogleAds.sort((a: any, b: any) => (b.cliques ?? 0) - (a.cliques ?? 0))
     const top3Google = allGoogleAds.slice(0, 3)
 
-    // ── Plataformas para título ──
     const plataformas = [redes.meta && 'Meta Ads', redes.google && 'Google Ads'].filter(Boolean).join(' + ')
-    const cabecalho = cliente.trim()
-      ? `${cliente.trim().toUpperCase()} - ${plataformas} - ${periodo.label}`
-      : `${plataformas} - ${periodo.label}`
+    const cabecalho = `${clienteSelecionado.toUpperCase()} - ${plataformas} - ${periodo.label}`
 
     const L: string[] = []
     L.push(cabecalho)
@@ -213,10 +259,16 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
         }
         L.push('')
 
-        // Audiência Meta
+        // Audiência Meta — alcance, frequência, gênero, idade, dispositivos
         L.push('👥 Audiência')
         if (metaReach > 0) L.push(`Alcance: ${fmtN(metaReach)}`)
         if (metaFreq > 0) L.push(`Frequência: ${fmtF(metaFreq)}`)
+        const generoLines = fmtBreakdown(audGenero)
+        const idadeLines = fmtBreakdown(audIdade)
+        const dispLines = fmtBreakdown(audDisp)
+        if (generoLines.length) { L.push(''); L.push('Gênero'); generoLines.forEach(l => L.push(l)) }
+        if (idadeLines.length) { L.push(''); L.push('Faixa etária'); idadeLines.forEach(l => L.push(l)) }
+        if (dispLines.length) { L.push(''); L.push('Dispositivos'); dispLines.forEach(l => L.push(l)) }
         L.push('')
 
         if (top3Meta.length > 0) {
@@ -256,10 +308,15 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
         }
         L.push('')
 
-        // Audiência Google (sem reach nativo — usa impressões como proxy de exposição)
+        // Audiência Google — exposição + cidades
         L.push('👥 Audiência')
         L.push(`Exposição: ${fmtN(gImpr)} impressões`)
-        if (gConv > 0) L.push(`Taxa de conversão: ${fmtPctn((gConv / gCliques) * 100)}`)
+        if (gConv > 0 && gCliques > 0) L.push(`Taxa de conversão: ${fmtPctn((gConv / gCliques) * 100)}`)
+        if (topCidades.length > 0) {
+          L.push('')
+          L.push('Top cidades')
+          topCidades.forEach(([nome, cliques]) => L.push(`${nome}: ${fmtN(cliques)} cliques`))
+        }
         L.push('')
 
         if (top3Google.length > 0) {
@@ -319,15 +376,42 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 0, marginTop: -2 }}>×</button>
         </div>
 
-        {/* Cliente */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Cliente (opcional)</div>
+        {/* Cliente — autocomplete obrigatório */}
+        <div style={{ marginBottom: 16, position: 'relative' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+            Cliente <span style={{ color: '#f87171' }}>*</span>
+          </div>
           <input
-            placeholder="Ex: TAINÁ REIS"
-            value={cliente}
-            onChange={e => setCliente(e.target.value)}
-            style={{ width: '100%', background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#e8e8e8', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+            placeholder={loadingNomes ? 'Carregando clientes...' : 'Buscar cliente...'}
+            value={clienteInput}
+            disabled={loadingNomes}
+            autoComplete="off"
+            onChange={e => { setClienteInput(e.target.value); setClienteSelecionado(null); setShowSugestoes(true) }}
+            onFocus={() => setShowSugestoes(true)}
+            onBlur={() => setTimeout(() => setShowSugestoes(false), 150)}
+            style={{ width: '100%', background: clienteSelecionado ? '#0f2e1a' : '#1a1a1a', border: `1px solid ${clienteSelecionado ? '#22c55e55' : '#2a2a2a'}`, color: '#e8e8e8', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box', transition: 'all 0.15s' }}
           />
+          {clienteSelecionado && (
+            <div style={{ fontSize: 11, color: '#4ade80', marginTop: 5 }}>✓ {clienteSelecionado}</div>
+          )}
+          {!clienteSelecionado && !loadingNomes && (
+            <div style={{ fontSize: 11, color: '#555', marginTop: 5 }}>Selecione um cliente para filtrar os dados corretamente</div>
+          )}
+          {showSugestoes && sugestoes.length > 0 && !clienteSelecionado && (
+            <div style={{ position: 'absolute', top: 'calc(100% - 8px)', left: 0, right: 0, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 8, zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+              {sugestoes.map(nome => (
+                <div
+                  key={nome}
+                  onMouseDown={() => { setClienteSelecionado(nome); setClienteInput(nome); setShowSugestoes(false) }}
+                  style={{ padding: '9px 12px', fontSize: 13, color: '#ddd', cursor: 'pointer', borderBottom: '1px solid #222', transition: 'background 0.1s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#2a2a2a')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {nome}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Redes */}

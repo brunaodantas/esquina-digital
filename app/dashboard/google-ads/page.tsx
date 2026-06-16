@@ -376,6 +376,47 @@ function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: num
   )
 }
 
+// ─── Cidades Section ─────────────────────────────────────────────────────────
+function CidadesSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof C['dark'] }) {
+  const map = new Map<string, { cliques: number; impressoes: number; custo: number }>()
+  for (const acc of filtrado) {
+    for (const c of acc.cidades ?? []) {
+      const ex = map.get(c.nome) ?? { cliques: 0, impressoes: 0, custo: 0 }
+      map.set(c.nome, { cliques: ex.cliques + c.cliques, impressoes: ex.impressoes + c.impressoes, custo: ex.custo + c.custo })
+    }
+  }
+  const cidades = Array.from(map.entries())
+    .map(([nome, v]) => ({ nome, ...v }))
+    .sort((a, b) => b.cliques - a.cliques)
+    .slice(0, 10)
+
+  if (!cidades.length) return null
+  const maxCliques = Math.max(...cidades.map(c => c.cliques))
+
+  return (
+    <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 16 }}>Cidades</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {cidades.map(c => (
+          <div key={c.nome}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: t.textSecondary }}>{c.nome}</span>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <span style={{ fontSize: 12, color: t.textMuted }}>{fmtNum(c.cliques)} cli</span>
+                <span style={{ fontSize: 12, color: t.textMuted }}>{fmtNum(c.impressoes)} imp</span>
+                <span style={{ fontSize: 12, color: t.textMuted }}>{fmtBRL(c.custo)}</span>
+              </div>
+            </div>
+            <div style={{ height: 5, background: t.barTrack, borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${(c.cliques / maxCliques) * 100}%`, background: '#4dabf7', borderRadius: 3 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Data Table (3 níveis) ────────────────────────────────────────────────────
 function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   campanhas: CampaignData[]; grupos: AdGroupData[]; anuncios: AdData[]
@@ -455,8 +496,11 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     }
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob); const a = document.createElement('a')
-    a.href = url; a.download = `google-ads-${nivel}.csv`; a.click(); URL.revokeObjectURL(url)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `google-ads-${nivel}.csv`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 100)
   }
 
   const thS: React.CSSProperties = {
@@ -836,6 +880,9 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
               {filtrado.map(acc => <AccountCard key={acc.id} acc={acc} totalCusto={totalCusto} t={t} />)}
             </div>
           )}
+          {/* Cidades breakdown */}
+          <CidadesSection filtrado={filtrado} t={t} />
+
           {/* Data table — always with level navigation */}
           <DataTable campanhas={allCampanhas} grupos={allGrupos} anuncios={allAnuncios} totalCusto={totalCusto} t={t} multiNivel={true} />
         </>

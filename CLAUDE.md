@@ -41,16 +41,50 @@ Next.js dashboard at `digital-esquina.vercel.app`. Three pages: Entregas, Meta A
 Google Ads e Entregas atualizam automaticamente no próximo horário par (1h, 3h, 5h… BRT).
 Cache da API: 30 min para Google Ads e Meta Ads; 1800s para Entregas (Sheets).
 
+### Seção Audiência — Meta Ads (`meta-ads/page.tsx`)
+Componente `AudienciaSection` exibido após os account cards e antes da DataTable.
+- Agrega `audiencia.genero`, `audiencia.idade`, `audiencia.dispositivos` de todas as contas filtradas
+- Barras horizontais com percentual de impressões por categoria
+- Os dados vêm de 3 chamadas adicionais por conta no `/api/meta-ads`: breakdowns `gender`, `age`, `device_platform`
+- Renderiza apenas quando há dados; oculto automaticamente se a API não retornar breakdowns
+
+### Seção Cidades — Google Ads (`google-ads/page.tsx`)
+Componente `CidadesSection` exibido após os account cards e antes da DataTable.
+- Agrega cliques por cidade de todas as contas filtradas (top 10)
+- Dados vêm de query `geographic_view` no GAQL + resolução de nomes via `geo_target_constant`
+- Barra horizontal proporcional ao maior valor de cliques
+- Oculto quando não há dados de cidade disponíveis
+
 ### Botão Relatório WA (dashboard/page.tsx)
 Quarto botão no header do dashboard (cor verde, ícone ✉). Abre um modal com:
+- **Cliente**: autocomplete obrigatório — carrega nomes das contas ativas de ambas as APIs ao abrir o modal; filtragem fuzzy por texto; seleção obrigatória para habilitar geração
 - **Redes**: toggle Meta Ads / Google Ads (botões que ativam/desativam)
 - **Período**: dropdown com presets (Este mês, Mês passado, Últimos 7/14/30 dias, Personalizado)
 - **Incluir valores financeiros**: toggle que controla se Investimento, CPM, CPC e Custo/Conv. aparecem
-- **Gerar Relatório**: busca `/api/meta-ads` e `/api/google-ads` em paralelo, monta mensagem formatada para WhatsApp (markdown do WA: `*negrito*`, `_itálico_`)
+- **Gerar Relatório**: busca `/api/meta-ads` e `/api/google-ads` em paralelo, **filtra pelo cliente selecionado** (`a.nome === clienteSelecionado`), monta mensagem formatada para WhatsApp
 - **Copiar texto**: copia para o clipboard com feedback "✓ Copiado!"
 - **Abrir no WhatsApp**: abre `https://wa.me/?text=...` (usuário escolhe o destinatário)
 
 Frequência Meta Ads calculada como `impressões / alcance` (matematicamente correto ao agregar múltiplas contas).
+
+**Regra crítica — filtro de cliente obrigatório:** O campo cliente não é mais texto livre. Sem seleção no autocomplete o botão "Gerar Relatório" fica desabilitado. O filtro aplica `a.nome === clienteSelecionado` nos arrays de Meta e Google antes de calcular qualquer métrica, garantindo que nunca sejam somados dados de todos os clientes juntos.
+
+**Audiência no relatório WA:**
+- Meta: Alcance, Frequência + breakdown de Gênero, Faixa etária e Dispositivos (% de impressões)
+- Google: Exposição (impressões) + Top 5 cidades por cliques (quando disponível via `acc.cidades`)
+
+## Correções de bug conhecidas
+
+### Exportação CSV abre nova aba (corrigido)
+O padrão `document.createElement('a'); a.click()` sem anexar ao DOM causa abertura de nova aba em Safari e Firefox.
+**Padrão correto** — sempre usar em qualquer exportação de arquivo:
+```ts
+document.body.appendChild(a)
+a.click()
+document.body.removeChild(a)
+setTimeout(() => URL.revokeObjectURL(url), 100)
+```
+Aplicado em `meta-ads/page.tsx` e `google-ads/page.tsx`.
 
 ## Deploy
 Push para `main` no GitHub dispara deploy automático na Vercel (conta `bruno@esquina.online`).
