@@ -84,6 +84,7 @@ export interface MetaAdData {
   status: string
   spend: number
   impressions: number
+  reach: number
   clicks: number
   ctr: number
   cpm: number
@@ -161,7 +162,7 @@ export async function GET(req: NextRequest) {
   })
 
   const adParams = new URLSearchParams({
-    fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,cpm,cpc',
+    fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpm,cpc',
     level: 'ad',
     time_range: timeRange,
     access_token: TOKEN,
@@ -256,6 +257,7 @@ export async function GET(req: NextRequest) {
               status: mapStatus(c.effective_status ?? 'ACTIVE'),
               spend: parseFloat(c.spend || '0'),
               impressions: parseInt(c.impressions || '0', 10),
+              reach: parseInt(c.reach || '0', 10),
               clicks: parseInt(c.clicks || '0', 10),
               ctr: parseFloat(c.ctr || '0'),
               cpm: parseFloat(c.cpm || '0'),
