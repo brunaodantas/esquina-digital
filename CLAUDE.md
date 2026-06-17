@@ -99,6 +99,17 @@ Página em `app/dashboard/tiktok-ads/page.tsx`, rota em `app/api/tiktok-ads/rout
 
 **Regra obrigatória**: qualquer filtro de nome de conta por `clienteSelecionado` deve usar `matchNome()`, nunca `===`. Contas do mesmo cliente têm nomes diferentes por plataforma (ex: "PMC – Prefeitura de Campinas" no Meta vs "PMC-CAMPINAS" no Google Ads vs "PMC Campinas" no TikTok).
 
+### Audiência TikTok no WA e PDF
+
+**Relatório WA**: agrega `audiencia.genero`, `audiencia.idade`, `audiencia.plataforma` de `tiktokDados` em `tkAudGenMap`/`tkAudIdadeMap`/`tkAudPlatMap`, formata com `fmtBreakdown` e exibe seção `👥 Audiência TikTok` após as métricas de desempenho. Renderiza apenas quando a API TikTok retorna dados demográficos.
+
+**Google Display / YouTube sem dados**: `analysisDisplay()` e `analysisYoutube()` verificam `dispImpr === 0` / `ytImpr === 0` e retornam mensagem "Sem dados para o período ou cliente selecionado" em vez de mostrar zeros. Causas comuns: período sem campanhas ativas, ou nome da conta Google Ads não coincide com o cliente via `matchNome`.
+
+**Diagnóstico multiplataforma**: 2 novos blocos qualitativos após os existentes —
+1. Distribuição % de impressões entre plataformas ativas (Meta / Google / TikTok)
+2. Papel do TikTok como complemento ao Meta (% das impressões combinadas + contexto mobile-first)
+Ambos renderizam apenas quando as plataformas relevantes têm dados.
+
 ### Audiência TikTok no PDF (buildRelatorioHTML)
 
 `buildRelatorioHTML` recebe `tiktokDados: any[]` (array de contas filtradas, não só escalares). A função agrega `audiencia.genero`, `audiencia.idade`, `audiencia.plataforma` e exibe barras via `tiktokAudHtml('#00994D')` na seção TikTok — mesmo padrão da Meta. O KPI card 4 mostra CPM quando disponível.
