@@ -324,11 +324,11 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 
   const safeChartJs = chartJsText.replace(/<\/script>/g, '<\\/script>')
 
-  const showDisplay = secoes.display && dispImpr > 0
-  const showYoutube = secoes.youtube && ytImpr > 0
-  const showTD = secoes.metaTD && finalTDImpr > 0
-  const showVP = secoes.metaVP && hasVPData && vpImpr > 0
-  const showTiktok = secoes.tiktok && tiktokImpressoes > 0
+  const showDisplay = secoes.display
+  const showYoutube = secoes.youtube
+  const showTD = secoes.metaTD
+  const showVP = secoes.metaVP
+  const showTiktok = secoes.tiktok
 
   // ── Chips plataformas ativas no hero ──
   const activeChips: string[] = []
@@ -774,7 +774,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
   const [todosNomes, setTodosNomes] = useState<string[]>([])
   const [showSugestoes, setShowSugestoes] = useState(false)
   const [loadingNomes, setLoadingNomes] = useState(true)
-  const [redes, setRedes] = useState({ meta: true, google: false })
+  const [redes, setRedes] = useState({ meta: true, google: false, tiktok: false })
   const [preset, setPreset] = useState<PresetWA>('mes-atual')
   const [custom, setCustom] = useState({ start: '', end: '' })
   const [incluirValores, setIncluirValores] = useState(false)
@@ -784,7 +784,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
   const [erro, setErro] = useState('')
 
   const periodo = getPeriodoWA(preset, custom)
-  const podeGerar = !!clienteSelecionado && (redes.meta || redes.google) && (preset !== 'personalizado' || (!!custom.start && !!custom.end))
+  const podeGerar = !!clienteSelecionado && (redes.meta || redes.google || redes.tiktok) && (preset !== 'personalizado' || (!!custom.start && !!custom.end))
 
   // Carrega nomes dos dois APIs ao abrir o modal (usa cache de 30min do servidor)
   useEffect(() => {
@@ -794,10 +794,12 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     Promise.all([
       fetch(`/api/meta-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
       fetch(`/api/google-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
-    ]).then(([meta, google]) => {
+      fetch(`/api/tiktok-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
+    ]).then(([meta, google, tiktok]) => {
       const metaNomes: string[] = (meta.data ?? []).map((a: any) => a.nome)
       const googleNomes: string[] = (google.data ?? []).map((a: any) => a.nome)
-      const merged = [...new Set([...metaNomes, ...googleNomes])].sort()
+      const tiktokNomes: string[] = (tiktok.data ?? []).map((a: any) => a.nome)
+      const merged = [...new Set([...metaNomes, ...googleNomes, ...tiktokNomes])].sort()
       setTodosNomes(merged)
       setLoadingNomes(false)
     })
@@ -813,6 +815,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
 
     let metaDados: any[] = []
     let googleDados: any[] = []
+    let tiktokDados: any[] = []
     const fetches: Promise<void>[] = []
 
     if (redes.meta) {
@@ -829,6 +832,14 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           .then(r => r.json())
           .then(res => { if (!res.error) googleDados = (res.data ?? []).filter((a: any) => a.nome === clienteSelecionado) })
           .catch(() => setErro(prev => prev || 'Erro ao buscar dados do Google Ads.'))
+      )
+    }
+    if (redes.tiktok) {
+      fetches.push(
+        fetch(`/api/tiktok-ads?start=${periodo.start}&end=${periodo.end}`)
+          .then(r => r.json())
+          .then(res => { if (!res.error) tiktokDados = (res.data ?? []).filter((a: any) => a.nome === clienteSelecionado) })
+          .catch(() => setErro(prev => prev || 'Erro ao buscar dados do TikTok.'))
       )
     }
 
@@ -887,18 +898,27 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     allGoogleAds.sort((a: any, b: any) => (b.cliques ?? 0) - (a.cliques ?? 0))
     const top3Google = allGoogleAds.slice(0, 3)
 
-    const plataformas = [redes.meta && 'Meta Ads', redes.google && 'Google Ads'].filter(Boolean).join(' + ')
+    // ── Totais TikTok ──
+    const tkSpend = tiktokDados.reduce((s: number, a: any) => s + (a.spend ?? 0), 0)
+    const tkImpr = tiktokDados.reduce((s: number, a: any) => s + (a.impressions ?? 0), 0)
+    const tkCliques = tiktokDados.reduce((s: number, a: any) => s + (a.clicks ?? 0), 0)
+    const tkCtr = tkImpr > 0 ? (tkCliques / tkImpr) * 100 : 0
+    const tkCpm = tkSpend > 0 && tkImpr > 0 ? (tkSpend / tkImpr) * 1000 : 0
+    const tkCpc = tkCliques > 0 ? tkSpend / tkCliques : 0
+
+    const plataformas = [redes.meta && 'Meta Ads', redes.google && 'Google Ads', redes.tiktok && 'TikTok'].filter(Boolean).join(' + ')
     const cabecalho = `${clienteSelecionado.toUpperCase()} - ${plataformas} - ${periodo.label}`
 
     const L: string[] = []
     L.push(cabecalho)
     L.push('')
 
-    // ── Visão Geral (consolidado Meta + Google) ──
-    const totalImpr = metaImpr + gImpr
-    const totalCliques = metaClicks + gCliques
-    const totalInvest = metaSpend + gCusto
-    const labelVG = redes.meta && redes.google ? '* Visão Geral (Meta + Google)' : '* Visão Geral'
+    // ── Visão Geral (consolidado Meta + Google + TikTok) ──
+    const totalImpr = metaImpr + gImpr + tkImpr
+    const totalCliques = metaClicks + gCliques + tkCliques
+    const totalInvest = metaSpend + gCusto + tkSpend
+    const redesSel = [redes.meta && 'Meta', redes.google && 'Google', redes.tiktok && 'TikTok'].filter(Boolean) as string[]
+    const labelVG = redesSel.length > 1 ? `* Visão Geral (${redesSel.join(' + ')})` : '* Visão Geral'
     L.push(labelVG)
     L.push(`Impressões: ${fmtN(totalImpr)}`)
     if (redes.meta && metaReach > 0) L.push(`Alcance: ${fmtN(metaReach)}`)
@@ -1001,14 +1021,35 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       }
     }
 
+    // ── TikTok ──
+    if (redes.tiktok) {
+      if (!tiktokDados.length) {
+        L.push('📱 Desempenho TikTok')
+        L.push('Nenhum dado encontrado para o período.')
+        L.push('')
+      } else {
+        L.push('📱 Desempenho TikTok')
+        L.push(`Impressões: ${fmtN(tkImpr)}`)
+        L.push(`Cliques: ${fmtN(tkCliques)}`)
+        L.push(`CTR: ${fmtPctn(tkCtr)}`)
+        if (incluirValores) {
+          L.push(`Investimento: ${fmtBRLn(tkSpend)}`)
+          if (tkCpm > 0) L.push(`CPM: ${fmtBRLn(tkCpm)}`)
+          if (tkCpc > 0) L.push(`CPC: ${fmtBRLn(tkCpc)}`)
+        }
+        L.push('')
+      }
+    }
+
     // ── Desempenho Geral ──
     L.push('Desempenho Geral')
     const partes: string[] = []
     if (redes.meta && metaDados.length) partes.push(`Meta Ads com ${fmtN(metaImpr)} impressões e ${fmtN(metaClicks)} cliques`)
     if (redes.google && googleDados.length) partes.push(`Google Ads com ${fmtN(gCliques)} cliques e CTR de ${fmtPctn(gCtr)}`)
+    if (redes.tiktok && tiktokDados.length) partes.push(`TikTok com ${fmtN(tkImpr)} impressões e CTR de ${fmtPctn(tkCtr)}`)
     if (partes.length > 0) L.push(partes.join('; ') + '.')
-    if (incluirValores && (metaSpend + gCusto) > 0) {
-      L.push(`Investimento total no período: ${fmtBRLn(metaSpend + gCusto)}.`)
+    if (incluirValores && totalInvest > 0) {
+      L.push(`Investimento total no período: ${fmtBRLn(totalInvest)}.`)
     } else if (!incluirValores && redes.meta && metaDados.length && redes.google && googleDados.length) {
       L.push(`CTR consolidado: Meta ${fmtPctn(metaCtr)} · Google ${fmtPctn(gCtr)}.`)
     }
@@ -1085,12 +1126,15 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Redes</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {(['meta', 'google'] as const).map(r => {
+            {(['meta', 'google', 'tiktok'] as const).map(r => {
               const ativo = redes[r]
+              const cor = r === 'tiktok' ? '#00994D' : '#1A3CFF'
+              const corText = r === 'tiktok' ? '#00cc66' : '#7ba3ff'
+              const label = r === 'meta' ? 'Meta Ads' : r === 'google' ? 'Google Ads' : 'TikTok'
               return (
                 <button key={r} onClick={() => setRedes(p => ({ ...p, [r]: !p[r] }))}
-                  style={{ flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${ativo ? '#1A3CFF' : '#2a2a2a'}`, background: ativo ? '#1A3CFF18' : 'transparent', color: ativo ? '#7ba3ff' : '#555', transition: 'all 0.15s' }}>
-                  {r === 'meta' ? 'Meta Ads' : 'Google Ads'}
+                  style={{ flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${ativo ? cor : '#2a2a2a'}`, background: ativo ? `${cor}18` : 'transparent', color: ativo ? corText : '#555', transition: 'all 0.15s' }}>
+                  {label}
                 </button>
               )
             })}
