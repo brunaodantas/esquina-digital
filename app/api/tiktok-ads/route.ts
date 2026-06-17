@@ -297,16 +297,14 @@ export async function GET(req: NextRequest) {
     async function probe(label: string, params: Record<string, string>) {
       try {
         const r = await tiktokGet('/report/integrated/get/', params)
-        out[label] = { code: r?.code, message: r?.message, count: r?.data?.list?.length ?? 0, sample: r?.data?.list?.[0] ?? null }
+        out[label] = { code: r?.code, message: r?.message, count: r?.data?.list?.length ?? 0, list: (r?.data?.list ?? []).map((it: any) => ({ d: it.dimensions, imp: it.metrics?.impressions })) }
       } catch (e: any) { out[label] = { error: String(e?.message ?? e) } }
     }
-    await probe('camp_dim_id', { ...base, data_level: 'AUCTION_CAMPAIGN', dimensions: JSON.stringify(['campaign_id']), metrics: JSON.stringify(['spend', 'campaign_name']), page_size: '50' })
-    await probe('camp_dim_id_name', { ...base, data_level: 'AUCTION_CAMPAIGN', dimensions: JSON.stringify(['campaign_id', 'campaign_name']), metrics: JSON.stringify(['spend']), page_size: '50' })
-    await probe('ad_dim_camp_name', { ...base, data_level: 'AUCTION_AD', dimensions: JSON.stringify(['campaign_id', 'campaign_name']), metrics: JSON.stringify(['spend']), page_size: '50' })
-    await probe('aud_age_advertiser', { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), dimensions: JSON.stringify(['age']), page_size: '50' })
-    await probe('aud_gender_advertiser', { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), dimensions: JSON.stringify(['gender']), page_size: '50' })
-    await probe('aud_platform_advertiser', { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), dimensions: JSON.stringify(['platform_type']), page_size: '50' })
-    await probe('aud_age_campaign', { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_CAMPAIGN', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), dimensions: JSON.stringify(['campaign_id', 'age']), page_size: '50' })
+    const aud = { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), page_size: '50' }
+    await probe('aud_age', { ...aud, dimensions: JSON.stringify(['age']) })
+    for (const dim of ['device_model', 'device_brand', 'os_platform', 'network_type', 'placement', 'device_price']) {
+      await probe(`aud_${dim}`, { ...aud, dimensions: JSON.stringify([dim]) })
+    }
     return NextResponse.json({ advertiser: id, period: { start, end }, probes: out })
   }
 
