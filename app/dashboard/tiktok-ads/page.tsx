@@ -1,7 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { TikTokAccountData, TikTokCampaignData, TikTokAudienceItem } from '@/app/api/tiktok-ads/route'
+import type { TikTokAccountData, TikTokCampaignData, TikTokAdSetData, TikTokAdData, TikTokAudienceItem } from '@/app/api/tiktok-ads/route'
+
+type NivelTK = 'campanhas' | 'conjuntos' | 'anuncios'
+const NIVEL_TABS_TK: { key: NivelTK; label: string }[] = [
+  { key: 'campanhas', label: 'Campanhas' },
+  { key: 'conjuntos', label: 'Conjuntos de Anúncios' },
+  { key: 'anuncios', label: 'Anúncios' },
+]
 
 type Theme = 'dark' | 'light'
 type Preset = 'personalizado' | 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'ytd-2026'
@@ -393,30 +400,53 @@ function AudienciaSection({ filtrado, t }: { filtrado: TikTokAccountData[]; t: t
   )
 }
 
-// ─── Campaigns Table ──────────────────────────────────────────────────────────
-function CampanhasTable({ campanhas, totalSpend, t }: { campanhas: TikTokCampaignData[]; totalSpend: number; t: typeof C['dark'] }) {
+// ─── Data Table (3 níveis: Campanhas / Conjuntos / Anúncios) ──────────────────
+function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
+  campanhas: TikTokCampaignData[]; grupos: TikTokAdSetData[]; anuncios: TikTokAdData[]; totalSpend: number; t: typeof C['dark']
+}) {
+  const [nivel, setNivel] = useState<NivelTK>('campanhas')
   const [busca, setBusca] = useState('')
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  useEffect(() => { setBusca(''); setSortCol(null) }, [nivel])
 
   function toggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortCol(col); setSortDir('desc') }
   }
+  function sortRows<T extends Record<string, any>>(rows: T[]): T[] {
+    if (!sortCol) return rows
+    return [...rows].sort((a, b) => {
+      const av = Number(a[sortCol] ?? 0), bv = Number(b[sortCol] ?? 0)
+      return sortDir === 'asc' ? av - bv : bv - av
+    })
+  }
 
-  const filtered = campanhas.filter(c => !busca || c.nome.toLowerCase().includes(busca.toLowerCase()))
-  const sorted = sortCol ? [...filtered].sort((a, b) => {
-    const av = Number((a as any)[sortCol] ?? 0), bv = Number((b as any)[sortCol] ?? 0)
-    return sortDir === 'asc' ? av - bv : bv - av
-  }) : filtered
+  const q = busca.toLowerCase()
+  const filtCamp = campanhas.filter(c => !q || c.nome.toLowerCase().includes(q))
+  const filtGrupos = grupos.filter(g => !q || g.nome.toLowerCase().includes(q) || g.campanha.toLowerCase().includes(q))
+  const filtAnuncios = anuncios.filter(a => !q || a.nome.toLowerCase().includes(q) || a.adset.toLowerCase().includes(q) || a.campanha.toLowerCase().includes(q))
+  const sortedCamp = sortRows(filtCamp)
+  const sortedGrupos = sortRows(filtGrupos)
+  const sortedAnuncios = sortRows(filtAnuncios)
 
   function exportCSV() {
-    const headers = ['Campanha', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
-    const rows = sorted.map(c => [c.nome, c.spend, c.impressions, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2)])
+    let headers: string[]; let rows: (string | number)[][]
+    if (nivel === 'campanhas') {
+      headers = ['Campanha', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
+      rows = sortedCamp.map(c => [c.nome, c.spend, c.impressions, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2)])
+    } else if (nivel === 'conjuntos') {
+      headers = ['Conjunto', 'Campanha', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
+      rows = sortedGrupos.map(g => [g.nome, g.campanha, g.spend, g.impressions, g.clicks, g.ctr.toFixed(4), g.cpm.toFixed(2), g.cpc.toFixed(2)])
+    } else {
+      headers = ['Anúncio', 'Conjunto', 'Campanha', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
+      rows = sortedAnuncios.map(a => [a.nome, a.adset, a.campanha, a.spend, a.impressions, a.clicks, a.ctr.toFixed(4), a.cpm.toFixed(2), a.cpc.toFixed(2)])
+    }
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'tiktok-campanhas.csv'
+    const a = document.createElement('a'); a.href = url; a.download = `tiktok-${nivel}.csv`
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
     setTimeout(() => URL.revokeObjectURL(url), 100)
   }
@@ -424,47 +454,114 @@ function CampanhasTable({ campanhas, totalSpend, t }: { campanhas: TikTokCampaig
   const thS: React.CSSProperties = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left', borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap' }
   const tdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textSecondary, borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle' }
 
+  const metricHeaders = (
+    <>
+      {(['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'cpc'] as const).map((col, i) => {
+        const labels = ['INVEST.', 'IMPR.', 'CLIQUES', 'CTR', 'CPM', 'CPC']
+        return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+      })}
+    </>
+  )
+  const metricCells = (item: { spend: number; impressions: number; clicks: number; ctr: number; cpm: number; cpc: number }) => (
+    <>
+      <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.spend)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressions)} full={fmtNumFull(item.impressions)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.clicks)} full={fmtNumFull(item.clicks)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(item.cpm)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpc > 0 ? <CopiavelNum compact={fmtBRL(item.cpc)} /> : '—'}</td>
+    </>
+  )
+
   return (
     <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12 }}>
+      {/* Level tabs */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${t.border}`, padding: '0 16px', overflowX: 'auto' }}>
+        {NIVEL_TABS_TK.map(tab => (
+          <button key={tab.key} onClick={() => setNivel(tab.key)} style={{
+            padding: '12px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', whiteSpace: 'nowrap',
+            color: nivel === tab.key ? TK : t.textMuted,
+            borderBottom: nivel === tab.key ? `2px solid ${TK}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s',
+          }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Search + export */}
       <div style={{ padding: '10px 16px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>Campanhas</span>
         <div style={{ flex: 1 }} />
         <input placeholder="Filtrar por nome..." value={busca} onChange={e => setBusca(e.target.value)} style={{ background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText, borderRadius: 8, padding: '5px 12px', fontSize: 13, outline: 'none', width: 'clamp(120px, 30vw, 200px)' }} />
         <button onClick={exportCSV} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted }}>↓ CSV</button>
       </div>
+
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>
-              {(['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'cpc'] as const).map((col, i) => {
-                const labels = ['INVEST.', 'IMPR.', 'CLIQUES', 'CTR', 'CPM', 'CPC']
-                return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+        {nivel === 'campanhas' && (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
+            <tbody>
+              {sortedCamp.length === 0 ? (
+                <tr><td colSpan={7} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
+              ) : sortedCamp.map(c => {
+                const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
+                return (
+                  <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={tdS}>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
+                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
+                    </td>
+                    {metricCells(c)}
+                  </tr>
+                )
               })}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.length === 0 ? (
-              <tr><td colSpan={7} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
-            ) : sorted.map(c => {
-              const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
-              return (
-                <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <td style={tdS}>
-                    <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
-                    {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
-                  </td>
-                  <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
-                  <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
-                  <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.clicks)} full={fmtNumFull(c.clicks)} /></td>
-                  <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
-                  <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
-                  <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        )}
+
+        {nivel === 'conjuntos' && (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={{ ...thS, minWidth: 200 }}>CONJUNTO DE ANÚNCIOS</th><th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
+            <tbody>
+              {sortedGrupos.length === 0 ? (
+                <tr><td colSpan={8} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
+              ) : sortedGrupos.map(g => {
+                const share = totalSpend > 0 ? (g.spend / totalSpend) * 100 : 0
+                return (
+                  <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={tdS}>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{g.nome}</div>
+                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
+                    </td>
+                    <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{g.campanha}</td>
+                    {metricCells(g)}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+
+        {nivel === 'anuncios' && (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={{ ...thS, minWidth: 200 }}>ANÚNCIO</th><th style={{ ...thS, minWidth: 160 }}>CONJUNTO</th><th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
+            <tbody>
+              {sortedAnuncios.length === 0 ? (
+                <tr><td colSpan={9} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum anúncio encontrado</td></tr>
+              ) : sortedAnuncios.map(a => {
+                const share = totalSpend > 0 ? (a.spend / totalSpend) * 100 : 0
+                return (
+                  <tr key={a.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <td style={tdS}>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{a.nome}</div>
+                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
+                    </td>
+                    <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{a.adset}</td>
+                    <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{a.campanha}</td>
+                    {metricCells(a)}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )
@@ -581,6 +678,8 @@ export default function TikTokAdsPage({ theme = 'dark', visible = true }: { them
   const prevCpc = prevClicks > 0 ? prevSpend / prevClicks : 0
 
   const allCampanhas = selectedAccount ? selectedAccount.campanhas : filtrado.flatMap(a => a.campanhas).sort((a, b) => b.spend - a.spend)
+  const allGrupos = selectedAccount ? (selectedAccount.grupos ?? []) : filtrado.flatMap(a => a.grupos ?? []).sort((a, b) => b.spend - a.spend)
+  const allAnuncios = selectedAccount ? (selectedAccount.anuncios ?? []) : filtrado.flatMap(a => a.anuncios ?? []).sort((a, b) => b.spend - a.spend)
 
   const mergedSerie = (() => {
     if (selectedAccount) return selectedAccount.serie ?? []
@@ -655,8 +754,8 @@ export default function TikTokAdsPage({ theme = 'dark', visible = true }: { them
           {/* Audiência */}
           <AudienciaSection filtrado={filtrado} t={t} />
 
-          {/* Campaigns table */}
-          <CampanhasTable campanhas={allCampanhas} totalSpend={totalSpend} t={t} />
+          {/* Data table — 3 níveis */}
+          <DataTable campanhas={allCampanhas} grupos={allGrupos} anuncios={allAnuncios} totalSpend={totalSpend} t={t} />
         </>
       )}
     </div>

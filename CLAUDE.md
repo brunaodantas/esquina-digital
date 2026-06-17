@@ -90,6 +90,10 @@ Página em `app/dashboard/tiktok-ads/page.tsx`, rota em `app/api/tiktok-ads/rout
 
 **Advertiser IDs** hardcoded em `ADVERTISER_IDS` (8 contas). Nomes reais em `ADVERTISER_NAMES_FALLBACK` (preferir sempre o fallback, não o retorno da API, para garantir consistência entre dropdown e dados).
 
+**Tabela com 3 níveis (Campanhas / Conjuntos de Anúncios / Anúncios)** — mesma estrutura do Meta. Componente `DataTable` em `tiktok-ads/page.tsx` com abas `NIVEL_TABS_TK`. A rota retorna `campanhas`, `grupos` (AUCTION_ADGROUP, dimensão `adgroup_id` + métricas `adgroup_name`/`campaign_name`) e `anuncios` (AUCTION_AD, dimensão `ad_id` + métricas `ad_name`/`adgroup_name`/`campaign_name`). Todos os `*_name` vêm como MÉTRICA (confirmado via probe — ver item 4). Colunas por nível: INVEST · IMPR · CLIQUES · CTR · CPM · CPC. Conjuntos mostram a campanha-mãe; Anúncios mostram conjunto + campanha.
+
+> **Google Ads já tem a mesma estrutura de 3 abas** (componente `DataTable` em `google-ads/page.tsx`, `multiNivel`): Campanhas · Grupos de Anúncios · Anúncios. A rota retorna `campanhas`/`grupos`/`anuncios`. Nenhuma mudança necessária — já estava no padrão Meta.
+
 **Bugs corrigidos (junho/2026):**
 
 1. **Campanhas vazias (campRes código 40002 silencioso):** `campaign_name` como métrica no relatório `AUCTION_CAMPAIGN` era rejeitada silenciosamente pela API TikTok (retornava HTTP 200 com `code: 40002` em vez de erro). A query retornava `data.list = null` → `campanhas = []`. Fix: remover `campaign_name` das métricas e buscar nomes separadamente via `/campaign/get/`.
@@ -109,7 +113,7 @@ Página em `app/dashboard/tiktok-ads/page.tsx`, rota em `app/api/tiktok-ads/rout
 
 6. **Contas desaparecendo mesmo veiculando (RESOLVIDO em v9 — era RATE LIMITING):** a causa real era throttle de QPS. A rota disparava 6 chamadas × 8 contas = 48 requisições simultâneas; o TikTok limita QPS e devolvia vazio para chamadas throttled, derrubando contas aleatoriamente. Fix: (a) `mapLimit(ids, 3, …)` limita a 3 contas simultâneas (~18 chamadas de pico); (b) `tiktokGet` faz retry com backoff em HTTP 429/5xx e em códigos de throttle no corpo (40100/40016/50002/51000). Mantido o Fallback 2 (reconstruir totais da série diária).
 
-**Cache versionado:** `CACHE_V = 'v9'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
+**Cache versionado:** `CACHE_V = 'v10'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo. (v10 adicionou níveis grupos/anuncios; concorrência baixada para 2 contas porque agora são 8 chamadas/conta.)
 
 **Como debugar a API TikTok:** `/api/*` não passa pelo middleware de auth (só `/dashboard/*`), então dá para `curl` a rota em produção. Para inspecionar respostas cruas da API, adicionar temporariamente um bloco `if (searchParams.get('debug'))` que roda chamadas sequenciais e retorna `{code, message, list}`. O token é "Sensitive" na Vercel (não sai no `vercel env pull`), então não dá para testar localmente — só via produção.
 
