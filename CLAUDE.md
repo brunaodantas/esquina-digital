@@ -87,7 +87,11 @@ Página em `app/dashboard/tiktok-ads/page.tsx`, rota em `app/api/tiktok-ads/rout
 
 3. **Dropdown incompleto / nome errado na conta ANFAVEA:** `ADVERTISER_NAMES_FALLBACK['7646886376989982741']` estava mapeado como `'Conta TK'` em vez de `'ANFAVEA'`. Corrigido. Também: nomes do fallback nunca devem ser sobrescritos pelo retorno da API `/advertiser/info/` pois a API retorna nomes internos ("BIODIESEL_ESQUINA") que não batem com o dropdown — use `ADVERTISER_NAMES_FALLBACK[id] ?? nomeMap.get(id)` na ordem certa.
 
-**Cache versionado:** `CACHE_V = 'v5'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
+4. **Nomes de campanha exibidos como IDs ("Campanha 1867..."):** `/campaign/get/` era chamado antes de ter os IDs do relatório, e erros eram silenciados. Fix: extrai IDs do `campRes` primeiro, depois chama `/campaign/get/` com `campaign_ids` específicos. Também trata ambos os formatos de campo (`campaign_id`/`id`, `campaign_name`/`name`). Erro agora é logado com `console.error`.
+
+5. **PMC Campinas (e outras contas) desaparecendo intermitentemente:** TikTok retorna 0 nos relatórios AUCTION_ADVERTISER e AUCTION_CAMPAIGN de forma inconsistente, mas os dados diários (`stat_time_day`) ainda retornam corretamente. Fix: Fallback 2 — se `account.spend === 0 && campanhas.length === 0 && serie.length > 0`, reconstrói os totais da conta somando os dados da série diária.
+
+**Cache versionado:** `CACHE_V = 'v6'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
 
 ## matchNome — filtragem fuzzy de clientes
 
