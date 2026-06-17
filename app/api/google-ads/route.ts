@@ -236,7 +236,7 @@ export async function GET(req: NextRequest) {
                 `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status,
                    ad_group.id, ad_group.name,
                    campaign.id, campaign.name,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
                  FROM ad_group_ad
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND ad_group_ad.status != 'REMOVED'

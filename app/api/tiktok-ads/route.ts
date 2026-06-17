@@ -200,6 +200,16 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
 
   const audiencia: TikTokAudienceData = audRes.status === 'fulfilled' ? audRes.value : { genero: [], idade: [], plataforma: [] }
 
+  // Fallback: se o nível de conta retornou 0 mas há campanhas com dados, soma das campanhas
+  if (account.spend === 0 && campanhas.length > 0) {
+    account.spend = campanhas.reduce((s, c) => s + c.spend, 0)
+    account.impressions = campanhas.reduce((s, c) => s + c.impressions, 0)
+    account.clicks = campanhas.reduce((s, c) => s + c.clicks, 0)
+    account.ctr = account.impressions > 0 ? (account.clicks / account.impressions) * 100 : 0
+    account.cpm = account.impressions > 0 ? (account.spend / account.impressions) * 1000 : 0
+    account.cpc = account.clicks > 0 ? account.spend / account.clicks : 0
+  }
+
   return { account, serie, campanhas, audiencia }
 }
 
