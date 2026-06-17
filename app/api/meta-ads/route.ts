@@ -3,27 +3,48 @@ import { NextRequest, NextResponse } from 'next/server'
 const TOKEN = process.env.META_ACCESS_TOKEN ?? ''
 const API = 'https://graph.facebook.com/v21.0'
 
-const ACCOUNTS = [
-  { id: '291661868263049',  nome: 'OAB BAHIA',                    moeda: 'BRL' },
-  { id: '382136322438021',  nome: 'BEQUANT',                      moeda: 'EUR' },
-  { id: '485257655640935',  nome: 'PMC – Prefeitura de Campinas', moeda: 'BRL' },
-  { id: '252035889832913',  nome: 'AMERICANA',                    moeda: 'BRL' },
-  { id: '753596575663139',  nome: 'Villa Global Education',       moeda: 'BRL' },
-  { id: '709760707406781',  nome: 'HORTOLÂNDIA, SP',              moeda: 'BRL' },
-  { id: '388253280554246',  nome: 'Esquina Geral',                moeda: 'BRL' },
-  { id: '1172242000851832', nome: 'Tatiana Roque Anúncios',       moeda: 'BRL' },
-  { id: '927384352383311',  nome: 'Celina 2025 CARTÃO',           moeda: 'BRL' },
-  { id: '490753189954978',  nome: 'MOISES SELERGES',              moeda: 'BRL' },
-  { id: '600732035857906',  nome: 'HUGO MOTTA',                   moeda: 'BRL' },
-  { id: '1523897018922271', nome: 'TAINÁ REIS',                   moeda: 'BRL' },
-  { id: '930277249802740',  nome: 'ALGORITMICA',                  moeda: 'BRL' },
-  { id: '1286014213483430', nome: 'GUSTAVO MARTINELLI',           moeda: 'BRL' },
-  { id: '609964923020870',  nome: 'ANFAVEA',                      moeda: 'BRL' },
-  { id: '309413169114545',  nome: 'Governo da Bahia',             moeda: 'BRL' },
-  { id: '1237116627914018', nome: 'Pref. de Bragança Paulista',   moeda: 'BRL' },
-  { id: '558577529595507',  nome: 'DARIO JORGE GIOLO SAADI',      moeda: 'BRL' },
-  { id: '467072400573584',  nome: 'SENAI CIMATEC',                moeda: 'BRL' },
-]
+interface MetaAccountRef { id: string; nome: string; moeda: string }
+
+// Nomes "bonitos" opcionais por ID — vencem o nome da API quando preenchidos.
+// Vazio por padrão: no Meta o `name` da conta de anúncio já costuma ser o nome bom.
+const NAME_OVERRIDES: Record<string, string> = {}
+
+// Contas que NÃO devem aparecer no painel mesmo tendo gasto (deny-list opcional).
+const DENY_IDS = new Set<string>()
+
+// Executa tarefas com limite de concorrência (evita estourar rate limit ao listar muitas contas)
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let next = 0
+  async function worker() {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()))
+  return results
+}
+
+// Descobre todas as contas de anúncio acessíveis pelo token (segue paginação)
+async function discoverAccounts(): Promise<MetaAccountRef[]> {
+  const out: MetaAccountRef[] = []
+  let url: string | null = `${API}/me/adaccounts?fields=account_id,name,currency&limit=200&access_token=${encodeURIComponent(TOKEN)}`
+  let guard = 0
+  while (url && guard < 25) {
+    guard++
+    const res = await fetch(url, { next: { revalidate: 0 } })
+    const json: any = await res.json()
+    if (json.error) throw new Error(`Meta /me/adaccounts: ${json.error.message}`)
+    for (const a of json.data ?? []) {
+      const id = String(a.account_id ?? '').replace(/^act_/, '')
+      if (!id || DENY_IDS.has(id)) continue
+      out.push({ id, nome: (NAME_OVERRIDES[id] ?? a.name ?? `Conta ${id}`).trim(), moeda: a.currency ?? 'BRL' })
+    }
+    url = json.paging?.next ?? null
+  }
+  return out
+}
 
 function parseThruplays(actions: any[]): number {
   if (!Array.isArray(actions)) return 0
@@ -146,7 +167,7 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
-  const cacheKey = `${start}|${end}`
+  const cacheKey = `metav2|${start}|${end}`
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
@@ -215,9 +236,30 @@ export async function GET(req: NextRequest) {
     return items.sort((a, b) => b.impressions - a.impressions)
   }
 
+  // Descobre as contas acessíveis pelo token (lista dinâmica, não mais hardcoded)
+  let discovered: MetaAccountRef[]
+  try {
+    discovered = await discoverAccounts()
+  } catch (e: any) {
+    console.error('Meta discover error:', e)
+    return NextResponse.json({ error: e.message ?? 'Erro ao listar contas Meta' }, { status: 500 })
+  }
+
+  // Fase A (leve): mantém só contas com gasto > 0 no período — some inativa/encerrada
+  const active = (await mapLimit(discovered, 8, async (acc): Promise<MetaAccountRef | null> => {
+    try {
+      const params = new URLSearchParams({ fields: 'spend', level: 'account', time_range: timeRange, access_token: TOKEN })
+      const r = await fetch(`${API}/act_${acc.id}/insights?${params}`, { next: { revalidate: 0 } })
+      const j = await r.json()
+      if (j.error) return null
+      return parseFloat(j.data?.[0]?.spend ?? '0') > 0 ? acc : null
+    } catch { return null }
+  })).filter((a): a is MetaAccountRef => a !== null)
+
+  // Fase B (pesada): detalhe completo só das contas ativas
   const results = (
     await Promise.all(
-      ACCOUNTS.map(async (acc) => {
+      active.map(async (acc) => {
         try {
           const [accRes, campRes, adsetRes, adRes, dailyRes, generoRes, idadeRes, dispositivoRes] = await Promise.all([
             fetch(`${API}/act_${acc.id}/insights?${accountParams}`, { next: { revalidate: 0 } }),
