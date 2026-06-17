@@ -1309,7 +1309,7 @@ export default function Dashboard() {
         <GoogleAdsPage theme={theme} />
       </div>
       <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'tiktok' ? 'flex' : 'none', flexDirection: 'column' }}>
-        <TikTokAdsPage theme={theme} />
+        <TikTokAdsPage theme={theme} visible={activeTab === 'tiktok'} />
       </div>
 
       {showRelatorio && <RelatorioModal onClose={() => setShowRelatorio(false)} />}

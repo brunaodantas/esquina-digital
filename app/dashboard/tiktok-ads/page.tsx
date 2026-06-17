@@ -471,7 +471,7 @@ function CampanhasTable({ campanhas, totalSpend, t }: { campanhas: TikTokCampaig
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function TikTokAdsPage({ theme = 'dark' }: { theme?: Theme }) {
+export default function TikTokAdsPage({ theme = 'dark', visible = true }: { theme?: Theme; visible?: boolean }) {
   const [data, setData] = useState<TikTokAccountData[] | null>(null)
   const [nomes, setNomes] = useState<string[]>([])
   const [error, setError] = useState('')
@@ -549,6 +549,14 @@ export default function TikTokAdsPage({ theme = 'dark' }: { theme?: Theme }) {
     return () => { clearTimeout(timer); if (cooldownRef.current) clearTimeout(cooldownRef.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Re-fetch quando a aba se torna visível e dados têm mais de 5 min (ou nunca foram carregados)
+  useEffect(() => {
+    if (!visible) return
+    const stale = !lastUpdated || (Date.now() - lastUpdated.getTime() > 5 * 60 * 1000)
+    if (stale && !loading) fetchData(periodoRef.current)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
 
   const center: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }
   const filtrado = (data ?? []).filter(d => !filtroCliente || d.nome === filtroCliente)
