@@ -218,7 +218,7 @@ export async function GET(req: NextRequest) {
             const [campRows, agRows, adRows, dailyRows, geoRows] = await Promise.all([
               gaql(acc.id,
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'`,
@@ -369,6 +369,12 @@ export async function GET(req: NextRequest) {
                 cpcMedio: d.cliques > 0 ? d.custo / d.cliques : 0,
                 cpm: d.impressoes > 0 ? (d.custo / d.impressoes) * 1000 : 0,
               }))
+
+            // Propaga videoViews dos ads para as campanhas correspondentes
+            for (const ad of adMap.values()) {
+              const camp = campMap.get(ad.campanhaId)
+              if (camp && ad.videoViews > 0) camp.videoViews += ad.videoViews
+            }
 
             if (custoMicros === 0) return null
 
