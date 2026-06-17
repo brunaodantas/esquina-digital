@@ -212,8 +212,9 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const cacheKey = `${start}|${end}`
+  const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
-    return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
+    return NextResponse.json({ nomes: allNomesStatic, data: _cache.data })
   }
 
   try {
@@ -236,7 +237,7 @@ export async function GET(req: NextRequest) {
     // nomes inclui todas as contas do fallback, mesmo sem gasto no período
     const allNomes = ADVERTISER_IDS.map(id => nomeMap.get(id) ?? `ID ${id}`)
     _cache = { key: cacheKey, ts: Date.now(), data: results, nomes: allNomes }
-    return NextResponse.json({ nomes, data: results })
+    return NextResponse.json({ nomes: allNomesStatic, data: results })
   } catch (err: any) {
     console.error('TikTok Ads API error:', err)
     return NextResponse.json({ error: err.message ?? 'Erro interno' }, { status: 500 })
