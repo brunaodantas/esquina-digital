@@ -48,6 +48,13 @@ Componente `AudienciaSection` exibido após os account cards e antes da DataTabl
 - Os dados vêm de 3 chamadas adicionais por conta no `/api/meta-ads`: breakdowns `gender`, `age`, `device_platform`
 - Renderiza apenas quando há dados; oculto automaticamente se a API não retornar breakdowns
 
+### Seção Audiência — Google Ads (`google-ads/page.tsx`)
+Componente `AudienciaSection` (mesmo layout da Meta) exibido após os account cards, antes de Cidades.
+- Dados de 3 queries GAQL adicionais por conta em `/api/google-ads`: `gender_view` (gênero), `age_range_view` (idade), `segments.device` em `campaign` (dispositivos). Todas com `.catch(() => [])`.
+- Labels traduzidos: MALE→Masculino, AGE_RANGE_25_34→25-34, MOBILE→Celular etc.
+
+**Visualizações YouTube — `metrics.video_views` NÃO existe na API v24** (`UNRECOGNIZED_FIELD`, confirmado via probe). Isso fazia as views aparecerem zeradas no PDF. Pior: incluir `metrics.video_views` na query principal de campanhas derrubava TODAS as contas (a query não tem `.catch`). Fix: query isolada (com `.catch`) buscando `metrics.impressions` + `metrics.video_quartile_p25_rate` só de campanhas VIDEO; `videoViews = round(impressões × p25_rate)` = visualizações **estimadas** (quem assistiu ≥25%). PDF rotula "Estimadas (25%+)".
+
 ### Seção Cidades — Google Ads (`google-ads/page.tsx`)
 Componente `CidadesSection` exibido após os account cards e antes da DataTable.
 - Agrega cliques por cidade de todas as contas filtradas (top 10)
@@ -87,11 +94,20 @@ Página em `app/dashboard/tiktok-ads/page.tsx`, rota em `app/api/tiktok-ads/rout
 
 3. **Dropdown incompleto / nome errado na conta ANFAVEA:** `ADVERTISER_NAMES_FALLBACK['7646886376989982741']` estava mapeado como `'Conta TK'` em vez de `'ANFAVEA'`. Corrigido. Também: nomes do fallback nunca devem ser sobrescritos pelo retorno da API `/advertiser/info/` pois a API retorna nomes internos ("BIODIESEL_ESQUINA") que não batem com o dropdown — use `ADVERTISER_NAMES_FALLBACK[id] ?? nomeMap.get(id)` na ordem certa.
 
-4. **Nomes de campanha exibidos como IDs (problema persistente — 4 tentativas):** A API TikTok com escopo de reporting não suporta `/campaign/get/` (token sem escopo de gerenciamento) nem `campaign_name` como métrica (code 40002). `campaign_name` como dimensão no `AUCTION_CAMPAIGN` é aceito mas retorna null. Fix final (v8): usar `AUCTION_AD` como 6ª chamada paralela — neste nível `campaign_name` está sempre disponível como dimensão no escopo de reporting. Constrói `campNamesMap` em duas fontes: (1) `AUCTION_CAMPAIGN` com `campaign_name` na dimensão, (2) `AUCTION_AD` com `campaign_id + campaign_name`. O nome é resolvido por `campNamesMap.get(campId) ?? campId`.
+4. **Nomes de campanha exibidos como IDs (RESOLVIDO em v9 — confirmado via probe na API):** `campaign_name` deve ser pedido como **MÉTRICA** (com dimensão `['campaign_id']`), não como dimensão. Verdade confirmada testando a API direto:
+   - `campaign_name` em `metrics` → **funciona** (retorna o nome em `metrics.campaign_name`)
+   - `campaign_name` em `dimensions` → `code 40002` "campaign_name is not supported"
+   - `AUCTION_AD` com dimensão `campaign_id` → `40002` "data_level AUCTION_AD and dimension campaign_id do not match" (a tentativa v8 estava fundamentalmente quebrada e ainda adicionava carga)
 
-5. **PMC Campinas (e outras contas) desaparecendo intermitentemente:** TikTok retorna 0 nos relatórios AUCTION_ADVERTISER e AUCTION_CAMPAIGN de forma inconsistente, mas os dados diários (`stat_time_day`) ainda retornam corretamente. Fix: Fallback 2 — se `account.spend === 0 && campanhas.length === 0 && serie.length > 0`, reconstrói os totais da conta somando os dados da série diária.
+5. **Audiência idade e dispositivo (RESOLVIDO em v9):** dimensões corretas confirmadas via probe:
+   - `gender` → MALE/FEMALE/NONE · `age` → AGE_18_24…AGE_55_100/NONE (precisa de label map) · `platform` → ANDROID/IPHONE/IPAD/WAP (dispositivo)
+   - `platform_type`, `device_model`, `device_brand`, `os_platform` → todos `40002` não suportados (o código antigo usava `platform_type`, por isso dispositivo vinha vazio)
 
-**Cache versionado:** `CACHE_V = 'v8'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
+6. **Contas desaparecendo mesmo veiculando (RESOLVIDO em v9 — era RATE LIMITING):** a causa real era throttle de QPS. A rota disparava 6 chamadas × 8 contas = 48 requisições simultâneas; o TikTok limita QPS e devolvia vazio para chamadas throttled, derrubando contas aleatoriamente. Fix: (a) `mapLimit(ids, 3, …)` limita a 3 contas simultâneas (~18 chamadas de pico); (b) `tiktokGet` faz retry com backoff em HTTP 429/5xx e em códigos de throttle no corpo (40100/40016/50002/51000). Mantido o Fallback 2 (reconstruir totais da série diária).
+
+**Cache versionado:** `CACHE_V = 'v9'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
+
+**Como debugar a API TikTok:** `/api/*` não passa pelo middleware de auth (só `/dashboard/*`), então dá para `curl` a rota em produção. Para inspecionar respostas cruas da API, adicionar temporariamente um bloco `if (searchParams.get('debug'))` que roda chamadas sequenciais e retorna `{code, message, list}`. O token é "Sensitive" na Vercel (não sai no `vercel env pull`), então não dá para testar localmente — só via produção.
 
 ## matchNome — filtragem fuzzy de clientes
 
