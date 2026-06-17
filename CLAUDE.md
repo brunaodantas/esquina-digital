@@ -45,6 +45,14 @@ Ordem dos botões da esquerda para a direita: **Meta Ads · Google Ads · TikTok
 Google Ads e Entregas atualizam automaticamente no próximo horário par (1h, 3h, 5h… BRT).
 Cache da API: 30 min para Google Ads e Meta Ads; 1800s para Entregas (Sheets).
 
+## Descoberta de contas (Meta Ads) — `app/api/meta-ads/route.ts`
+A lista de contas NÃO é mais hardcoded. `discoverAccounts()` lista as contas do token via `GET /me/adaccounts?fields=account_id,name,currency` (com paginação). Conta nova entra sozinha; conta sem gasto no período some.
+- **Fase A (leve):** probe de `spend` nível account por conta (concorrência 8 via `mapLimit`) → mantém só `spend > 0` no período.
+- **Fase B (pesada):** detalhe completo (8 chamadas) só nas contas ativas. Parsing inalterado.
+- `nome` e `moeda` vêm da API. `NAME_OVERRIDES` (por ID) corrige nomes internos feios (ex: `930277249802740` → "Algoritmica", que a API devolve como "ALGORITMICA_BACKUP01"). `DENY_IDS` exclui contas indesejadas mesmo com gasto (vazio por padrão).
+- `cacheKey` versionada (`metav2|...`).
+- **Contraste com TikTok:** TikTok continua com `ADVERTISER_IDS`/`ADVERTISER_NAMES_FALLBACK` hardcoded (decisão de não mexer). Google já era dinâmico via MCC.
+
 ### Seção Audiência — Meta Ads (`meta-ads/page.tsx`)
 Componente `AudienciaSection` exibido após os account cards e antes da DataTable.
 - Agrega `audiencia.genero`, `audiencia.idade`, `audiencia.dispositivos` de todas as contas filtradas
