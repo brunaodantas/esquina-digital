@@ -270,6 +270,22 @@ export async function GET(req: NextRequest) {
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  // ── DEBUG: confirmar adgroup/ad como métricas ──
+  if (searchParams.get('debug')) {
+    const id = '7621991089315774471' // PMC Campinas
+    const base = { advertiser_id: id, report_type: 'BASIC', start_date: start, end_date: end, page_size: '20' }
+    const out: Record<string, any> = {}
+    async function probe(label: string, params: Record<string, string>) {
+      try {
+        const r = await tiktokGet('/report/integrated/get/', params)
+        out[label] = { code: r?.code, message: r?.message, count: r?.data?.list?.length ?? 0, sample: r?.data?.list?.[0] ?? null }
+      } catch (e: any) { out[label] = { error: String(e?.message ?? e) } }
+    }
+    await probe('adgroup', { ...base, data_level: 'AUCTION_ADGROUP', dimensions: JSON.stringify(['adgroup_id']), metrics: JSON.stringify(['adgroup_name', 'campaign_name', 'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm']) })
+    await probe('ad', { ...base, data_level: 'AUCTION_AD', dimensions: JSON.stringify(['ad_id']), metrics: JSON.stringify(['ad_name', 'adgroup_name', 'campaign_name', 'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm']) })
+    return NextResponse.json({ advertiser: id, out })
+  }
+
   const cacheKey = `${CACHE_V}|${start}|${end}`
   const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
