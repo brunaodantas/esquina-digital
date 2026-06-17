@@ -288,6 +288,28 @@ export async function GET(req: NextRequest) {
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  // ── DEBUG: respostas cruas da API para um advertiser (sequencial, evita throttle) ──
+  const debugId = searchParams.get('debug')
+  if (debugId) {
+    const id = debugId === '1' ? ADVERTISER_IDS[4] : debugId // default PMC Campinas
+    const base = { advertiser_id: id, report_type: 'BASIC', start_date: start, end_date: end }
+    const out: Record<string, any> = {}
+    async function probe(label: string, params: Record<string, string>) {
+      try {
+        const r = await tiktokGet('/report/integrated/get/', params)
+        out[label] = { code: r?.code, message: r?.message, count: r?.data?.list?.length ?? 0, sample: r?.data?.list?.[0] ?? null }
+      } catch (e: any) { out[label] = { error: String(e?.message ?? e) } }
+    }
+    await probe('camp_dim_id', { ...base, data_level: 'AUCTION_CAMPAIGN', dimensions: JSON.stringify(['campaign_id']), metrics: JSON.stringify(['spend', 'campaign_name']), page_size: '50' })
+    await probe('camp_dim_id_name', { ...base, data_level: 'AUCTION_CAMPAIGN', dimensions: JSON.stringify(['campaign_id', 'campaign_name']), metrics: JSON.stringify(['spend']), page_size: '50' })
+    await probe('ad_dim_camp_name', { ...base, data_level: 'AUCTION_AD', dimensions: JSON.stringify(['campaign_id', 'campaign_name']), metrics: JSON.stringify(['spend']), page_size: '50' })
+    await probe('aud_age_advertiser', { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), dimensions: JSON.stringify(['age']), page_size: '50' })
+    await probe('aud_gender_advertiser', { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), dimensions: JSON.stringify(['gender']), page_size: '50' })
+    await probe('aud_platform_advertiser', { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), dimensions: JSON.stringify(['platform_type']), page_size: '50' })
+    await probe('aud_age_campaign', { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_CAMPAIGN', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), dimensions: JSON.stringify(['campaign_id', 'age']), page_size: '50' })
+    return NextResponse.json({ advertiser: id, period: { start, end }, probes: out })
+  }
+
   const cacheKey = `${CACHE_V}|${start}|${end}`
   const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
