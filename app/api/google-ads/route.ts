@@ -174,7 +174,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v4'
+const CACHE_V = 'v5'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -215,32 +215,6 @@ export async function GET(req: NextRequest) {
     searchParams.get('start') ??
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
-
-  // ── DEBUG: testa nomes de campo de visualizações de vídeo ──
-  if (searchParams.get('debug') === 'vv') {
-    const token = await getToken()
-    const cid = '5619636645' // BIODIESEL (tem campanhas YouTube)
-    const out: Record<string, any> = {}
-    async function rawQuery(q: string) {
-      const res = await fetch(`${BASE}/customers/${cid}/googleAds:search`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'developer-token': DEV_TOKEN, 'login-customer-id': MCC_ID, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
-      })
-      const json = await res.json()
-      if (!res.ok) {
-        const errs = json?.error?.details?.[0]?.errors ?? []
-        return { ok: false, reason: errs.map((e: any) => `${JSON.stringify(e.errorCode)}: ${e.message}`).join(' | ') || json?.error?.message }
-      }
-      return { ok: true, sample: (json.results ?? []).slice(0, 2).map((r: any) => r.metrics) }
-    }
-    const probes: [string, string][] = [
-      ['video_views', `SELECT campaign.id, metrics.video_views FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0 LIMIT 3`],
-      ['quartiles', `SELECT campaign.id, metrics.impressions, metrics.video_quartile_p25_rate, metrics.video_quartile_p100_rate, metrics.engagements FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}' AND campaign.advertising_channel_type = 'VIDEO' AND metrics.impressions > 0 LIMIT 3`],
-    ]
-    for (const [label, q] of probes) out[label] = await rawQuery(q)
-    return NextResponse.json({ debug: 'vv', period: { start, end }, out })
-  }
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -335,11 +309,14 @@ export async function GET(req: NextRequest) {
                    AND campaign.status != 'REMOVED'
                    AND metrics.impressions > 0`,
                 token).catch(() => []),
+              // metrics.video_views não existe na API v24 (UNRECOGNIZED_FIELD).
+              // Visualizações estimadas = impressões × taxa que atingiu 25% do vídeo.
               gaql(acc.id,
-                `SELECT campaign.id, metrics.video_views
+                `SELECT campaign.id, metrics.impressions, metrics.video_quartile_p25_rate
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
-                   AND campaign.status != 'REMOVED'`,
+                   AND campaign.advertising_channel_type = 'VIDEO'
+                   AND metrics.impressions > 0`,
                 token).catch(() => []),
             ])
 
@@ -375,12 +352,13 @@ export async function GET(req: NextRequest) {
               }
             }
 
-            // videoViews vem de query isolada (metrics.video_views) — evita quebrar a query principal
+            // Visualizações estimadas (impressões × p25_rate) em query isolada — video_views não existe na v24
             for (const row of vvRows) {
               const cid = String(row.campaign?.id ?? '')
-              const vv = Number(row.metrics?.videoViews ?? 0)
+              const imp = Number(row.metrics?.impressions ?? 0)
+              const p25 = Number(row.metrics?.videoQuartileP25Rate ?? 0)
               const camp = campMap.get(cid)
-              if (camp) camp.videoViews += vv
+              if (camp) camp.videoViews += Math.round(imp * p25)
             }
 
             // ── Ad Groups ──────────────────────────────────────────────

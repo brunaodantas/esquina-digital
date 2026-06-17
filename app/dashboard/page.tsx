@@ -286,7 +286,7 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   function analysisYoutube(): string {
     if (ytImpr === 0) return 'Sem dados de YouTube para o período ou cliente selecionado. Verifique se há campanhas de vídeo ativas ou se o nome da conta corresponde ao cliente.'
     const vtr = ytImpr > 0 ? (ytViews / ytImpr) * 100 : 0
-    return `YouTube registrou ${fmtK(ytViews)} visualizações em ${fmtK(ytImpr)} impressões (VTR de ${fmtPct2(vtr)})${inscritosYT > 0 ? `, gerando ${fmtK(inscritosYT)} novos inscritos` : ''}. ${vtr >= 25 ? 'Taxa de visualização acima da média, indicando boa adequação do conteúdo ao público.' : 'VTR dentro da faixa esperada para formatos in-stream.'}`
+    return `YouTube registrou ${fmtK(ytViews)} visualizações estimadas em ${fmtK(ytImpr)} impressões (VTR de ${fmtPct2(vtr)})${inscritosYT > 0 ? `, gerando ${fmtK(inscritosYT)} novos inscritos` : ''}. ${vtr >= 25 ? 'Taxa de visualização acima da média, indicando boa adequação do conteúdo ao público.' : 'VTR dentro da faixa esperada para formatos in-stream.'}`
   }
 
   function analysisVP(): string {
@@ -574,7 +574,7 @@ ${showDisplay ? fullSection('display', '#1A3CFF', 'Google Display', 'Google Disp
   'ch-display', 'Grupos de Anúncio por Cliques', googleAudHtml('#1A3CFF'), analysisDisplay()) : ''}
 
 ${showYoutube ? fullSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Visualizações, cliques e inscritos · ${periodoLabel}`,
-  kpiCard('Impressões', fmtK(ytImpr), 'Total') + kpiCard('Visualizações', fmtK(ytViews), 'Total') + kpiCard('Cliques', fmtK(ytCliques), 'Total') + kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
+  kpiCard('Impressões', fmtK(ytImpr), 'Total') + kpiCard('Visualizações', fmtK(ytViews), 'Estimadas (25%+)') + kpiCard('Cliques', fmtK(ytCliques), 'Total') + kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
   'ch-youtube', ytUseViews ? 'Top Campanhas por Visualizações' : (ytAds.length > 0 ? 'Top 3 Anúncios por Impressões' : 'Campanhas por Impressões'), googleAudHtml('#FF4444'), analysisYoutube()) : ''}
 
 ${showTD ? fullSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
