@@ -68,7 +68,7 @@ export interface TikTokCampaignData {
 
 let _cache: { key: string; ts: number; data: TikTokAccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v5'
+const CACHE_V = 'v6'
 
 async function tiktokGet(path: string, params: Record<string, string>): Promise<any> {
   const url = new URL(`${BASE}${path}`)
@@ -135,19 +135,6 @@ async function getAudienceData(advertiserId: string, start: string, end: string)
 async function getAccountMetrics(advertiserId: string, start: string, end: string) {
   const baseParams = { advertiser_id: advertiserId, report_type: 'BASIC', start_date: start, end_date: end }
 
-  // Busca nomes das campanhas separadamente (campaign_name como métrica pode ser rejeitada pela API)
-  let campNamesMap = new Map<string, string>()
-  try {
-    const campInfo = await tiktokGet('/campaign/get/', {
-      advertiser_id: advertiserId,
-      fields: JSON.stringify(['campaign_id', 'campaign_name']),
-      page_size: '100',
-    })
-    for (const c of campInfo?.data?.list ?? []) {
-      campNamesMap.set(String(c.campaign_id), c.campaign_name ?? '')
-    }
-  } catch (_) {}
-
   const [accountRes, dailyRes, campRes, audRes] = await Promise.allSettled([
     tiktokGet('/report/integrated/get/', {
       ...baseParams, data_level: 'AUCTION_ADVERTISER',
@@ -196,35 +183,72 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     serie.sort((a, b) => a.date.localeCompare(b.date))
   }
 
-  const campanhas: TikTokCampaignData[] = []
-  if (campRes.status === 'fulfilled') {
-    if (campRes.value?.code !== 0) {
-      console.error(`TikTok campanha ${advertiserId}: code=${campRes.value?.code} msg=${campRes.value?.message}`)
-    }
-    for (const item of campRes.value?.data?.list ?? []) {
-      const m = item.metrics ?? {}
-      const campId = String(item.dimensions?.campaign_id ?? '')
-      const spend = Number(m.spend ?? 0)
-      if (spend === 0) continue
-      campanhas.push({
-        id: campId,
-        nome: campNamesMap.get(campId) ?? `Campanha ${campId}`,
-        spend, impressions: Number(m.impressions ?? 0), clicks: Number(m.clicks ?? 0),
-        ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
-      })
-    }
-    campanhas.sort((a, b) => b.spend - a.spend)
-  } else {
+  // Extrai IDs das campanhas do relatório para buscar nomes em seguida
+  const campListRaw = campRes.status === 'fulfilled' ? campRes.value?.data?.list ?? [] : []
+  if (campRes.status === 'fulfilled' && campRes.value?.code !== 0) {
+    console.error(`TikTok campanha ${advertiserId}: code=${campRes.value?.code} msg=${campRes.value?.message}`)
+  } else if (campRes.status === 'rejected') {
     console.error(`TikTok campRes failed ${advertiserId}:`, campRes.reason)
   }
 
+  const campIds = campListRaw
+    .map((item: any) => String(item.dimensions?.campaign_id ?? ''))
+    .filter(Boolean)
+
+  // Busca nomes das campanhas pelos IDs reais (após obter os IDs do relatório)
+  const campNamesMap = new Map<string, string>()
+  if (campIds.length > 0) {
+    try {
+      const campInfo = await tiktokGet('/campaign/get/', {
+        advertiser_id: advertiserId,
+        campaign_ids: JSON.stringify(campIds),
+        page_size: '100',
+      })
+      if (campInfo?.code !== 0) {
+        console.error(`TikTok /campaign/get/ ${advertiserId}: code=${campInfo?.code} msg=${campInfo?.message}`)
+      }
+      for (const c of campInfo?.data?.list ?? []) {
+        const cid = String(c.campaign_id ?? c.id ?? '')
+        const cname = c.campaign_name ?? c.name ?? ''
+        if (cid && cname) campNamesMap.set(cid, cname)
+      }
+    } catch (e) {
+      console.error(`TikTok /campaign/get/ failed ${advertiserId}:`, e)
+    }
+  }
+
+  const campanhas: TikTokCampaignData[] = []
+  for (const item of campListRaw) {
+    const m = item.metrics ?? {}
+    const campId = String(item.dimensions?.campaign_id ?? '')
+    const spend = Number(m.spend ?? 0)
+    if (spend === 0) continue
+    campanhas.push({
+      id: campId,
+      nome: campNamesMap.get(campId) ?? `Campanha ${campId}`,
+      spend, impressions: Number(m.impressions ?? 0), clicks: Number(m.clicks ?? 0),
+      ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
+    })
+  }
+  campanhas.sort((a, b) => b.spend - a.spend)
+
   const audiencia: TikTokAudienceData = audRes.status === 'fulfilled' ? audRes.value : { genero: [], idade: [], plataforma: [] }
 
-  // Fallback: se o nível de conta retornou 0 mas há campanhas com dados, soma das campanhas
+  // Fallback 1: conta retornou 0 mas campanhas têm dados — soma das campanhas
   if (account.spend === 0 && campanhas.length > 0) {
     account.spend = campanhas.reduce((s, c) => s + c.spend, 0)
     account.impressions = campanhas.reduce((s, c) => s + c.impressions, 0)
     account.clicks = campanhas.reduce((s, c) => s + c.clicks, 0)
+    account.ctr = account.impressions > 0 ? (account.clicks / account.impressions) * 100 : 0
+    account.cpm = account.impressions > 0 ? (account.spend / account.impressions) * 1000 : 0
+    account.cpc = account.clicks > 0 ? account.spend / account.clicks : 0
+  }
+
+  // Fallback 2: conta e campanhas retornaram 0 mas série diária tem dados (inconsistência da API)
+  if (account.spend === 0 && campanhas.length === 0 && serie.length > 0) {
+    account.spend = serie.reduce((s, d) => s + d.spend, 0)
+    account.impressions = serie.reduce((s, d) => s + d.impressions, 0)
+    account.clicks = serie.reduce((s, d) => s + d.clicks, 0)
     account.ctr = account.impressions > 0 ? (account.clicks / account.impressions) * 100 : 0
     account.cpm = account.impressions > 0 ? (account.spend / account.impressions) * 1000 : 0
     account.cpc = account.clicks > 0 ? account.spend / account.clicks : 0
