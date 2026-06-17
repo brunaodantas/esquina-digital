@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { signInWithRedirect, getRedirectResult, onAuthStateChanged, User } from 'firebase/auth'
+import { signInWithPopup, onAuthStateChanged, User } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
@@ -35,25 +35,14 @@ export default function Home() {
   }, [])
 
   function checkAuthState() {
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result?.user) {
-          await checkUserStatus(result.user)
-          return
-        }
-        const unsub = onAuthStateChanged(auth, async (u) => {
-          unsub()
-          if (u) {
-            await checkUserStatus(u)
-          } else {
-            setScreen('login')
-          }
-        })
-      })
-      .catch(() => {
-        setError('Não foi possível fazer login. Tente novamente.')
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      unsub()
+      if (u) {
+        await checkUserStatus(u)
+      } else {
         setScreen('login')
-      })
+      }
+    })
   }
 
   async function checkUserStatus(u: User) {
@@ -88,7 +77,8 @@ export default function Home() {
   async function handleLogin() {
     setError('')
     try {
-      await signInWithRedirect(auth, googleProvider)
+      const result = await signInWithPopup(auth, googleProvider)
+      await checkUserStatus(result.user)
     } catch {
       setError('Não foi possível fazer login. Tente novamente.')
     }
