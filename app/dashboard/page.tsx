@@ -279,10 +279,12 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   }
 
   function analysisDisplay(): string {
+    if (dispImpr === 0) return 'Sem dados de Display para o período ou cliente selecionado. Verifique se há campanhas ativas no Google Display ou se o nome da conta corresponde ao cliente.'
     return `Google Display entregou ${fmtK(dispImpr)} impressões com ${fmtK(dispCliques)} cliques e CTR de ${fmtPct2(dispCtr)}. ${dispCtr >= 0.4 ? 'Índice de cliques dentro da faixa esperada para campanhas de display programático.' : 'CTR abaixo da média — recomendado revisar criativos e segmentações de público.'}`
   }
 
   function analysisYoutube(): string {
+    if (ytImpr === 0) return 'Sem dados de YouTube para o período ou cliente selecionado. Verifique se há campanhas de vídeo ativas ou se o nome da conta corresponde ao cliente.'
     const vtr = ytImpr > 0 ? (ytViews / ytImpr) * 100 : 0
     return `YouTube registrou ${fmtK(ytViews)} visualizações em ${fmtK(ytImpr)} impressões (VTR de ${fmtPct2(vtr)})${inscritosYT > 0 ? `, gerando ${fmtK(inscritosYT)} novos inscritos` : ''}. ${vtr >= 25 ? 'Taxa de visualização acima da média, indicando boa adequação do conteúdo ao público.' : 'VTR dentro da faixa esperada para formatos in-stream.'}`
   }
@@ -372,6 +374,27 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
     diagItems.push(`TikTok entregou <strong>${fmtK(tiktokImpressoes)}</strong> impressões — CTR de <strong>${fmtPct2(tiktokCtr)}</strong>, ${tkNote}.`)
   }
   if (seguidoresSemana > 0) diagItems.push(`Instagram registrou crescimento de <strong>${fmtK(seguidoresSemana)}</strong> seguidores na semana${seguidoresMes > 0 ? `, com <strong>${fmtK(seguidoresMes)}</strong> acumulados no mês` : ''}.`)
+
+  // Análise multiplataforma: distribuição de impressões
+  const imprByPlatform = [
+    finalTDImpr + vpImpr > 0 ? { nome: 'Meta Ads', impr: finalTDImpr + vpImpr } : null,
+    dispImpr + ytImpr > 0 ? { nome: 'Google', impr: dispImpr + ytImpr } : null,
+    tiktokImpressoes > 0 ? { nome: 'TikTok', impr: tiktokImpressoes } : null,
+  ].filter(Boolean) as { nome: string; impr: number }[]
+  if (imprByPlatform.length >= 2) {
+    const totalImprAll = imprByPlatform.reduce((s, p) => s + p.impr, 0)
+    const distrib = imprByPlatform.map(p => `${p.nome} com <strong>${Math.round(p.impr / totalImprAll * 100)}%</strong>`).join(', ')
+    diagItems.push(`Distribuição de impressões no período: ${distrib} — estratégia multiplataforma amplia cobertura e reduz dependência de um único canal.`)
+  }
+
+  // TikTok como complemento ao Meta
+  if (tiktokImpressoes > 0 && finalTDImpr + vpImpr > 0) {
+    const metaImprTotal = finalTDImpr + vpImpr
+    const tkShare = Math.round(tiktokImpressoes / (metaImprTotal + tiktokImpressoes) * 100)
+    const tkRole = tkShare >= 20 ? 'com presença relevante' : 'como canal de suporte ao mix'
+    diagItems.push(`TikTok representou <strong>${tkShare}%</strong> das impressões combinadas com Meta Ads, ${tkRole} — reforça a estratégia de alcance em audiências mobile-first com formatos verticais nativos.`)
+  }
+
   if (!diagItems.length) diagItems.push(`Campanha ativa no período de ${periodoLabel}.`)
 
   const conclItems = [
@@ -980,6 +1003,19 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     const tkCpm = tkSpend > 0 && tkImpr > 0 ? (tkSpend / tkImpr) * 1000 : 0
     const tkCpc = tkCliques > 0 ? tkSpend / tkCliques : 0
 
+    // ── Audiência TikTok ──
+    const tkAudGenMap = new Map<string, number>()
+    const tkAudIdadeMap = new Map<string, number>()
+    const tkAudPlatMap = new Map<string, number>()
+    for (const acc of tiktokDados) {
+      for (const item of acc.audiencia?.genero ?? []) tkAudGenMap.set(item.label, (tkAudGenMap.get(item.label) ?? 0) + item.impressions)
+      for (const item of acc.audiencia?.idade ?? []) tkAudIdadeMap.set(item.label, (tkAudIdadeMap.get(item.label) ?? 0) + item.impressions)
+      for (const item of acc.audiencia?.plataforma ?? []) tkAudPlatMap.set(item.label, (tkAudPlatMap.get(item.label) ?? 0) + item.impressions)
+    }
+    const tkGenLines = fmtBreakdown(tkAudGenMap)
+    const tkIdadeLines = fmtBreakdown(tkAudIdadeMap)
+    const tkPlatLines = fmtBreakdown(tkAudPlatMap)
+
     const plataformas = [redes.meta && 'Meta Ads', redes.google && 'Google Ads', redes.tiktok && 'TikTok'].filter(Boolean).join(' + ')
     const cabecalho = `${clienteSelecionado.toUpperCase()} - ${plataformas} - ${periodo.label}`
 
@@ -1112,6 +1148,14 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           if (tkCpc > 0) L.push(`CPC: ${fmtBRLn(tkCpc)}`)
         }
         L.push('')
+
+        if (tkGenLines.length || tkIdadeLines.length || tkPlatLines.length) {
+          L.push('👥 Audiência TikTok')
+          if (tkGenLines.length) { L.push('Gênero'); tkGenLines.forEach(l => L.push(l)) }
+          if (tkIdadeLines.length) { L.push(''); L.push('Faixa etária'); tkIdadeLines.forEach(l => L.push(l)) }
+          if (tkPlatLines.length) { L.push(''); L.push('Dispositivos'); tkPlatLines.forEach(l => L.push(l)) }
+          L.push('')
+        }
       }
     }
 
