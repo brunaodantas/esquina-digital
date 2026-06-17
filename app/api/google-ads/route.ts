@@ -243,10 +243,10 @@ export async function GET(req: NextRequest) {
       await Promise.all(
         accounts.map(async (acc: { id: string; nome: string }) => {
           try {
-            const [campRows, agRows, adRows, dailyRows, geoRows, genderRows, ageRows, deviceRows] = await Promise.all([
+            const [campRows, agRows, adRows, dailyRows, geoRows, genderRows, ageRows, deviceRows, vvRows] = await Promise.all([
               gaql(acc.id,
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'`,
@@ -264,7 +264,7 @@ export async function GET(req: NextRequest) {
                 `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status,
                    ad_group.id, ad_group.name,
                    campaign.id, campaign.name,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
                  FROM ad_group_ad
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND ad_group_ad.status != 'REMOVED'
@@ -309,6 +309,12 @@ export async function GET(req: NextRequest) {
                    AND campaign.status != 'REMOVED'
                    AND metrics.impressions > 0`,
                 token).catch(() => []),
+              gaql(acc.id,
+                `SELECT campaign.id, metrics.video_views
+                 FROM campaign
+                 WHERE segments.date BETWEEN '${start}' AND '${end}'
+                   AND campaign.status != 'REMOVED'`,
+                token).catch(() => []),
             ])
 
             // ── Campaigns ──────────────────────────────────────────────
@@ -341,6 +347,14 @@ export async function GET(req: NextRequest) {
                 ex.cliques += cl; ex.impressoes += imp; ex.videoViews += vv; ex.custo += custo; ex.conversoes += conv
                 Object.assign(ex, buildMetrics(ex.cliques, ex.impressoes, ex.custo, ex.conversoes))
               }
+            }
+
+            // videoViews vem de query isolada (metrics.video_views) — evita quebrar a query principal
+            for (const row of vvRows) {
+              const cid = String(row.campaign?.id ?? '')
+              const vv = Number(row.metrics?.videoViews ?? 0)
+              const camp = campMap.get(cid)
+              if (camp) camp.videoViews += vv
             }
 
             // ── Ad Groups ──────────────────────────────────────────────

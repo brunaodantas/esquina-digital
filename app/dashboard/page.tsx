@@ -313,7 +313,8 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   const chartScripts: string[] = []
   if (dispImpr > 0 && topDisp.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-display'),${barChartJson(topDisp.map(g => cleanName(g.nome)), topDisp.map(g => g.cliques), '#1A3CFF')});`)
   const ytUseViews = ytViews > 0
-  const ytChartItems = ytAds.length > 0 ? ytAds : ytCamps
+  // videoViews é confiável no nível de campanha (vem de metrics.video_views); ads usam impressões
+  const ytChartItems = ytUseViews ? ytCamps : (ytAds.length > 0 ? ytAds : ytCamps)
   const topYTSorted = ytUseViews
     ? [...ytChartItems].sort((a, b) => b.videoViews - a.videoViews).slice(0, 3)
     : [...ytChartItems].sort((a, b) => b.impressoes - a.impressoes).slice(0, 3)
@@ -574,7 +575,7 @@ ${showDisplay ? fullSection('display', '#1A3CFF', 'Google Display', 'Google Disp
 
 ${showYoutube ? fullSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Visualizações, cliques e inscritos · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(ytImpr), 'Total') + kpiCard('Visualizações', fmtK(ytViews), 'Total') + kpiCard('Cliques', fmtK(ytCliques), 'Total') + kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
-  'ch-youtube', ytUseViews ? (ytAds.length > 0 ? 'Top 3 Anúncios por Visualizações' : 'Campanhas por Visualizações') : (ytAds.length > 0 ? 'Top 3 Anúncios por Impressões' : 'Campanhas por Impressões'), googleAudHtml('#FF4444'), analysisYoutube()) : ''}
+  'ch-youtube', ytUseViews ? 'Top Campanhas por Visualizações' : (ytAds.length > 0 ? 'Top 3 Anúncios por Impressões' : 'Campanhas por Impressões'), googleAudHtml('#FF4444'), analysisYoutube()) : ''}
 
 ${showTD ? fullSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(finalTDImpr), 'Total') + kpiCard('Alcance', fmtK(finalTDReach), 'Únicos') + kpiCard('Engajamentos', fmtK(finalTDCliques), 'Cliques') + kpiCard('Frequência', fmtF2(finalTDFreq) + 'x', 'Média'),

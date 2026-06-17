@@ -284,7 +284,8 @@ export async function GET(req: NextRequest) {
     const results = (await mapLimit(ADVERTISER_IDS, 3, async (id) => {
       try {
         const { account, serie, campanhas, audiencia } = await getAccountMetrics(id, start, end)
-        if (account.spend === 0 && campanhas.length === 0 && serie.length === 0) return null
+        // Fallback 2 já reconstruiu account.spend da série; spend 0 + sem campanhas = conta sem atividade real
+        if (account.spend === 0 && campanhas.length === 0) return null
         // nome sempre vem do fallback para consistência com o dropdown
         return { id, nome: ADVERTISER_NAMES_FALLBACK[id] ?? nomeMap.get(id) ?? `ID ${id}`, ...account, serie, campanhas, audiencia } as TikTokAccountData
       } catch (e) {
