@@ -301,8 +301,7 @@ export async function GET(req: NextRequest) {
       } catch (e: any) { out[label] = { error: String(e?.message ?? e) } }
     }
     const aud = { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), page_size: '50' }
-    await probe('aud_age', { ...aud, dimensions: JSON.stringify(['age']) })
-    for (const dim of ['device_model', 'device_brand', 'os_platform', 'network_type', 'placement', 'device_price']) {
+    for (const dim of ['platform', 'device_os', 'os', 'operating_system', 'app_id']) {
       await probe(`aud_${dim}`, { ...aud, dimensions: JSON.stringify([dim]) })
     }
     return NextResponse.json({ advertiser: id, period: { start, end }, probes: out })
