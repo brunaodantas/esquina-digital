@@ -221,15 +221,20 @@ export async function GET(req: NextRequest) {
     const token = await getToken()
     const cid = '5619636645' // BIODIESEL (tem campanhas YouTube)
     const out: Record<string, any> = {}
-    const fields = ['metrics.video_views', 'metrics.video_view_rate', 'metrics.video_quartile_p100_rate', 'metrics.engagements']
-    for (const f of fields) {
+    const probes: [string, string][] = [
+      ['camp_video_views', `SELECT campaign.id, metrics.video_views FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`],
+      ['video_resource', `SELECT video.id, metrics.video_views FROM video WHERE segments.date BETWEEN '${start}' AND '${end}'`],
+      ['ad_video_views', `SELECT ad_group.id, metrics.video_views FROM ad_group WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`],
+    ]
+    for (const [label, q] of probes) {
       try {
-        const rows = await gaql(cid,
-          `SELECT campaign.id, ${f} FROM campaign
-           WHERE segments.date BETWEEN '${start}' AND '${end}'
-             AND campaign.advertising_channel_type = 'VIDEO' AND metrics.impressions > 0 LIMIT 3`, token)
-        out[f] = { ok: true, sample: rows.slice(0, 2).map((r: any) => r.metrics) }
-      } catch (e: any) { out[f] = { error: String(e?.message ?? e).slice(0, 200) } }
+        const rows = await gaql(cid, q + ' LIMIT 3', token)
+        out[label] = { ok: true, sample: rows.slice(0, 2).map((r: any) => r.metrics) }
+      } catch (e: any) {
+        let detail = ''
+        try { detail = JSON.parse(String(e.message).replace(/^GAQL\[[^\]]+\]:\s*/, '')).error?.details?.[0]?.errors?.[0]?.message ?? '' } catch {}
+        out[label] = { error: (detail || String(e?.message ?? e)).replace(/\s+/g, ' ').slice(0, 220) }
+      }
     }
     return NextResponse.json({ debug: 'vv', period: { start, end }, out })
   }
