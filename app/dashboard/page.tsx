@@ -616,7 +616,7 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
     function matchNome(accNome: string, query: string): boolean {
       if (accNome === query) return true
       const normalize = (s: string) => s.toLowerCase()
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2)
       const accWords = new Set(normalize(accNome))
       return normalize(query).some(w => accWords.has(w))

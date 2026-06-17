@@ -14,6 +14,18 @@ const ADVERTISER_IDS = [
   '7646886376989982741',
 ]
 
+// Fallback com nomes reais das contas — usado quando /advertiser/info/ não retorna nomes (escopo do token)
+const ADVERTISER_NAMES_FALLBACK: Record<string, string> = {
+  '7322194824105590786': 'Esquina',
+  '7621648190602952722': 'Biodiesel',
+  '7621988608429506567': 'Hortolândia',
+  '7621989577078784018': 'Governo da Bahia',
+  '7621991089315774471': 'PMC Campinas',
+  '7621991605880406024': 'Abradee',
+  '7621993104521920530': 'Biodiesel 2',
+  '7646886376989982741': 'Conta TK',
+}
+
 export interface TikTokAudienceItem {
   label: string
   impressions: number
@@ -67,13 +79,20 @@ async function tiktokGet(path: string, params: Record<string, string>): Promise<
 
 async function getAdvertiserNames(ids: string[]): Promise<Map<string, string>> {
   const map = new Map<string, string>()
+  // Pré-popula com nomes do fallback hardcoded
+  for (const id of ids) {
+    map.set(id, ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)
+  }
+  // Tenta enriquecer com nomes da API (pode falhar por escopo do token)
   try {
     const data = await tiktokGet('/advertiser/info/', {
       advertiser_ids: JSON.stringify(ids),
       fields: JSON.stringify(['advertiser_id', 'advertiser_name']),
     })
     for (const item of data?.data?.list ?? []) {
-      map.set(String(item.advertiser_id), item.advertiser_name ?? `ID ${item.advertiser_id}`)
+      const id = String(item.advertiser_id)
+      const name = item.advertiser_name
+      if (name && name !== id) map.set(id, name)
     }
   } catch (_) {}
   return map

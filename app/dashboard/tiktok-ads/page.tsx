@@ -313,7 +313,7 @@ function AccountCard({ acc, totalSpend, t }: { acc: TikTokAccountData; totalSpen
       {sharePct > 0 && <div style={{ height: 2, background: t.barTrack, margin: '0 16px' }}><div style={{ width: `${Math.min(100, sharePct)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
       {open && (
         <div style={{ padding: '12px 16px 16px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px 16px' }}>
             {[
               { label: 'Invest.', v: fmtBRL(acc.spend), h: '#60a5fa' },
               { label: 'Impressões', v: fmtNum(acc.impressions) },
@@ -429,7 +429,7 @@ function CampanhasTable({ campanhas, totalSpend, t }: { campanhas: TikTokCampaig
       <div style={{ padding: '10px 16px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>Campanhas</span>
         <div style={{ flex: 1 }} />
-        <input placeholder="Filtrar por nome..." value={busca} onChange={e => setBusca(e.target.value)} style={{ background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText, borderRadius: 8, padding: '5px 12px', fontSize: 13, outline: 'none', width: 200 }} />
+        <input placeholder="Filtrar por nome..." value={busca} onChange={e => setBusca(e.target.value)} style={{ background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText, borderRadius: 8, padding: '5px 12px', fontSize: 13, outline: 'none', width: 'clamp(120px, 30vw, 200px)' }} />
         <button onClick={exportCSV} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted }}>↓ CSV</button>
       </div>
       <div style={{ overflowX: 'auto' }}>
@@ -550,11 +550,12 @@ export default function TikTokAdsPage({ theme = 'dark', visible = true }: { them
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Re-fetch quando a aba se torna visível e dados têm mais de 5 min (ou nunca foram carregados)
+  // Re-fetch quando a aba se torna visível: sempre se data estiver vazia, ou se tiver > 5 min
   useEffect(() => {
     if (!visible) return
+    const isEmpty = !data || data.length === 0
     const stale = !lastUpdated || (Date.now() - lastUpdated.getTime() > 5 * 60 * 1000)
-    if (stale && !loading) fetchData(periodoRef.current)
+    if ((isEmpty || stale) && !loading) fetchData(periodoRef.current)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
 
@@ -599,7 +600,7 @@ export default function TikTokAdsPage({ theme = 'dark', visible = true }: { them
   })()
 
   return (
-    <div style={{ padding: '20px 24px 40px', overflowY: 'auto', height: '100%', boxSizing: 'border-box', background: t.page }}>
+    <div style={{ padding: 'clamp(12px, 4vw, 24px) clamp(12px, 4vw, 24px) 40px', overflowY: 'auto', height: '100%', boxSizing: 'border-box', background: t.page }}>
 
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
