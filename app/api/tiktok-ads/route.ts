@@ -23,7 +23,7 @@ const ADVERTISER_NAMES_FALLBACK: Record<string, string> = {
   '7621991089315774471': 'PMC Campinas',
   '7621991605880406024': 'Abradee',
   '7621993104521920530': 'Biodiesel 2',
-  '7646886376989982741': 'Conta TK',
+  '7646886376989982741': 'ANFAVEA',
 }
 
 export interface TikTokAudienceItem {
@@ -68,6 +68,7 @@ export interface TikTokCampaignData {
 
 let _cache: { key: string; ts: number; data: TikTokAccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
+const CACHE_V = 'v5'
 
 async function tiktokGet(path: string, params: Record<string, string>): Promise<any> {
   const url = new URL(`${BASE}${path}`)
@@ -134,6 +135,19 @@ async function getAudienceData(advertiserId: string, start: string, end: string)
 async function getAccountMetrics(advertiserId: string, start: string, end: string) {
   const baseParams = { advertiser_id: advertiserId, report_type: 'BASIC', start_date: start, end_date: end }
 
+  // Busca nomes das campanhas separadamente (campaign_name como métrica pode ser rejeitada pela API)
+  let campNamesMap = new Map<string, string>()
+  try {
+    const campInfo = await tiktokGet('/campaign/get/', {
+      advertiser_id: advertiserId,
+      fields: JSON.stringify(['campaign_id', 'campaign_name']),
+      page_size: '100',
+    })
+    for (const c of campInfo?.data?.list ?? []) {
+      campNamesMap.set(String(c.campaign_id), c.campaign_name ?? '')
+    }
+  } catch (_) {}
+
   const [accountRes, dailyRes, campRes, audRes] = await Promise.allSettled([
     tiktokGet('/report/integrated/get/', {
       ...baseParams, data_level: 'AUCTION_ADVERTISER',
@@ -150,7 +164,7 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     tiktokGet('/report/integrated/get/', {
       ...baseParams, data_level: 'AUCTION_CAMPAIGN',
       dimensions: JSON.stringify(['campaign_id']),
-      metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'campaign_name']),
+      metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm']),
       page_size: '50',
     }),
     getAudienceData(advertiserId, start, end),
@@ -184,18 +198,24 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
 
   const campanhas: TikTokCampaignData[] = []
   if (campRes.status === 'fulfilled') {
+    if (campRes.value?.code !== 0) {
+      console.error(`TikTok campanha ${advertiserId}: code=${campRes.value?.code} msg=${campRes.value?.message}`)
+    }
     for (const item of campRes.value?.data?.list ?? []) {
       const m = item.metrics ?? {}
+      const campId = String(item.dimensions?.campaign_id ?? '')
       const spend = Number(m.spend ?? 0)
       if (spend === 0) continue
       campanhas.push({
-        id: String(item.dimensions?.campaign_id ?? ''),
-        nome: String(m.campaign_name ?? `ID ${item.dimensions?.campaign_id ?? ''}`),
+        id: campId,
+        nome: campNamesMap.get(campId) ?? `Campanha ${campId}`,
         spend, impressions: Number(m.impressions ?? 0), clicks: Number(m.clicks ?? 0),
         ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
       })
     }
     campanhas.sort((a, b) => b.spend - a.spend)
+  } else {
+    console.error(`TikTok campRes failed ${advertiserId}:`, campRes.reason)
   }
 
   const audiencia: TikTokAudienceData = audRes.status === 'fulfilled' ? audRes.value : { genero: [], idade: [], plataforma: [] }
@@ -221,7 +241,7 @@ export async function GET(req: NextRequest) {
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
-  const cacheKey = `${start}|${end}`
+  const cacheKey = `${CACHE_V}|${start}|${end}`
   const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: allNomesStatic, data: _cache.data })
@@ -235,7 +255,8 @@ export async function GET(req: NextRequest) {
         try {
           const { account, serie, campanhas, audiencia } = await getAccountMetrics(id, start, end)
           if (account.spend === 0 && campanhas.length === 0) return null
-          return { id, nome: nomeMap.get(id) ?? `ID ${id}`, ...account, serie, campanhas, audiencia } as TikTokAccountData
+          // nome sempre vem do fallback para consistência com o dropdown
+          return { id, nome: ADVERTISER_NAMES_FALLBACK[id] ?? nomeMap.get(id) ?? `ID ${id}`, ...account, serie, campanhas, audiencia } as TikTokAccountData
         } catch (e) {
           console.error(`TikTok skip ${id}:`, e)
           return null

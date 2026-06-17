@@ -160,6 +160,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
+const CACHE_V = 'v3'
 
 function buildMetrics(cliques: number, impressoes: number, custo: number, conversoes: number) {
   return {
@@ -188,7 +189,7 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
-  const cacheKey = `${start}|${end}`
+  const cacheKey = `${CACHE_V}|${start}|${end}`
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }

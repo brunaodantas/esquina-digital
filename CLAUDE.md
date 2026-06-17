@@ -73,6 +73,22 @@ Frequência Meta Ads calculada como `impressões / alcance` (matematicamente cor
 - Meta: Alcance, Frequência + breakdown de Gênero, Faixa etária e Dispositivos (% de impressões)
 - Google: Exposição (impressões) + Top 5 cidades por cliques (quando disponível via `acc.cidades`)
 
+## TikTok Ads
+
+Página em `app/dashboard/tiktok-ads/page.tsx`, rota em `app/api/tiktok-ads/route.ts`.
+
+**Advertiser IDs** hardcoded em `ADVERTISER_IDS` (8 contas). Nomes reais em `ADVERTISER_NAMES_FALLBACK` (preferir sempre o fallback, não o retorno da API, para garantir consistência entre dropdown e dados).
+
+**Bugs corrigidos (junho/2026):**
+
+1. **Campanhas vazias (campRes código 40002 silencioso):** `campaign_name` como métrica no relatório `AUCTION_CAMPAIGN` era rejeitada silenciosamente pela API TikTok (retornava HTTP 200 com `code: 40002` em vez de erro). A query retornava `data.list = null` → `campanhas = []`. Fix: remover `campaign_name` das métricas e buscar nomes separadamente via `/campaign/get/`.
+
+2. **Dropdown mostrando IDs em vez de nomes:** variável `nomes` no `return` apontava para `undefined` após renomeação de variável. Fix: `allNomesStatic` calculado antes da checagem de cache e usado em ambos os paths (cache hit e fresh fetch).
+
+3. **Dropdown incompleto / nome errado na conta ANFAVEA:** `ADVERTISER_NAMES_FALLBACK['7646886376989982741']` estava mapeado como `'Conta TK'` em vez de `'ANFAVEA'`. Corrigido. Também: nomes do fallback nunca devem ser sobrescritos pelo retorno da API `/advertiser/info/` pois a API retorna nomes internos ("BIODIESEL_ESQUINA") que não batem com o dropdown — use `ADVERTISER_NAMES_FALLBACK[id] ?? nomeMap.get(id)` na ordem certa.
+
+**Cache versionado:** `CACHE_V = 'v5'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
+
 ## Correções de bug conhecidas
 
 ### Exportação CSV abre nova aba (corrigido)
