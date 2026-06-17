@@ -101,6 +101,16 @@ function comentarioGoogle(cliques: number, impressoes: number, ctr: number, cpc:
   return linhas.join('\n')
 }
 
+// ─── Match fuzzy de nomes de contas entre plataformas ─────────────────────────
+function matchNome(accNome: string, query: string): boolean {
+  if (accNome === query) return true
+  const normalize = (s: string) => s.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2)
+  const accWords = new Set(normalize(accNome))
+  return normalize(query).some(w => accWords.has(w))
+}
+
 // ─── Relatório Semanal ─────────────────────────────────────────────────────────
 
 interface RelSemanalParams {
@@ -115,12 +125,13 @@ interface RelSemanalParams {
   visitasPerfil: number
   tiktokImpressoes: number
   tiktokCliques: number
+  tiktokDados: any[]
   chartJsText: string
   logoB64: string
 }
 
 function buildRelatorioHTML(p: RelSemanalParams): string {
-  const { cliente, periodoStart, periodoEnd, metaDados, googleDados, secoes, seguidoresSemana, seguidoresMes, visitasPerfil, tiktokImpressoes, tiktokCliques, chartJsText, logoB64 } = p
+  const { cliente, periodoStart, periodoEnd, metaDados, googleDados, secoes, seguidoresSemana, seguidoresMes, visitasPerfil, tiktokImpressoes, tiktokCliques, tiktokDados, chartJsText, logoB64 } = p
 
   const [, ms, ds] = periodoStart.split('-')
   const [, me, de] = periodoEnd.split('-')
@@ -196,6 +207,21 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   const ageItems = toItems(audI, 4)
   const devItems = toItems(audD, 3)
 
+  // ── Audience: TikTok (genero, idade, plataforma) ──
+  const tkAudG = new Map<string, number>()
+  const tkAudI = new Map<string, number>()
+  const tkAudP = new Map<string, number>()
+  for (const acc of tiktokDados) {
+    for (const i of acc.audiencia?.genero ?? []) tkAudG.set(i.label, (tkAudG.get(i.label) ?? 0) + i.impressions)
+    for (const i of acc.audiencia?.idade ?? []) tkAudI.set(i.label, (tkAudI.get(i.label) ?? 0) + i.impressions)
+    for (const i of acc.audiencia?.plataforma ?? []) tkAudP.set(i.label, (tkAudP.get(i.label) ?? 0) + i.impressions)
+  }
+  const tkGenItems = toItems(tkAudG, 2)
+  const tkAgeItems = toItems(tkAudI, 4)
+  const tkPlatItems = toItems(tkAudP, 3)
+  const tiktokSpend = tiktokDados.reduce((s: number, a: any) => s + (a.spend ?? 0), 0)
+  const tiktokCpm = tiktokImpressoes > 0 && tiktokSpend > 0 ? (tiktokSpend / tiktokImpressoes) * 1000 : 0
+
   // ── Audience: Google cities ──
   const cidMap = new Map<string, number>()
   for (const acc of googleDados) for (const c of acc.cidades ?? []) cidMap.set(c.nome, (cidMap.get(c.nome) ?? 0) + c.cliques)
@@ -233,6 +259,15 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
       h += `<div class="aud-row"><span class="aud-name" style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nome}</span><div class="aud-bar"><div class="aud-fill" style="width:${Math.round(cliques / max * 100)}%;background:${color}"></div></div><span class="aud-pct">${fmtK(cliques)}</span></div>`
     })
     h += '</div>'
+    return h
+  }
+
+  function tiktokAudHtml(color: string): string {
+    if (!tkGenItems.length && !tkAgeItems.length && !tkPlatItems.length) return '<p class="aud-empty">Sem dados demográficos disponíveis</p>'
+    let h = ''
+    if (tkGenItems.length) h += `<div class="aud-sec"><div class="aud-sec-title">Gênero</div>${tkGenItems.map(i => miniBar(i.l, i.pct, color)).join('')}</div>`
+    if (tkAgeItems.length) h += `<div class="aud-sec"><div class="aud-sec-title">Faixa Etária</div>${tkAgeItems.map(i => miniBar(i.l, i.pct, color + 'aa')).join('')}</div>`
+    if (tkPlatItems.length) h += `<div class="aud-sec"><div class="aud-sec-title">Plataforma</div>${tkPlatItems.map(i => miniBar(i.l, i.pct, color + '66')).join('')}</div>`
     return h
   }
 
@@ -311,14 +346,32 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 </section>`
   }
 
-  // ── Diagnóstico bullets ──
+  // ── Diagnóstico qualitativo ──
   const diagItems: string[] = []
-  if (dispImpr > 0) diagItems.push(`Google Display entregou <strong>${fmtK(dispImpr)}</strong> impressões com CTR de <strong>${fmtPct2(dispCtr)}</strong> no período.`)
-  if (ytViews > 0) diagItems.push(`YouTube registrou <strong>${fmtK(ytViews)}</strong> visualizações${inscritosYT > 0 ? ` e <strong>${fmtK(inscritosYT)}</strong> novos inscritos` : ''}.`)
-  if (finalTDImpr > 0) diagItems.push(`Meta Temas Diversos alcançou <strong>${fmtK(finalTDReach)}</strong> usuários únicos com frequência de <strong>${fmtF2(finalTDFreq)}x</strong>.`)
-  if (vpImpr > 0) diagItems.push(`Meta Visitas ao Perfil gerou <strong>${fmtK(vpImpr)}</strong> impressões${visitasPerfil > 0 ? ` e <strong>${fmtK(visitasPerfil)}</strong> visitas ao perfil` : ''}.`)
-  if (tiktokImpressoes > 0) diagItems.push(`TikTok registrou <strong>${fmtK(tiktokImpressoes)}</strong> impressões com CTR de <strong>${fmtPct2(tiktokCtr)}</strong>.`)
-  if (seguidoresSemana > 0) diagItems.push(`Instagram cresceu <strong>${fmtK(seguidoresSemana)}</strong> seguidores na semana${seguidoresMes > 0 ? `, acumulando <strong>${fmtK(seguidoresMes)}</strong> novos no mês` : ''}.`)
+  if (dispImpr > 0) {
+    const note = dispCtr >= 0.4 ? 'dentro da faixa esperada para programático' : 'abaixo da média — revisar criativos e segmentações'
+    diagItems.push(`Google Display entregou <strong>${fmtK(dispImpr)}</strong> impressões com CTR de <strong>${fmtPct2(dispCtr)}</strong> — ${note}.`)
+  }
+  if (ytImpr > 0) {
+    const vtr = ytImpr > 0 ? (ytViews / ytImpr) * 100 : 0
+    const vtrNote = vtr >= 25 ? 'boa taxa de conclusão de vídeo' : 'taxa dentro da média para in-stream'
+    const ytExtra = inscritosYT > 0 ? ` — converteu <strong>${fmtK(inscritosYT)}</strong> novos inscritos` : ''
+    diagItems.push(`YouTube acumulou <strong>${fmtK(ytViews)}</strong> visualizações (VTR <strong>${fmtPct2(vtr)}</strong>) em <strong>${fmtK(ytImpr)}</strong> impressões — ${vtrNote}${ytExtra}.`)
+  }
+  if (finalTDImpr > 0) {
+    const freqNote = finalTDFreq <= 1.5 ? 'frequência baixa, há espaço para ampliar entrega' : finalTDFreq <= 2.5 ? 'frequência adequada, sem sinais de saturação' : 'frequência elevada — avaliar rotação de criativos'
+    diagItems.push(`Meta Ads alcançou <strong>${fmtK(finalTDReach)}</strong> usuários únicos com frequência média de <strong>${fmtF2(finalTDFreq)}x</strong> — ${freqNote}.`)
+  }
+  if (vpImpr > 0) {
+    const vpExtra = visitasPerfil > 0 ? ` e gerou <strong>${fmtK(visitasPerfil)}</strong> visitas ao perfil` : ''
+    const freqVPNote = vpFreq <= 2.5 ? 'exposição equilibrada' : 'frequência elevada — considerar novos públicos'
+    diagItems.push(`Meta Visitas ao Perfil entregou <strong>${fmtK(vpImpr)}</strong> impressões${vpExtra} — ${freqVPNote} (freq. <strong>${fmtF2(vpFreq)}x</strong>).`)
+  }
+  if (tiktokImpressoes > 0) {
+    const tkNote = tiktokCtr >= 1.0 ? 'CTR elevado para a plataforma — criativos com boa receptividade' : tiktokCtr >= 0.3 ? 'CTR dentro da faixa esperada para TikTok Ads' : 'CTR abaixo da média — revisar criativos e segmentação'
+    diagItems.push(`TikTok entregou <strong>${fmtK(tiktokImpressoes)}</strong> impressões — CTR de <strong>${fmtPct2(tiktokCtr)}</strong>, ${tkNote}.`)
+  }
+  if (seguidoresSemana > 0) diagItems.push(`Instagram registrou crescimento de <strong>${fmtK(seguidoresSemana)}</strong> seguidores na semana${seguidoresMes > 0 ? `, com <strong>${fmtK(seguidoresMes)}</strong> acumulados no mês` : ''}.`)
   if (!diagItems.length) diagItems.push(`Campanha ativa no período de ${periodoLabel}.`)
 
   const conclItems = [
@@ -509,8 +562,8 @@ ${showVP ? fullSection('meta-vp', '#C44A00', 'Meta — Visitas ao Perfil', 'Meta
   'ch-meta-vp', 'Campanhas por Impressões', metaAudHtml('#C44A00'), analysisVP()) : ''}
 
 ${showTiktok && tiktokImpressoes > 0 ? fullSection('tiktok', '#00994D', 'TikTok', 'TikTok', `Impressões, cliques e CTR · ${periodoLabel}`,
-  kpiCard('Impressões', fmtK(tiktokImpressoes), 'Total') + kpiCard('Cliques', fmtK(tiktokCliques), 'Destino') + kpiCard('CTR', fmtPct2(tiktokCtr), 'Taxa de clique') + kpiCard('—', '—', ''),
-  'ch-tiktok', 'Impressões vs Cliques', '<p class="aud-empty">Dados demográficos via TikTok Ads Manager</p>', analysisTiktok()) : ''}
+  kpiCard('Impressões', fmtK(tiktokImpressoes), 'Total') + kpiCard('Cliques', fmtK(tiktokCliques), 'Destino') + kpiCard('CTR', fmtPct2(tiktokCtr), 'Taxa de clique') + (tiktokCpm > 0 ? kpiCard('CPM', 'R$ ' + tiktokCpm.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'Custo por mil') : kpiCard('—', '—', '')),
+  'ch-tiktok', 'Impressões vs Cliques', tiktokAudHtml('#00994D'), analysisTiktok()) : ''}
 ${showTiktok && tiktokImpressoes === 0 ? `
 <section id="tiktok" class="plat-section">
   <div class="slide-inner">
@@ -631,16 +684,6 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
     if (!clienteSelecionado || !periodoStart || !periodoEnd) return
     setGerando(true); setErro('')
 
-    // Match fuzzy: compara palavras significativas (>2 chars) entre nomes de conta e cliente selecionado
-    function matchNome(accNome: string, query: string): boolean {
-      if (accNome === query) return true
-      const normalize = (s: string) => s.toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2)
-      const accWords = new Set(normalize(accNome))
-      return normalize(query).some(w => accWords.has(w))
-    }
-
     try {
       const [metaRes, googleRes, tiktokRes, chartJsText, logoData] = await Promise.all([
         fetch(`/api/meta-ads?start=${periodoStart}&end=${periodoEnd}`).then(r => r.json()).catch(() => ({ data: [] })),
@@ -669,6 +712,7 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
         visitasPerfil: Number(visitasPerfil) || 0,
         tiktokImpressoes: tiktokImpressoesPDF,
         tiktokCliques: tiktokCliquesPDF,
+        tiktokDados: tiktokDadosPDF,
         chartJsText,
         logoB64: logoData,
       })
@@ -852,7 +896,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       fetches.push(
         fetch(`/api/meta-ads?start=${periodo.start}&end=${periodo.end}`)
           .then(r => r.json())
-          .then(res => { if (!res.error) metaDados = (res.data ?? []).filter((a: any) => a.nome === clienteSelecionado) })
+          .then(res => { if (!res.error) metaDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!)) })
           .catch(() => setErro('Erro ao buscar dados do Meta Ads.'))
       )
     }
@@ -860,7 +904,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       fetches.push(
         fetch(`/api/google-ads?start=${periodo.start}&end=${periodo.end}`)
           .then(r => r.json())
-          .then(res => { if (!res.error) googleDados = (res.data ?? []).filter((a: any) => a.nome === clienteSelecionado) })
+          .then(res => { if (!res.error) googleDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!)) })
           .catch(() => setErro(prev => prev || 'Erro ao buscar dados do Google Ads.'))
       )
     }
@@ -868,7 +912,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       fetches.push(
         fetch(`/api/tiktok-ads?start=${periodo.start}&end=${periodo.end}`)
           .then(r => r.json())
-          .then(res => { if (!res.error) tiktokDados = (res.data ?? []).filter((a: any) => a.nome === clienteSelecionado) })
+          .then(res => { if (!res.error) tiktokDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!)) })
           .catch(() => setErro(prev => prev || 'Erro ao buscar dados do TikTok.'))
       )
     }
