@@ -4,6 +4,10 @@
 
 Next.js dashboard at `digital-esquina.vercel.app`. Three pages: Entregas, Meta Ads, Google Ads.
 
+## Menu de navegação (header em `dashboard/page.tsx`)
+
+Ordem dos botões da esquerda para a direita: **Meta Ads · Google Ads · TikTok · Relatório WA · Boletim PDF · Entregas**. As três redes ficam contínuas no início; o Entregas fica por último (após o Boletim PDF), por ser um fluxo operacional, não de mídia. Todos os botões chamam `setActiveTab(...)` exceto Relatório WA e Boletim PDF (abrem modais).
+
 ## Estrutura de páginas
 
 | Página | Arquivo | Fonte de dados |

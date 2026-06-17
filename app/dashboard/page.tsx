@@ -1397,7 +1397,6 @@ export default function Dashboard() {
         borderBottom: '1px solid #2a2a2a',
       }}>
         <button onClick={() => setActiveTab('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? '#1A3CFF' : '#252525', color: activeTab === 'meta' ? '#fff' : '#999', outline: activeTab !== 'meta' ? '1px solid #333' : 'none' }}>Meta Ads</button>
-        <button onClick={() => setActiveTab('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : '#252525', color: activeTab === 'entregas' ? '#fff' : '#999', outline: activeTab !== 'entregas' ? '1px solid #333' : 'none' }}>Entregas</button>
         <button onClick={() => setActiveTab('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? '#1A3CFF' : '#252525', color: activeTab === 'google-ads' ? '#fff' : '#999', outline: activeTab !== 'google-ads' ? '1px solid #333' : 'none' }}>Google Ads</button>
         <button onClick={() => setActiveTab('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#00994D' : '#252525', color: activeTab === 'tiktok' ? '#fff' : '#999', outline: activeTab !== 'tiktok' ? '1px solid #333' : 'none' }}>TikTok</button>
         <button onClick={() => setShowRelatorio(true)} title="Gerar relatório para WhatsApp" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a4a2a', transition: 'all 0.15s', background: '#1a2e1a', color: '#4ade80', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1406,6 +1405,7 @@ export default function Dashboard() {
         <button onClick={() => setShowRelatorioSemanal(true)} title="Gerar boletim semanal PDF" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a3a4a', transition: 'all 0.15s', background: '#1a2030', color: '#7ba3ff', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>📄</span> Boletim PDF
         </button>
+        <button onClick={() => setActiveTab('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : '#252525', color: activeTab === 'entregas' ? '#fff' : '#999', outline: activeTab !== 'entregas' ? '1px solid #333' : 'none' }}>Entregas</button>
 
         <div style={{ flex: 1 }} />
 
