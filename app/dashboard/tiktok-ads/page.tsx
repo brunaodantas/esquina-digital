@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { TikTokAccountData, TikTokCampaignData } from '@/app/api/tiktok-ads/route'
+import type { TikTokAccountData, TikTokCampaignData, TikTokAudienceItem } from '@/app/api/tiktok-ads/route'
 
 type Theme = 'dark' | 'light'
 type Preset = 'personalizado' | 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'ytd-2026'
+
+const TK = '#00994D'
 
 const C = {
   dark: {
@@ -45,15 +47,14 @@ const PRESETS: { key: Preset; label: string }[] = [
   { key: 'ytd-2026', label: '2026 (YTD)' },
 ]
 
-const TK = '#00994D'
-
 function fmtDate(d: Date) { return d.toISOString().slice(0, 10) }
 
-function getPeriodo(preset: Preset, custom?: { start: string; end: string }) {
+function getPeriodo(preset: Preset, custom?: { start: string; end: string }): { start: string; end: string; label: string } {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
   if (preset === 'personalizado' && custom?.start && custom?.end) {
-    const [, sm, sd] = custom.start.split('-'); const [, em, ed] = custom.end.split('-')
-    return { start: custom.start, end: custom.end, label: `${sd}/${sm} – ${ed}/${em}` }
+    const [sy, sm, sd] = custom.start.split('-'); const [ey, em, ed] = custom.end.split('-')
+    const label = sm === em && sy === ey ? `${sd}/${sm} – ${ed}/${em}/${sy}` : `${sd}/${sm}/${sy} – ${ed}/${em}/${ey}`
+    return { start: custom.start, end: custom.end, label }
   }
   if (preset === 'mes-atual') return { start: fmtDate(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), end: fmtDate(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)), label: 'Este mês' }
   if (preset === 'mes-passado') return { start: fmtDate(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)), end: fmtDate(new Date(hoje.getFullYear(), hoje.getMonth(), 0)), label: 'Mês passado' }
@@ -64,244 +65,590 @@ function getPeriodo(preset: Preset, custom?: { start: string; end: string }) {
   return { start: fmtDate(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), end: fmtDate(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)), label: 'Este mês' }
 }
 
+function getPrevPeriodo(p: { start: string; end: string }) {
+  const s = new Date(p.start + 'T00:00:00'), e = new Date(p.end + 'T00:00:00')
+  const days = Math.round((e.getTime() - s.getTime()) / 86400000)
+  const prevEnd = new Date(s.getTime() - 86400000)
+  const prevStart = new Date(prevEnd.getTime() - days * 86400000)
+  return { start: fmtDate(prevStart), end: fmtDate(prevEnd) }
+}
+
 function fmtNum(n: number) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace('.', ',') + 'M'
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace('.', ',') + 'k'
   return n.toLocaleString('pt-BR')
 }
+function fmtNumFull(n: number) { return n.toLocaleString('pt-BR') }
 function fmtBRL(n: number) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtPct(n: number) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
 
-function PeriodoDropdown({ preset, custom, setPreset, setCustom, theme }: {
-  preset: Preset; custom: { start: string; end: string }
-  setPreset: (p: Preset) => void; setCustom: (c: { start: string; end: string }) => void; theme: Theme
+function CopiavelNum({ compact, full = compact }: { compact: string; full?: string }) {
+  const [tip, setTip] = useState<'hover' | 'copied' | null>(null)
+  return (
+    <span style={{ position: 'relative', cursor: 'copy', userSelect: 'none' }}
+      onMouseEnter={() => setTip('hover')} onMouseLeave={() => setTip(null)}
+      onClick={() => { navigator.clipboard.writeText(full); setTip('copied'); setTimeout(() => setTip(null), 1200) }}>
+      {compact}
+      {tip && (
+        <span style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: '50%', transform: 'translateX(50%)', background: '#0f172a', border: '1px solid #334155', borderRadius: 5, padding: '3px 8px', fontSize: 11, whiteSpace: 'nowrap', zIndex: 200, pointerEvents: 'none', color: tip === 'copied' ? '#4ade80' : '#e2e8f0', fontWeight: 400 }}>
+          {tip === 'copied' ? '✓ Copiado!' : full}
+        </span>
+      )}
+    </span>
+  )
+}
+
+// ─── Period Dropdown ──────────────────────────────────────────────────────────
+function PeriodoDropdown({ preset, custom, t, onApply }: {
+  preset: Preset; custom: { start: string; end: string }; t: typeof C['dark']
+  onApply: (p: Preset, c: { start: string; end: string }) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const [tmp, setTmp] = useState(custom)
-  const cl = C[theme]
+  const [aberto, setAberto] = useState(false)
+  const [tp, setTp] = useState<Preset>(preset)
+  const [tc, setTc] = useState(custom)
   const label = getPeriodo(preset, custom).label
 
-  return (
-    <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 32, borderRadius: 7, border: `1px solid ${cl.border}`, background: cl.card, color: cl.textPrimary, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        {label}
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={cl.chevron} strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      {open && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: cl.dropBg, border: `1px solid ${cl.dropBorder}`, borderRadius: 10, padding: 8, zIndex: 50, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
-          {PRESETS.filter(p => p.key !== 'personalizado').map(p => (
-            <button key={p.key} onClick={() => { setPreset(p.key); setOpen(false) }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 6, border: 'none', background: preset === p.key ? TK + '22' : 'transparent', color: preset === p.key ? TK : cl.dropText, fontSize: 13, cursor: 'pointer' }}>{p.label}</button>
-          ))}
-          <div style={{ borderTop: `1px solid ${cl.dropBorder}`, margin: '6px 0', paddingTop: 6 }}>
-            <div style={{ fontSize: 11, color: cl.textMuted, padding: '2px 10px 6px' }}>Personalizado</div>
-            <div style={{ display: 'flex', gap: 6, padding: '0 6px' }}>
-              <input type="date" value={tmp.start} onChange={e => setTmp(t => ({ ...t, start: e.target.value }))} style={{ flex: 1, padding: '4px 6px', borderRadius: 5, border: `1px solid ${cl.inputBorder}`, background: cl.inputBg, color: cl.inputText, fontSize: 12 }} />
-              <input type="date" value={tmp.end} onChange={e => setTmp(t => ({ ...t, end: e.target.value }))} style={{ flex: 1, padding: '4px 6px', borderRadius: 5, border: `1px solid ${cl.inputBorder}`, background: cl.inputBg, color: cl.inputText, fontSize: 12 }} />
-            </div>
-            <button onClick={() => { setPreset('personalizado'); setCustom(tmp); setOpen(false) }} style={{ width: 'calc(100% - 12px)', margin: '8px 6px 2px', padding: '6px 0', borderRadius: 5, border: 'none', background: TK, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Aplicar</button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function KpiTile({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
-  return (
-    <div style={{ flex: '1 1 0', minWidth: 140, padding: '14px 16px', borderRadius: 10, background: color + '12', border: `1px solid ${color}30` }}>
-      <div style={{ fontSize: 11, color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>{sub}</div>}
-    </div>
-  )
-}
-
-function KpiTileLight({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
-  return (
-    <div style={{ flex: '1 1 0', minWidth: 140, padding: '14px 16px', borderRadius: 10, background: color + '10', border: `1px solid ${color}25` }}>
-      <div style={{ fontSize: 11, color, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: '#111', lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{sub}</div>}
-    </div>
-  )
-}
-
-function ShareBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0
-  return (
-    <div style={{ height: 4, borderRadius: 2, background: '#2a2a2a', overflow: 'hidden', marginTop: 4 }}>
-      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 2 }} />
-    </div>
-  )
-}
-
-export default function TikTokAdsPage({ theme = 'dark' }: { theme?: Theme }) {
-  const cl = C[theme]
-  const [data, setData] = useState<TikTokAccountData[]>([])
-  const [nomes, setNomes] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [preset, setPreset] = useState<Preset>('mes-atual')
-  const [custom, setCustom] = useState({ start: '', end: '' })
-  const [filtroNome, setFiltroNome] = useState('todas')
-  const periodoRef = useRef(getPeriodo(preset, custom))
-
-  useEffect(() => {
-    const p = getPeriodo(preset, custom)
-    periodoRef.current = p
-    fetchData(p.start, p.end)
-  }, [preset, custom])
-
-  async function fetchData(start: string, end: string) {
-    setLoading(true); setError('')
-    try {
-      const res = await fetch(`/api/tiktok-ads?start=${start}&end=${end}`)
-      const json = await res.json()
-      if (json.error) { setError(json.error); setLoading(false); return }
-      setData(json.data ?? [])
-      if ((json.nomes ?? []).length > 0) setNomes(json.nomes)
-    } catch {
-      setError('Erro ao carregar dados do TikTok Ads.')
-    }
-    setLoading(false)
+  function aplicar() {
+    if (tp === 'personalizado' && (!tc.start || !tc.end)) return
+    onApply(tp, tc); setAberto(false)
   }
+  function abrir() { setTp(preset); setTc(custom); setAberto(true) }
 
-  const filtered = filtroNome === 'todas' ? data : data.filter(a => a.nome === filtroNome)
-
-  const totals = filtered.reduce((acc, a) => ({
-    spend: acc.spend + a.spend,
-    impressions: acc.impressions + a.impressions,
-    clicks: acc.clicks + a.clicks,
-    reach: acc.reach + a.reach,
-  }), { spend: 0, impressions: 0, clicks: 0, reach: 0 })
-
-  const avgCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0
-  const avgCpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0
-  const avgCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0
-  const avgFreq = filtered.reduce((s, a) => s + a.frequency, 0) / (filtered.length || 1)
-  const maxSpend = Math.max(...filtered.map(a => a.spend), 1)
-
-  const Tile = theme === 'dark' ? KpiTile : KpiTileLight
-
+  const inputStyle: React.CSSProperties = {
+    background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText,
+    borderRadius: 6, padding: '6px 10px', fontSize: 13, width: '100%', outline: 'none', colorScheme: 'dark',
+  }
   return (
-    <div style={{ flex: 1, overflow: 'auto', background: cl.page, display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{ padding: '20px 24px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderBottom: `1px solid ${cl.border}`, background: cl.card }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 200 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: TK }} />
-          <span style={{ fontSize: 16, fontWeight: 700, color: cl.textPrimary }}>TikTok Ads</span>
-          {loading && <span style={{ fontSize: 12, color: cl.textMuted }}>Carregando...</span>}
-        </div>
-        <PeriodoDropdown preset={preset} custom={custom} setPreset={setPreset} setCustom={setCustom} theme={theme} />
-        <select value={filtroNome} onChange={e => setFiltroNome(e.target.value)} style={{ height: 32, padding: '0 10px', borderRadius: 7, border: `1px solid ${cl.selectBorder}`, background: cl.selectBg, color: cl.selectText, fontSize: 13, cursor: 'pointer' }}>
-          <option value="todas">Todas as contas</option>
-          {nomes.map(n => <option key={n} value={n}>{n}</option>)}
-        </select>
-        <button onClick={() => fetchData(periodoRef.current.start, periodoRef.current.end)} style={{ height: 32, padding: '0 14px', borderRadius: 7, border: `1px solid ${cl.border}`, background: 'transparent', color: cl.textMuted, fontSize: 12, cursor: 'pointer' }}>↻ Atualizar</button>
-      </div>
-
-      {error && (
-        <div style={{ margin: '16px 24px', padding: '12px 16px', borderRadius: 8, background: '#ff444420', border: '1px solid #ff444440', color: '#ff6666', fontSize: 13 }}>
-          {error}
-        </div>
-      )}
-
-      {!loading && filtered.length === 0 && !error && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: cl.emptyText, fontSize: 14 }}>
-          Nenhum dado encontrado para o período selecionado.
-        </div>
-      )}
-
-      {!loading && filtered.length > 0 && (
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* KPI tiles */}
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Tile label="Investimento" value={fmtBRL(totals.spend)} color={TILE_COLORS[0]} />
-            <Tile label="Impressões" value={fmtNum(totals.impressions)} color={TILE_COLORS[1]} />
-            <Tile label="Alcance" value={fmtNum(totals.reach)} color={TILE_COLORS[2]} />
-            <Tile label="Cliques" value={fmtNum(totals.clicks)} color={TILE_COLORS[3]} />
-            <Tile label="CTR" value={fmtPct(avgCtr)} color={TILE_COLORS[4]} />
-            <Tile label="CPM" value={fmtBRL(avgCpm)} color={TILE_COLORS[5]} />
-            <Tile label="CPC" value={fmtBRL(avgCpc)} color={TILE_COLORS[6]} />
-            <Tile label="Freq. Média" value={avgFreq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} color={TILE_COLORS[7]} />
-          </div>
-
-          {/* Account cards */}
-          {filtered.map((acc) => (
-            <div key={acc.id} style={{ background: cl.card, border: `1px solid ${cl.border}`, borderRadius: 12, overflow: 'hidden' }}>
-              {/* Card header */}
-              <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${cl.borderInner}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 7, background: TK + '22', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill={TK}><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.31 6.31 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V9.13a8.16 8.16 0 004.77 1.52V7.21a4.85 4.85 0 01-1-.52z"/></svg>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: cl.textPrimary }}>{acc.nome}</div>
-                    <div style={{ fontSize: 11, color: cl.textMuted }}>ID {acc.id}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
-                  <span style={{ color: cl.textMuted }}>Investimento: <span style={{ color: cl.textPrimary, fontWeight: 600 }}>{fmtBRL(acc.spend)}</span></span>
-                  <span style={{ color: cl.textMuted }}>Impressões: <span style={{ color: cl.textPrimary, fontWeight: 600 }}>{fmtNum(acc.impressions)}</span></span>
-                  <span style={{ color: cl.textMuted }}>CTR: <span style={{ color: cl.textPrimary, fontWeight: 600 }}>{fmtPct(acc.ctr)}</span></span>
-                </div>
-              </div>
-
-              {/* Metrics grid */}
-              <div style={{ padding: '12px 18px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, borderBottom: acc.campanhas.length > 0 ? `1px solid ${cl.borderInner}` : 'none' }}>
-                {[
-                  { label: 'Investimento', val: fmtBRL(acc.spend) },
-                  { label: 'Impressões', val: fmtNum(acc.impressions) },
-                  { label: 'Alcance', val: fmtNum(acc.reach) },
-                  { label: 'Cliques', val: fmtNum(acc.clicks) },
-                  { label: 'CTR', val: fmtPct(acc.ctr) },
-                  { label: 'CPM', val: fmtBRL(acc.cpm) },
-                  { label: 'CPC', val: fmtBRL(acc.cpc) },
-                  { label: 'Frequência', val: acc.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
-                ].map(({ label, val }) => (
-                  <div key={label} style={{ padding: '10px 12px', borderRadius: 8, background: cl.kpiBg, border: `1px solid ${cl.kpiBorder}` }}>
-                    <div style={{ fontSize: 10, color: cl.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: cl.textPrimary }}>{val}</div>
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button onClick={aberto ? () => setAberto(false) : abrir} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: t.filtroBtn, border: `1px solid ${t.border}`, color: t.textSecondary, cursor: 'pointer' }}>
+        📅 {label} <span style={{ fontSize: 10, color: t.textMuted }}>▼</span>
+      </button>
+      {aberto && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setAberto(false)} />
+          <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 999, background: t.dropBg, border: `1px solid ${t.dropBorder}`, borderRadius: 12, padding: 16, minWidth: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
+            <div style={{ display: 'flex', gap: 20 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
+                {PRESETS.map(p => (
+                  <div key={p.key} onClick={() => setTp(p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: tp === p.key ? TK + '1A' : 'transparent' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, border: `2px solid ${tp === p.key ? TK : t.textMuted}`, background: tp === p.key ? TK : 'transparent' }} />
+                    <span style={{ fontSize: 13, color: tp === p.key ? t.dropActive : t.dropText }}>{p.label}</span>
                   </div>
                 ))}
               </div>
-
-              {/* Campaign breakdown */}
-              {acc.campanhas.length > 0 && (
-                <div style={{ padding: '12px 18px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: cl.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Campanhas</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {acc.campanhas.map((camp) => (
-                      <div key={camp.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto auto', gap: 12, alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: cl.kpiBg, border: `1px solid ${cl.kpiBorder}` }}>
-                        <div>
-                          <div style={{ fontSize: 12, fontWeight: 500, color: cl.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 300 }}>{camp.nome}</div>
-                          <ShareBar value={camp.spend} max={acc.campanhas[0].spend} color={TK} />
-                        </div>
-                        <div style={{ textAlign: 'right', minWidth: 90 }}>
-                          <div style={{ fontSize: 10, color: cl.textMuted }}>Investimento</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: cl.textPrimary }}>{fmtBRL(camp.spend)}</div>
-                        </div>
-                        <div style={{ textAlign: 'right', minWidth: 70 }}>
-                          <div style={{ fontSize: 10, color: cl.textMuted }}>Impressões</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: cl.textPrimary }}>{fmtNum(camp.impressions)}</div>
-                        </div>
-                        <div style={{ textAlign: 'right', minWidth: 60 }}>
-                          <div style={{ fontSize: 10, color: cl.textMuted }}>CTR</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: cl.textPrimary }}>{fmtPct(camp.ctr)}</div>
-                        </div>
-                        <div style={{ textAlign: 'right', minWidth: 80 }}>
-                          <div style={{ fontSize: 10, color: cl.textMuted }}>CPC</div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: cl.textPrimary }}>{fmtBRL(camp.cpc)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {tp === 'personalizado' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, paddingTop: 28 }}>
+                  <div><div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5 }}>Data inicial</div><input type="date" value={tc.start} onChange={e => setTc(c => ({ ...c, start: e.target.value }))} style={inputStyle} /></div>
+                  <div><div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5 }}>Data final</div><input type="date" value={tc.end} onChange={e => setTc(c => ({ ...c, end: e.target.value }))} style={inputStyle} /></div>
                 </div>
               )}
             </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${t.dropBorder}` }}>
+              <button onClick={() => setAberto(false)} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: 'transparent', border: `1px solid ${t.border}`, color: t.textMuted, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: TK, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Aplicar</button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── Trend Chart ──────────────────────────────────────────────────────────────
+type TKBarMetric = 'spend' | 'impressions' | 'clicks'
+type TKLineMetric = 'cpm' | 'ctr' | 'cpc'
+
+const TK_BAR_OPTIONS: { key: TKBarMetric; label: string; color: string }[] = [
+  { key: 'spend', label: 'Investimento', color: TK },
+  { key: 'impressions', label: 'Impressões', color: '#c77dff' },
+  { key: 'clicks', label: 'Cliques', color: '#74c69d' },
+]
+const TK_LINE_OPTIONS: { key: TKLineMetric; label: string; color: string }[] = [
+  { key: 'cpm', label: 'CPM', color: '#ff9f1c' },
+  { key: 'ctr', label: 'CTR', color: '#56cfe1' },
+  { key: 'cpc', label: 'CPC', color: '#ffd166' },
+]
+
+function fmtTKBarVal(v: number, metric: TKBarMetric): string {
+  if (metric === 'spend') return `R$${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v.toFixed(0)}`
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M'
+  if (v >= 1_000) return (v / 1_000).toFixed(0) + 'k'
+  return String(Math.round(v))
+}
+function fmtTKLineVal(v: number, metric: TKLineMetric): string {
+  if (metric === 'ctr') return `${v.toFixed(2)}%`
+  return `R$${v.toFixed(2)}`
+}
+
+function TrendChart({ serie, theme }: { serie: TikTokAccountData['serie']; theme: Theme }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const chartRef = useRef<any>(null)
+  const [barMetrics, setBarMetrics] = useState<TKBarMetric[]>(['spend'])
+  const [lineMetrics, setLineMetrics] = useState<TKLineMetric[]>(['cpm'])
+  const t = C[theme]
+
+  function toggleBar(key: TKBarMetric) {
+    setBarMetrics(prev => prev.includes(key) ? (prev.length > 1 ? prev.filter(k => k !== key) : prev) : [...prev, key])
+  }
+  function toggleLine(key: TKLineMetric) {
+    setLineMetrics(prev => prev.includes(key) ? (prev.length > 1 ? prev.filter(k => k !== key) : prev) : [...prev, key])
+  }
+
+  const barLabels = barMetrics.map(k => TK_BAR_OPTIONS.find(o => o.key === k)!.label)
+  const lineLabels = lineMetrics.map(k => TK_LINE_OPTIONS.find(o => o.key === k)!.label)
+  const title = `TENDÊNCIA — ${barLabels.join(' E ').toUpperCase()} VS ${lineLabels.join(' E ').toUpperCase()}`
+  const primaryLine = TK_LINE_OPTIONS.find(o => o.key === lineMetrics[0])!
+
+  const btnStyle = (active: boolean, color: string): React.CSSProperties => ({
+    padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+    cursor: 'pointer', border: `1px solid ${active ? color : t.border}`,
+    background: active ? color + '22' : 'transparent',
+    color: active ? color : t.textMuted, transition: 'all 0.15s',
+  })
+
+  useEffect(() => {
+    if (!canvasRef.current || serie.length === 0) return
+    const run = async () => {
+      const { Chart, registerables } = await import('chart.js')
+      Chart.register(...registerables)
+      chartRef.current?.destroy()
+      const labels = serie.map(p => { const [, m, d] = p.date.split('-'); return `${d}/${m}` })
+      const allBarData = barMetrics.map(k => serie.map(p => (p[k] as number) ?? 0))
+      const barDatasets = barMetrics.map((k, i) => {
+        const opt = TK_BAR_OPTIONS.find(o => o.key === k)!
+        return { type: 'bar' as const, label: opt.label, data: allBarData[i], backgroundColor: opt.color + '99', borderColor: opt.color, borderWidth: 1, borderRadius: 3, yAxisID: `yBar${i}` }
+      })
+      const lineDatasets = lineMetrics.map(k => {
+        const opt = TK_LINE_OPTIONS.find(o => o.key === k)!
+        return { type: 'line' as const, label: opt.label, data: serie.map(p => (p[k] as number) ?? 0), borderColor: opt.color, backgroundColor: opt.color + '22', borderWidth: 2, pointRadius: serie.length > 30 ? 0 : 3, pointBackgroundColor: opt.color, tension: 0.3, yAxisID: 'yLine' }
+      })
+      const barScales: Record<string, any> = {}
+      barMetrics.forEach((k, i) => {
+        const opt = TK_BAR_OPTIONS.find(o => o.key === k)!
+        const maxVal = Math.max(...allBarData[i], 1)
+        barScales[`yBar${i}`] = { type: 'linear', position: 'left', display: i === 0, max: maxVal * 1.15, grid: { color: i === 0 ? t.borderInner : 'transparent' }, ticks: { color: opt.color, font: { size: 10 }, callback: (v: any) => fmtTKBarVal(Number(v), k) } }
+      })
+      chartRef.current = new Chart(canvasRef.current!, {
+        data: { labels, datasets: [...barDatasets, ...lineDatasets] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: t.textMuted, font: { size: 11 }, boxWidth: 12, padding: 16 } },
+            tooltip: {
+              backgroundColor: t.dropBg, titleColor: t.textPrimary, bodyColor: t.textSecondary, borderColor: t.border, borderWidth: 1,
+              callbacks: {
+                label: (ctx: any) => {
+                  const isBar = ctx.dataset.type === 'bar'
+                  const key = isBar ? barMetrics[ctx.datasetIndex] : lineMetrics[ctx.datasetIndex - barMetrics.length]
+                  if (isBar) return `  ${ctx.dataset.label}: ${fmtTKBarVal(ctx.raw, key as TKBarMetric)}`
+                  return `  ${ctx.dataset.label}: ${fmtTKLineVal(ctx.raw, key as TKLineMetric)}`
+                },
+              },
+            },
+          },
+          scales: {
+            x: { ticks: { color: t.textMuted, font: { size: 10 }, maxTicksLimit: serie.length > 30 ? 8 : 15 }, grid: { color: t.borderInner } },
+            ...barScales,
+            yLine: { type: 'linear' as const, position: 'right' as const, ticks: { color: primaryLine.color, font: { size: 10 }, callback: (v: any) => fmtTKLineVal(Number(v), lineMetrics[0]) }, grid: { drawOnChartArea: false } },
+          },
+        },
+      })
+    }
+    run()
+    return () => { chartRef.current?.destroy(); chartRef.current = null }
+  }, [serie, theme, barMetrics.join(), lineMetrics.join()]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: t.textMuted, marginRight: 4 }}>Barras:</span>
+          {TK_BAR_OPTIONS.map(o => <button key={o.key} onClick={() => toggleBar(o.key)} style={btnStyle(barMetrics.includes(o.key), o.color)}>{o.label}</button>)}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: t.textMuted, marginRight: 4 }}>Linha:</span>
+          {TK_LINE_OPTIONS.map(o => <button key={o.key} onClick={() => toggleLine(o.key)} style={btnStyle(lineMetrics.includes(o.key), o.color)}>{o.label}</button>)}
+        </div>
+      </div>
+      <div style={{ height: 260 }}><canvas ref={canvasRef} /></div>
+    </div>
+  )
+}
+
+// ─── KPI Tile ─────────────────────────────────────────────────────────────────
+function KpiTile({ label, value, note, color, t, delta }: { label: string; value: string; note?: string; color: string; t: typeof C['dark']; delta?: number | null }) {
+  return (
+    <div style={{ background: t.kpiBg, border: `1px solid ${t.kpiBorder}`, borderRadius: 10, padding: '14px 16px', borderTop: `3px solid ${color}` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}><CopiavelNum compact={value} /></div>
+      {note && <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>{note}</div>}
+      {delta != null && (
+        <div style={{ fontSize: 11, fontWeight: 700, color: delta >= 0 ? '#22c55e' : '#f87171', marginTop: 4 }}>
+          {delta > 0 ? '+' : ''}{delta.toFixed(1).replace('.', ',')}%
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Account Card ─────────────────────────────────────────────────────────────
+function AccountCard({ acc, totalSpend, t }: { acc: TikTokAccountData; totalSpend: number; t: typeof C['dark'] }) {
+  const [open, setOpen] = useState(true)
+  const sharePct = totalSpend > 0 ? (acc.spend / totalSpend) * 100 : 0
+  return (
+    <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden', background: t.card }}>
+      <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: t.textPrimary }}>{acc.nome}</span>
+          <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: TK + '18', color: TK, border: `1px solid ${TK}33` }}>{fmtBRL(acc.spend)}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {sharePct > 0 && <span style={{ fontSize: 11, color: t.textMuted }}>{fmtPct(sharePct)} do total</span>}
+          <span style={{ color: t.chevron, fontSize: 12 }}>{open ? '▲' : '▼'}</span>
+        </div>
+      </button>
+      {sharePct > 0 && <div style={{ height: 2, background: t.barTrack, margin: '0 16px' }}><div style={{ width: `${Math.min(100, sharePct)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
+      {open && (
+        <div style={{ padding: '12px 16px 16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 16px' }}>
+            {[
+              { label: 'Invest.', v: fmtBRL(acc.spend), h: '#60a5fa' },
+              { label: 'Impressões', v: fmtNum(acc.impressions) },
+              { label: 'Alcance', v: fmtNum(acc.reach) },
+              { label: 'Cliques', v: fmtNum(acc.clicks) },
+              { label: 'CTR', v: fmtPct(acc.ctr) },
+              { label: 'CPM', v: fmtBRL(acc.cpm) },
+              { label: 'CPC', v: fmtBRL(acc.cpc) },
+              { label: 'Frequência', v: acc.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+            ].map(m => (
+              <div key={m.label}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{m.label}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: m.h ?? t.textPrimary }}>{m.v}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Audiência Section ─────────────────────────────────────────────────────────
+function AudienciaSection({ filtrado, t }: { filtrado: TikTokAccountData[]; t: typeof C['dark'] }) {
+  const barColors = ['#4dabf7', '#c77dff', '#56cfe1', '#74c69d', '#ffd166', '#ff9f1c']
+
+  function aggregate(key: 'genero' | 'idade' | 'plataforma') {
+    const map = new Map<string, { impressions: number; clicks: number; spend: number }>()
+    for (const acc of filtrado) {
+      for (const item of acc.audiencia?.[key] ?? []) {
+        const ex = map.get(item.label) ?? { impressions: 0, clicks: 0, spend: 0 }
+        map.set(item.label, { impressions: ex.impressions + item.impressions, clicks: ex.clicks + item.clicks, spend: ex.spend + item.spend })
+      }
+    }
+    const items = Array.from(map.entries()).map(([label, v]) => ({ label, ...v, pct: 0 }))
+    const total = items.reduce((s, i) => s + i.impressions, 0)
+    items.forEach(i => { i.pct = total > 0 ? Math.round((i.impressions / total) * 1000) / 10 : 0 })
+    return items.sort((a, b) => b.impressions - a.impressions)
+  }
+
+  const genero = aggregate('genero')
+  const idade = aggregate('idade')
+  const plataforma = aggregate('plataforma')
+  if (!genero.length && !idade.length && !plataforma.length) return null
+
+  function BreakdownGroup({ title, items }: { title: string; items: ReturnType<typeof aggregate> }) {
+    if (!items.length) return null
+    return (
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.map((item, i) => (
+            <div key={item.label}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: t.textSecondary }}>{item.label}</span>
+                <span style={{ fontSize: 12, color: t.textMuted }}>{item.pct.toFixed(1).replace('.', ',')}%</span>
+              </div>
+              <div style={{ height: 6, background: t.barTrack, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${item.pct}%`, background: barColors[i % barColors.length], borderRadius: 3, transition: 'width 0.4s ease' }} />
+              </div>
+            </div>
           ))}
         </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 16 }}>Audiência</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28 }}>
+        <BreakdownGroup title="Gênero" items={genero} />
+        <BreakdownGroup title="Faixa Etária" items={idade} />
+        <BreakdownGroup title="Plataforma" items={plataforma} />
+      </div>
+    </div>
+  )
+}
+
+// ─── Campaigns Table ──────────────────────────────────────────────────────────
+function CampanhasTable({ campanhas, totalSpend, t }: { campanhas: TikTokCampaignData[]; totalSpend: number; t: typeof C['dark'] }) {
+  const [busca, setBusca] = useState('')
+  const [sortCol, setSortCol] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  function toggleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('desc') }
+  }
+
+  const filtered = campanhas.filter(c => !busca || c.nome.toLowerCase().includes(busca.toLowerCase()))
+  const sorted = sortCol ? [...filtered].sort((a, b) => {
+    const av = Number((a as any)[sortCol] ?? 0), bv = Number((b as any)[sortCol] ?? 0)
+    return sortDir === 'asc' ? av - bv : bv - av
+  }) : filtered
+
+  function exportCSV() {
+    const headers = ['Campanha', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
+    const rows = sorted.map(c => [c.nome, c.spend, c.impressions, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2)])
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'tiktok-campanhas.csv'
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 100)
+  }
+
+  const thS: React.CSSProperties = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left', borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap' }
+  const tdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textSecondary, borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle' }
+
+  return (
+    <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12 }}>
+      <div style={{ padding: '10px 16px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>Campanhas</span>
+        <div style={{ flex: 1 }} />
+        <input placeholder="Filtrar por nome..." value={busca} onChange={e => setBusca(e.target.value)} style={{ background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText, borderRadius: 8, padding: '5px 12px', fontSize: 13, outline: 'none', width: 200 }} />
+        <button onClick={exportCSV} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted }}>↓ CSV</button>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>
+              {(['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'cpc'] as const).map((col, i) => {
+                const labels = ['INVEST.', 'IMPR.', 'CLIQUES', 'CTR', 'CPM', 'CPC']
+                return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 ? (
+              <tr><td colSpan={7} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
+            ) : sorted.map(c => {
+              const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
+              return (
+                <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  <td style={tdS}>
+                    <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
+                    {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
+                  </td>
+                  <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
+                  <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
+                  <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.clicks)} full={fmtNumFull(c.clicks)} /></td>
+                  <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
+                  <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
+                  <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+export default function TikTokAdsPage({ theme = 'dark' }: { theme?: Theme }) {
+  const [data, setData] = useState<TikTokAccountData[] | null>(null)
+  const [nomes, setNomes] = useState<string[]>([])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [filtroCliente, setFiltroCliente] = useState('')
+  const [preset, setPreset] = useState<Preset>('mes-atual')
+  const [custom, setCustom] = useState({ start: '', end: '' })
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [cooldown, setCooldown] = useState(false)
+  const [comparar, setComparar] = useState(false)
+  const [prevData, setPrevData] = useState<TikTokAccountData[] | null>(null)
+  const [loadingPrev, setLoadingPrev] = useState(false)
+
+  const t = C[theme]
+  const periodoRef = useRef(getPeriodo('mes-atual'))
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function fetchData(p: { start: string; end: string }) {
+    setLoading(true); setError('')
+    fetch(`/api/tiktok-ads?start=${p.start}&end=${p.end}`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.error) { setError(res.error); setLoading(false); return }
+        setData(res.data ?? [])
+        if ((res.nomes ?? []).length > 0) setNomes(res.nomes)
+        setLastUpdated(new Date())
+        setLoading(false)
+      })
+      .catch(() => { setError('Erro ao carregar dados.'); setLoading(false) })
+  }
+
+  function handleManualRefresh() {
+    if (cooldown || loading) return
+    setCooldown(true)
+    fetchData(periodoRef.current)
+    if (cooldownRef.current) clearTimeout(cooldownRef.current)
+    cooldownRef.current = setTimeout(() => setCooldown(false), 30000)
+  }
+
+  function toggleComparar() {
+    if (comparar) { setComparar(false); setPrevData(null); return }
+    const prev = getPrevPeriodo(periodoRef.current)
+    setLoadingPrev(true); setComparar(true)
+    fetch(`/api/tiktok-ads?start=${prev.start}&end=${prev.end}`)
+      .then(r => r.json())
+      .then(res => { if (!res.error) setPrevData(res.data ?? []); setLoadingPrev(false) })
+      .catch(() => setLoadingPrev(false))
+  }
+
+  function aplicarPeriodo(newPreset: Preset, newCustom: { start: string; end: string }) {
+    const p = getPeriodo(newPreset, newCustom)
+    periodoRef.current = p; setPreset(newPreset); setCustom(newCustom); setFiltroCliente('')
+    setComparar(false); setPrevData(null)
+    fetchData(p)
+  }
+
+  useEffect(() => {
+    const p = getPeriodo('mes-atual')
+    periodoRef.current = p
+    fetchData(p)
+    const scheduleNext = (): ReturnType<typeof setTimeout> => {
+      const now = new Date()
+      const nextEvenHour = (Math.floor(now.getHours() / 2) * 2 + 2) % 24
+      const next = new Date(now); next.setHours(nextEvenHour, 1, 0, 0)
+      if (next <= now) next.setDate(next.getDate() + 1)
+      return setTimeout(() => {
+        const cur = periodoRef.current
+        fetch(`/api/tiktok-ads?start=${cur.start}&end=${cur.end}`).then(r => r.json()).then(res => {
+          if (!res.error) { setData(res.data ?? []); if ((res.nomes ?? []).length > 0) setNomes(res.nomes); setLastUpdated(new Date()) }
+        }).catch(() => {})
+        timer = scheduleNext()
+      }, next.getTime() - now.getTime())
+    }
+    let timer = scheduleNext()
+    return () => { clearTimeout(timer); if (cooldownRef.current) clearTimeout(cooldownRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const center: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }
+  const filtrado = (data ?? []).filter(d => !filtroCliente || d.nome === filtroCliente)
+  const selectedAccount = filtroCliente ? filtrado[0] : null
+
+  const totalSpend = filtrado.reduce((s, a) => s + a.spend, 0)
+  const totalImpressions = filtrado.reduce((s, a) => s + a.impressions, 0)
+  const totalClicks = filtrado.reduce((s, a) => s + a.clicks, 0)
+  const ctrMedio = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0
+  const cpmMedio = totalSpend > 0 && totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0
+  const cpcMedio = totalClicks > 0 ? totalSpend / totalClicks : 0
+  const freqMedio = selectedAccount ? selectedAccount.frequency : filtrado.length > 0 ? filtrado.reduce((s, a) => s + a.frequency, 0) / filtrado.length : 0
+
+  const prevFiltrado = comparar && prevData ? prevData.filter(d => !filtroCliente || d.nome === filtroCliente) : []
+  const pDelta = (curr: number, prev: number): number | null => comparar && prevData && prev > 0 ? ((curr - prev) / prev) * 100 : null
+  const prevSpend = prevFiltrado.reduce((s, a) => s + a.spend, 0)
+  const prevImpr = prevFiltrado.reduce((s, a) => s + a.impressions, 0)
+  const prevClicks = prevFiltrado.reduce((s, a) => s + a.clicks, 0)
+  const prevCtr = prevImpr > 0 ? (prevClicks / prevImpr) * 100 : 0
+  const prevCpm = prevSpend > 0 && prevImpr > 0 ? (prevSpend / prevImpr) * 1000 : 0
+  const prevCpc = prevClicks > 0 ? prevSpend / prevClicks : 0
+
+  const allCampanhas = selectedAccount ? selectedAccount.campanhas : filtrado.flatMap(a => a.campanhas).sort((a, b) => b.spend - a.spend)
+
+  const mergedSerie = (() => {
+    if (selectedAccount) return selectedAccount.serie ?? []
+    const dateMap = new Map<string, { spend: number; impressions: number; clicks: number }>()
+    for (const acc of filtrado) {
+      for (const pt of (acc.serie ?? [])) {
+        const ex = dateMap.get(pt.date) ?? { spend: 0, impressions: 0, clicks: 0 }
+        dateMap.set(pt.date, { spend: ex.spend + pt.spend, impressions: ex.impressions + pt.impressions, clicks: ex.clicks + pt.clicks })
+      }
+    }
+    return Array.from(dateMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([date, d]) => ({
+      date, ...d,
+      ctr: d.impressions > 0 ? (d.clicks / d.impressions) * 100 : 0,
+      cpc: d.clicks > 0 ? d.spend / d.clicks : 0,
+      cpm: d.impressions > 0 ? (d.spend / d.impressions) * 1000 : 0,
+    }))
+  })()
+
+  return (
+    <div style={{ padding: '20px 24px 40px', overflowY: 'auto', height: '100%', boxSizing: 'border-box', background: t.page }}>
+
+      {/* Controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <PeriodoDropdown preset={preset} custom={custom} t={t} onApply={aplicarPeriodo} />
+        <select value={filtroCliente} onChange={e => setFiltroCliente(e.target.value)} style={{ background: t.selectBg, border: `1px solid ${t.selectBorder}`, color: t.selectText, borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', outline: 'none', height: 34 }}>
+          <option value="">Todas as contas</option>
+          {nomes.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <button onClick={handleManualRefresh} disabled={cooldown || loading} title={cooldown ? 'Aguarde 30s' : 'Atualizar dados'} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: cooldown || loading ? 'not-allowed' : 'pointer', border: `1px solid ${t.border}`, background: t.filtroBtn, color: cooldown || loading ? t.textMuted : t.textSecondary, transition: 'all 0.15s', flexShrink: 0 }}>
+          <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>↻</span>
+          {lastUpdated ? `${String(lastUpdated.getHours()).padStart(2, '0')}:${String(lastUpdated.getMinutes()).padStart(2, '0')}` : 'Atualizar'}
+        </button>
+        {loading && <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: `2px solid ${TK}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
+        <button onClick={toggleComparar} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${comparar ? TK + '55' : t.border}`, background: comparar ? TK + '18' : t.filtroBtn, color: comparar ? TK : t.textSecondary, transition: 'all 0.15s', flexShrink: 0 }}>
+          ⇄ {loadingPrev ? '...' : comparar ? 'Comparando' : 'Comparar'}
+        </button>
+      </div>
+
+      {loading && !data ? (
+        <div style={center}><div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: `3px solid ${TK}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>
+      ) : error ? (
+        <div style={{ ...center, flexDirection: 'column', gap: 8 }}>
+          <span style={{ fontSize: 15, color: '#f87171' }}>Erro ao carregar dados</span>
+          <span style={{ fontSize: 13, color: t.textMuted, maxWidth: 480, textAlign: 'center' }}>{error}</span>
+        </div>
+      ) : !filtrado.length ? (
+        <div style={center}><span style={{ color: t.emptyText }}>Nenhuma conta com dados no período selecionado.</span></div>
+      ) : (
+        <>
+          {/* KPI tiles */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 20 }}>
+            <KpiTile label="Investimento" value={fmtBRL(totalSpend)} color={TILE_COLORS[0]} t={t} delta={pDelta(totalSpend, prevSpend)} />
+            <KpiTile label="Impressões" value={fmtNum(totalImpressions)} color={TILE_COLORS[1]} t={t} delta={pDelta(totalImpressions, prevImpr)} />
+            <KpiTile label="Alcance" value={selectedAccount ? fmtNum(selectedAccount.reach) : '—'} note={!selectedAccount ? 'Selecione uma conta' : undefined} color={TILE_COLORS[2]} t={t} />
+            <KpiTile label="Cliques" value={fmtNum(totalClicks)} color={TILE_COLORS[3]} t={t} delta={pDelta(totalClicks, prevClicks)} />
+            <KpiTile label="CTR Médio" value={fmtPct(ctrMedio)} color={TILE_COLORS[4]} t={t} delta={pDelta(ctrMedio, prevCtr)} />
+            <KpiTile label="CPM Médio" value={fmtBRL(cpmMedio)} color={TILE_COLORS[5]} t={t} delta={pDelta(cpmMedio, prevCpm)} />
+            <KpiTile label="CPC Médio" value={cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'} color={TILE_COLORS[6]} t={t} delta={pDelta(cpcMedio, prevCpc)} />
+            <KpiTile label="Frequência" value={freqMedio > 0 ? freqMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'} note={!selectedAccount && filtrado.length > 1 ? 'média entre contas' : undefined} color={TILE_COLORS[7]} t={t} />
+          </div>
+
+          {/* Trend chart */}
+          {mergedSerie.length > 1 && <TrendChart serie={mergedSerie} theme={theme} />}
+
+          {/* Account cards */}
+          {!filtroCliente && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+              {filtrado.map(acc => <AccountCard key={acc.id} acc={acc} totalSpend={totalSpend} t={t} />)}
+            </div>
+          )}
+
+          {/* Audiência */}
+          <AudienciaSection filtrado={filtrado} t={t} />
+
+          {/* Campaigns table */}
+          <CampanhasTable campanhas={allCampanhas} totalSpend={totalSpend} t={t} />
+        </>
       )}
     </div>
   )

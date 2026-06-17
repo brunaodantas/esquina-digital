@@ -14,6 +14,19 @@ const ADVERTISER_IDS = [
   '7646886376989982741',
 ]
 
+export interface TikTokAudienceItem {
+  label: string
+  impressions: number
+  clicks: number
+  spend: number
+}
+
+export interface TikTokAudienceData {
+  genero: TikTokAudienceItem[]
+  idade: TikTokAudienceItem[]
+  plataforma: TikTokAudienceItem[]
+}
+
 export interface TikTokAccountData {
   id: string
   nome: string
@@ -25,8 +38,9 @@ export interface TikTokAccountData {
   ctr: number
   cpc: number
   cpm: number
-  serie: { date: string; spend: number; impressions: number; clicks: number }[]
+  serie: { date: string; spend: number; impressions: number; clicks: number; ctr: number; cpc: number; cpm: number }[]
   campanhas: TikTokCampaignData[]
+  audiencia: TikTokAudienceData
 }
 
 export interface TikTokCampaignData {
@@ -46,9 +60,7 @@ const CACHE_TTL = 30 * 60 * 1000
 async function tiktokGet(path: string, params: Record<string, string>): Promise<any> {
   const url = new URL(`${BASE}${path}`)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), {
-    headers: { 'Access-Token': TOKEN },
-  })
+  const res = await fetch(url.toString(), { headers: { 'Access-Token': TOKEN } })
   if (!res.ok) throw new Error(`TikTok ${path}: HTTP ${res.status}`)
   return res.json()
 }
@@ -67,43 +79,62 @@ async function getAdvertiserNames(ids: string[]): Promise<Map<string, string>> {
   return map
 }
 
-async function getAccountMetrics(
-  advertiserId: string,
-  start: string,
-  end: string
-): Promise<{ account: { spend: number; impressions: number; clicks: number; reach: number; frequency: number; ctr: number; cpc: number; cpm: number }; serie: TikTokAccountData['serie']; campanhas: TikTokCampaignData[] }> {
-  const baseParams = {
-    advertiser_id: advertiserId,
-    report_type: 'BASIC',
-    start_date: start,
-    end_date: end,
+const GENDER_LABELS: Record<string, string> = { MALE: 'Masculino', FEMALE: 'Feminino', UNKNOWN: 'Desconhecido' }
+const PLATFORM_LABELS: Record<string, string> = { ANDROID: 'Android', IOS: 'iOS', PC: 'PC/Web', UNKNOWN: 'Outros' }
+
+async function getAudienceData(advertiserId: string, start: string, end: string): Promise<TikTokAudienceData> {
+  const base = { advertiser_id: advertiserId, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), page_size: '50' }
+
+  const [genderRes, ageRes, platformRes] = await Promise.allSettled([
+    tiktokGet('/report/integrated/get/', { ...base, dimensions: JSON.stringify(['gender']) }),
+    tiktokGet('/report/integrated/get/', { ...base, dimensions: JSON.stringify(['age']) }),
+    tiktokGet('/report/integrated/get/', { ...base, dimensions: JSON.stringify(['platform_type']) }),
+  ])
+
+  function parseItems(res: PromiseSettledResult<any>, dimKey: string, labelMap?: Record<string, string>): TikTokAudienceItem[] {
+    if (res.status !== 'fulfilled') return []
+    return (res.value?.data?.list ?? []).map((item: any) => {
+      const raw = String(item.dimensions?.[dimKey] ?? '')
+      return {
+        label: labelMap?.[raw] ?? raw,
+        impressions: Number(item.metrics?.impressions ?? 0),
+        clicks: Number(item.metrics?.clicks ?? 0),
+        spend: Number(item.metrics?.spend ?? 0),
+      }
+    }).filter((i: TikTokAudienceItem) => i.impressions > 0)
+      .sort((a: TikTokAudienceItem, b: TikTokAudienceItem) => b.impressions - a.impressions)
   }
 
-  const [accountRes, dailyRes, campRes] = await Promise.allSettled([
-    // Account-level aggregate
+  return {
+    genero: parseItems(genderRes, 'gender', GENDER_LABELS),
+    idade: parseItems(ageRes, 'age'),
+    plataforma: parseItems(platformRes, 'platform_type', PLATFORM_LABELS),
+  }
+}
+
+async function getAccountMetrics(advertiserId: string, start: string, end: string) {
+  const baseParams = { advertiser_id: advertiserId, report_type: 'BASIC', start_date: start, end_date: end }
+
+  const [accountRes, dailyRes, campRes, audRes] = await Promise.allSettled([
     tiktokGet('/report/integrated/get/', {
-      ...baseParams,
-      data_level: 'AUCTION_ADVERTISER',
+      ...baseParams, data_level: 'AUCTION_ADVERTISER',
       dimensions: JSON.stringify(['advertiser_id']),
       metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'reach', 'frequency', 'ctr', 'cpc', 'cpm']),
       page_size: '1',
     }),
-    // Daily series
     tiktokGet('/report/integrated/get/', {
-      ...baseParams,
-      data_level: 'AUCTION_ADVERTISER',
+      ...baseParams, data_level: 'AUCTION_ADVERTISER',
       dimensions: JSON.stringify(['advertiser_id', 'stat_time_day']),
       metrics: JSON.stringify(['spend', 'impressions', 'clicks']),
       page_size: '100',
     }),
-    // Campaign breakdown
     tiktokGet('/report/integrated/get/', {
-      ...baseParams,
-      data_level: 'AUCTION_CAMPAIGN',
+      ...baseParams, data_level: 'AUCTION_CAMPAIGN',
       dimensions: JSON.stringify(['campaign_id']),
       metrics: JSON.stringify(['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm', 'campaign_name']),
       page_size: '50',
     }),
+    getAudienceData(advertiserId, start, end),
   ])
 
   const account = { spend: 0, impressions: 0, clicks: 0, reach: 0, frequency: 0, ctr: 0, cpc: 0, cpm: 0 }
@@ -124,12 +155,10 @@ async function getAccountMetrics(
     for (const item of dailyRes.value?.data?.list ?? []) {
       const date = item.dimensions?.stat_time_day?.slice(0, 10) ?? ''
       if (!date) continue
-      serie.push({
-        date,
-        spend: Number(item.metrics?.spend ?? 0),
-        impressions: Number(item.metrics?.impressions ?? 0),
-        clicks: Number(item.metrics?.clicks ?? 0),
-      })
+      const spend = Number(item.metrics?.spend ?? 0)
+      const impressions = Number(item.metrics?.impressions ?? 0)
+      const clicks = Number(item.metrics?.clicks ?? 0)
+      serie.push({ date, spend, impressions, clicks, ctr: impressions > 0 ? (clicks / impressions) * 100 : 0, cpc: clicks > 0 ? spend / clicks : 0, cpm: impressions > 0 ? (spend / impressions) * 1000 : 0 })
     }
     serie.sort((a, b) => a.date.localeCompare(b.date))
   }
@@ -143,24 +172,20 @@ async function getAccountMetrics(
       campanhas.push({
         id: String(item.dimensions?.campaign_id ?? ''),
         nome: String(m.campaign_name ?? `ID ${item.dimensions?.campaign_id ?? ''}`),
-        spend,
-        impressions: Number(m.impressions ?? 0),
-        clicks: Number(m.clicks ?? 0),
-        ctr: Number(m.ctr ?? 0),
-        cpc: Number(m.cpc ?? 0),
-        cpm: Number(m.cpm ?? 0),
+        spend, impressions: Number(m.impressions ?? 0), clicks: Number(m.clicks ?? 0),
+        ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
       })
     }
     campanhas.sort((a, b) => b.spend - a.spend)
   }
 
-  return { account, serie, campanhas }
+  const audiencia: TikTokAudienceData = audRes.status === 'fulfilled' ? audRes.value : { genero: [], idade: [], plataforma: [] }
+
+  return { account, serie, campanhas, audiencia }
 }
 
 export async function GET(req: NextRequest) {
-  if (!TOKEN) {
-    return NextResponse.json({ error: 'TIKTOK_ACCESS_TOKEN não configurado.' }, { status: 500 })
-  }
+  if (!TOKEN) return NextResponse.json({ error: 'TIKTOK_ACCESS_TOKEN não configurado.' }, { status: 500 })
 
   const { searchParams } = new URL(req.url)
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
@@ -175,26 +200,18 @@ export async function GET(req: NextRequest) {
   try {
     const nomeMap = await getAdvertiserNames(ADVERTISER_IDS)
 
-    const results = (
-      await Promise.all(
-        ADVERTISER_IDS.map(async (id) => {
-          try {
-            const { account, serie, campanhas } = await getAccountMetrics(id, start, end)
-            if (account.spend === 0 && campanhas.length === 0) return null
-            return {
-              id,
-              nome: nomeMap.get(id) ?? `ID ${id}`,
-              ...account,
-              serie,
-              campanhas,
-            } as TikTokAccountData
-          } catch (e) {
-            console.error(`TikTok skip ${id}:`, e)
-            return null
-          }
-        })
-      )
-    ).filter((a): a is TikTokAccountData => a !== null)
+    const results = (await Promise.all(
+      ADVERTISER_IDS.map(async (id) => {
+        try {
+          const { account, serie, campanhas, audiencia } = await getAccountMetrics(id, start, end)
+          if (account.spend === 0 && campanhas.length === 0) return null
+          return { id, nome: nomeMap.get(id) ?? `ID ${id}`, ...account, serie, campanhas, audiencia } as TikTokAccountData
+        } catch (e) {
+          console.error(`TikTok skip ${id}:`, e)
+          return null
+        }
+      })
+    )).filter((a): a is TikTokAccountData => a !== null)
 
     results.sort((a, b) => b.spend - a.spend)
     const nomes = results.map((a) => a.nome)
