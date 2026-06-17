@@ -140,6 +140,7 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   const ytCamps: any[] = googleDados.flatMap(a => (a.campanhas ?? []).filter((c: any) => c.tipoRaw === 'VIDEO'))
   const dispCampIds = new Set(dispCamps.map(c => c.id))
   const ytCampIds = new Set(ytCamps.map(c => c.id))
+  const ytAds: any[] = googleDados.flatMap(a => (a.anuncios ?? []).filter((ad: any) => ytCampIds.has(ad.campanhaId)))
   const dispGroups: any[] = googleDados.flatMap(a => (a.grupos ?? []).filter((g: any) => dispCampIds.has(g.campanhaId)))
 
   const dispImpr = dispCamps.reduce((s, c) => s + c.impressoes, 0)
@@ -275,7 +276,10 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   const chartScripts: string[] = []
   if (dispImpr > 0 && topDisp.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-display'),${barChartJson(topDisp.map(g => cleanName(g.nome)), topDisp.map(g => g.cliques), '#1A3CFF')});`)
   const ytUseViews = ytViews > 0
-  const topYTSorted = ytUseViews ? [...ytCamps].sort((a, b) => b.videoViews - a.videoViews).slice(0, 5) : [...ytCamps].sort((a, b) => b.impressoes - a.impressoes).slice(0, 5)
+  const ytChartItems = ytAds.length > 0 ? ytAds : ytCamps
+  const topYTSorted = ytUseViews
+    ? [...ytChartItems].sort((a, b) => b.videoViews - a.videoViews).slice(0, 3)
+    : [...ytChartItems].sort((a, b) => b.impressoes - a.impressoes).slice(0, 3)
   if (ytImpr > 0 && topYTSorted.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-youtube'),${barChartJson(topYTSorted.map(c => cleanName(c.nome)), topYTSorted.map(c => ytUseViews ? c.videoViews : c.impressoes), '#FF4444')});`)
   if (finalTDImpr > 0 && topTD.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-meta-td'),${barChartJson(topTD.map(c => cleanName(c.nome)), topTD.map(c => c.impressions), '#7B2FBE')});`)
   if (hasVPData && topVP.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-meta-vp'),${barChartJson(topVP.map(c => cleanName(c.nome)), topVP.map(c => c.impressions), '#C44A00')});`)
@@ -494,7 +498,7 @@ ${showDisplay ? fullSection('display', '#1A3CFF', 'Google Display', 'Google Disp
 
 ${showYoutube ? fullSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Visualizações, cliques e inscritos · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(ytImpr), 'Total') + kpiCard('Visualizações', fmtK(ytViews), 'Total') + kpiCard('Cliques', fmtK(ytCliques), 'Total') + kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
-  'ch-youtube', ytUseViews ? 'Campanhas por Visualizações' : 'Campanhas por Impressões', googleAudHtml('#FF4444'), analysisYoutube()) : ''}
+  'ch-youtube', ytUseViews ? (ytAds.length > 0 ? 'Top 3 Anúncios por Visualizações' : 'Campanhas por Visualizações') : (ytAds.length > 0 ? 'Top 3 Anúncios por Impressões' : 'Campanhas por Impressões'), googleAudHtml('#FF4444'), analysisYoutube()) : ''}
 
 ${showTD ? fullSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(finalTDImpr), 'Total') + kpiCard('Alcance', fmtK(finalTDReach), 'Únicos') + kpiCard('Engajamentos', fmtK(finalTDCliques), 'Cliques') + kpiCard('Frequência', fmtF2(finalTDFreq) + 'x', 'Média'),

@@ -107,6 +107,7 @@ export interface AdData {
   grupoNome: string
   campanhaId: string
   campanhaNome: string
+  tipoRaw?: string
   cliques: number
   impressoes: number
   videoViews: number
@@ -234,8 +235,8 @@ export async function GET(req: NextRequest) {
               gaql(acc.id,
                 `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status,
                    ad_group.id, ad_group.name,
-                   campaign.id, campaign.name,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                   campaign.id, campaign.name, campaign.advertising_channel_type,
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
                  FROM ad_group_ad
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND ad_group_ad.status != 'REMOVED'
@@ -332,6 +333,7 @@ export async function GET(req: NextRequest) {
               const imp = Number(m.impressions ?? 0)
               const custo = Number(m.costMicros ?? 0) / 1_000_000
               const conv = Number(m.conversions ?? 0)
+              const vv = Number(m.videoViews ?? 0)
               const ex = adMap.get(adid)
               const rawName = (ada.ad?.name ?? '').trim()
               if (!ex) {
@@ -340,11 +342,12 @@ export async function GET(req: NextRequest) {
                   status: ada.status === 'PAUSED' ? 'pausado' : 'ativo',
                   grupoId: String(ag.id ?? ''), grupoNome: (ag.name ?? '').trim(),
                   campanhaId: String(camp.id ?? ''), campanhaNome: (camp.name ?? '').trim(),
-                  cliques: cl, impressoes: imp, videoViews: 0, custo, conversoes: conv,
+                  tipoRaw: (camp.advertisingChannelType ?? 'UNKNOWN') as string,
+                  cliques: cl, impressoes: imp, videoViews: vv, custo, conversoes: conv,
                   ...buildMetrics(cl, imp, custo, conv),
                 })
               } else {
-                ex.cliques += cl; ex.impressoes += imp; ex.custo += custo; ex.conversoes += conv
+                ex.cliques += cl; ex.impressoes += imp; ex.videoViews = (ex.videoViews ?? 0) + vv; ex.custo += custo; ex.conversoes += conv
                 Object.assign(ex, buildMetrics(ex.cliques, ex.impressoes, ex.custo, ex.conversoes))
               }
             }
@@ -414,8 +417,9 @@ export async function GET(req: NextRequest) {
             }
 
             const custo = custoMicros / 1_000_000
+            const videoViews = Array.from(campMap.values()).reduce((s, c) => s + c.videoViews, 0)
             return {
-              id: acc.id, nome: acc.nome, cliques, impressoes, videoViews: 0, custo, conversoes,
+              id: acc.id, nome: acc.nome, cliques, impressoes, videoViews, custo, conversoes,
               ...buildMetrics(cliques, impressoes, custo, conversoes),
               campanhas: Array.from(campMap.values()).filter(c => c.custo > 0).sort((a, b) => b.custo - a.custo),
               grupos: Array.from(agMap.values()).filter(g => g.custo > 0).sort((a, b) => b.custo - a.custo),
