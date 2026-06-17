@@ -217,7 +217,7 @@ export async function GET(req: NextRequest) {
             const [campRows, agRows, adRows, dailyRows, geoRows] = await Promise.all([
               gaql(acc.id,
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'`,
@@ -277,17 +277,18 @@ export async function GET(req: NextRequest) {
 
               const ex = campMap.get(cid)
               const custo = cm / 1_000_000
+              const vv = Number(m.videoViews ?? 0)
               if (!ex) {
                 const tipoRaw = (c.advertisingChannelType ?? 'UNKNOWN') as string
                 campMap.set(cid, {
                   id: cid, nome: (c.name ?? '').trim(),
                   tipo: TIPO_MAP[tipoRaw] ?? tipoRaw, tipoRaw,
                   status: c.status === 'PAUSED' ? 'pausado' : 'ativo',
-                  cliques: cl, impressoes: imp, videoViews: 0, custo, conversoes: conv,
+                  cliques: cl, impressoes: imp, videoViews: vv, custo, conversoes: conv,
                   ...buildMetrics(cl, imp, custo, conv),
                 })
               } else {
-                ex.cliques += cl; ex.impressoes += imp; ex.custo += custo; ex.conversoes += conv
+                ex.cliques += cl; ex.impressoes += imp; ex.videoViews += vv; ex.custo += custo; ex.conversoes += conv
                 Object.assign(ex, buildMetrics(ex.cliques, ex.impressoes, ex.custo, ex.conversoes))
               }
             }

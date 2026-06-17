@@ -202,7 +202,7 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 
   // ── Top items for charts ──
   const topDisp = [...dispGroups].sort((a, b) => b.cliques - a.cliques).slice(0, 5)
-  const topYT = [...ytCamps].sort((a, b) => b.videoViews - a.videoViews).slice(0, 5)
+
   const topTD = [...finalTDCamps].sort((a, b) => b.impressions - a.impressions).slice(0, 5)
   const topVP = [...vpCamps].sort((a, b) => b.impressions - a.impressions).slice(0, 5)
 
@@ -274,7 +274,9 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 
   const chartScripts: string[] = []
   if (dispImpr > 0 && topDisp.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-display'),${barChartJson(topDisp.map(g => cleanName(g.nome)), topDisp.map(g => g.cliques), '#1A3CFF')});`)
-  if (ytImpr > 0 && topYT.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-youtube'),${barChartJson(topYT.map(c => cleanName(c.nome)), topYT.map(c => c.videoViews), '#FF4444')});`)
+  const ytUseViews = ytViews > 0
+  const topYTSorted = ytUseViews ? [...ytCamps].sort((a, b) => b.videoViews - a.videoViews).slice(0, 5) : [...ytCamps].sort((a, b) => b.impressoes - a.impressoes).slice(0, 5)
+  if (ytImpr > 0 && topYTSorted.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-youtube'),${barChartJson(topYTSorted.map(c => cleanName(c.nome)), topYTSorted.map(c => ytUseViews ? c.videoViews : c.impressoes), '#FF4444')});`)
   if (finalTDImpr > 0 && topTD.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-meta-td'),${barChartJson(topTD.map(c => cleanName(c.nome)), topTD.map(c => c.impressions), '#7B2FBE')});`)
   if (hasVPData && topVP.length > 0) chartScripts.push(`new Chart(document.getElementById('ch-meta-vp'),${barChartJson(topVP.map(c => cleanName(c.nome)), topVP.map(c => c.impressions), '#C44A00')});`)
   if (tiktokImpressoes > 0) chartScripts.push(`new Chart(document.getElementById('ch-tiktok'),${JSON.stringify({ type: 'bar', data: { labels: ['Impressões', 'Cliques'], datasets: [{ data: [tiktokImpressoes, tiktokCliques], backgroundColor: ['#00994D', '#00994D66'], borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#888', font: { size: 10 } } }, y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#555', font: { size: 10 } } } } } })});`)
@@ -492,7 +494,7 @@ ${showDisplay ? fullSection('display', '#1A3CFF', 'Google Display', 'Google Disp
 
 ${showYoutube ? fullSection('youtube', '#FF4444', 'YouTube', 'YouTube', `Visualizações, cliques e inscritos · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(ytImpr), 'Total') + kpiCard('Visualizações', fmtK(ytViews), 'Total') + kpiCard('Cliques', fmtK(ytCliques), 'Total') + kpiCard(ytConv > 0 ? 'Novos Inscritos' : 'Campanhas', ytConv > 0 ? fmtK(ytConv) : String(ytCamps.length), ytConv > 0 ? 'Conversões' : 'Ativas'),
-  'ch-youtube', 'Campanhas por Visualizações', googleAudHtml('#FF4444'), analysisYoutube()) : ''}
+  'ch-youtube', ytUseViews ? 'Campanhas por Visualizações' : 'Campanhas por Impressões', googleAudHtml('#FF4444'), analysisYoutube()) : ''}
 
 ${showTD ? fullSection('meta-td', '#7B2FBE', 'Meta — Temas Diversos', 'Meta Temas Diversos', `Impressões, alcance e frequência · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(finalTDImpr), 'Total') + kpiCard('Alcance', fmtK(finalTDReach), 'Únicos') + kpiCard('Engajamentos', fmtK(finalTDCliques), 'Cliques') + kpiCard('Frequência', fmtF2(finalTDFreq) + 'x', 'Média'),
@@ -502,9 +504,22 @@ ${showVP ? fullSection('meta-vp', '#C44A00', 'Meta — Visitas ao Perfil', 'Meta
   kpiCard('Impressões', fmtK(vpImpr), 'Total') + kpiCard('Alcance', fmtK(vpReach), 'Únicos') + kpiCard('Visitas ao Perfil', visitasPerfil > 0 ? fmtK(visitasPerfil) : '—', 'Instagram') + kpiCard('Frequência', fmtF2(vpFreq) + 'x', 'Média'),
   'ch-meta-vp', 'Campanhas por Impressões', metaAudHtml('#C44A00'), analysisVP()) : ''}
 
-${showTiktok ? fullSection('tiktok', '#00994D', 'TikTok', 'TikTok', `Impressões, cliques e CTR · ${periodoLabel}`,
+${showTiktok && tiktokImpressoes > 0 ? fullSection('tiktok', '#00994D', 'TikTok', 'TikTok', `Impressões, cliques e CTR · ${periodoLabel}`,
   kpiCard('Impressões', fmtK(tiktokImpressoes), 'Total') + kpiCard('Cliques', fmtK(tiktokCliques), 'Destino') + kpiCard('CTR', fmtPct2(tiktokCtr), 'Taxa de clique') + kpiCard('—', '—', ''),
   'ch-tiktok', 'Impressões vs Cliques', '<p class="aud-empty">Dados demográficos via TikTok Ads Manager</p>', analysisTiktok()) : ''}
+${showTiktok && tiktokImpressoes === 0 ? `
+<section id="tiktok" class="plat-section">
+  <div class="slide-inner">
+    <div class="sec-head">
+      <div class="plat-badge" style="background:#00994D18;color:#00994D">TikTok</div>
+      <h2 class="sec-title">TikTok</h2>
+      <p class="sec-sub">Impressões, cliques e CTR · ${periodoLabel}</p>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;flex:1;color:#999;font-size:14px;padding:40px 0">
+      Sem dados de TikTok no período selecionado para este cliente.
+    </div>
+  </div>
+</section>` : ''}
 
 ${secoes.diagnostico || secoes.conclusao ? `
 <section id="diag">
