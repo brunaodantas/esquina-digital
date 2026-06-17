@@ -216,6 +216,24 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  // ── DEBUG: testa nomes de campo de visualizações de vídeo ──
+  if (searchParams.get('debug') === 'vv') {
+    const token = await getToken()
+    const cid = '5619636645' // BIODIESEL (tem campanhas YouTube)
+    const out: Record<string, any> = {}
+    const fields = ['metrics.video_views', 'metrics.video_view_rate', 'metrics.video_quartile_p100_rate', 'metrics.engagements']
+    for (const f of fields) {
+      try {
+        const rows = await gaql(cid,
+          `SELECT campaign.id, ${f} FROM campaign
+           WHERE segments.date BETWEEN '${start}' AND '${end}'
+             AND campaign.advertising_channel_type = 'VIDEO' AND metrics.impressions > 0 LIMIT 3`, token)
+        out[f] = { ok: true, sample: rows.slice(0, 2).map((r: any) => r.metrics) }
+      } catch (e: any) { out[f] = { error: String(e?.message ?? e).slice(0, 200) } }
+    }
+    return NextResponse.json({ debug: 'vv', period: { start, end }, out })
+  }
+
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
