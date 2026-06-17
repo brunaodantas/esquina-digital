@@ -89,6 +89,24 @@ Página em `app/dashboard/tiktok-ads/page.tsx`, rota em `app/api/tiktok-ads/rout
 
 **Cache versionado:** `CACHE_V = 'v5'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
 
+## matchNome — filtragem fuzzy de clientes
+
+`matchNome(accNome, query)` é uma função de nível de módulo em `dashboard/page.tsx` (antes de `buildRelatorioHTML`). Normaliza ambos os nomes (lowercase, sem acentos, sem pontuação), extrai palavras com mais de 2 chars e verifica sobreposição.
+
+**Regra obrigatória**: qualquer filtro de nome de conta por `clienteSelecionado` deve usar `matchNome()`, nunca `===`. Contas do mesmo cliente têm nomes diferentes por plataforma (ex: "PMC – Prefeitura de Campinas" no Meta vs "PMC-CAMPINAS" no Google Ads vs "PMC Campinas" no TikTok).
+
+### Audiência TikTok no PDF (buildRelatorioHTML)
+
+`buildRelatorioHTML` recebe `tiktokDados: any[]` (array de contas filtradas, não só escalares). A função agrega `audiencia.genero`, `audiencia.idade`, `audiencia.plataforma` e exibe barras via `tiktokAudHtml('#00994D')` na seção TikTok — mesmo padrão da Meta. O KPI card 4 mostra CPM quando disponível.
+
+### Diagnóstico qualitativo (buildRelatorioHTML)
+
+Cada bullet do Diagnóstico cruza o dado numérico com uma interpretação contextual:
+- CTR Display: compara com benchmark de 0,4% para programático
+- YouTube VTR: compara com 25% como referência para in-stream
+- Meta frequência: < 1,5x = baixa; 1,5–2,5x = adequada; > 2,5x = avaliar rotação
+- TikTok CTR: < 0,3% = revisar criativos; 0,3–1,0% = dentro da faixa; > 1,0% = acima da média
+
 ## Correções de bug conhecidas
 
 ### Exportação CSV abre nova aba (corrigido)
