@@ -8,7 +8,7 @@ interface MetaAccountRef { id: string; nome: string; moeda: string }
 // Nomes "bonitos" opcionais por ID — vencem o nome da API quando preenchidos.
 // No Meta o `name` da conta já costuma ser bom; preencher só quando vier nome interno feio.
 const NAME_OVERRIDES: Record<string, string> = {
-  '930277249802740': 'Algoritmica', // API devolve "ALGORITMICA_BACKUP01"
+  '930277249802740': 'Algoritmica Backup 01', // API devolve "ALGORITMICA_BACKUP01"
 }
 
 // Contas que NÃO devem aparecer no painel mesmo tendo gasto (deny-list opcional).
