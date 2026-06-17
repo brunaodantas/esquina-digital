@@ -577,8 +577,6 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
   const [seguidoresSemana, setSeguidoresSemana] = useState('')
   const [seguidoresMes, setSeguidoresMes] = useState('')
   const [visitasPerfil, setVisitasPerfil] = useState('')
-  const [tiktokImpressoes, setTiktokImpressoes] = useState('')
-  const [tiktokCliques, setTiktokCliques] = useState('')
   const [gerando, setGerando] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -613,10 +611,22 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
   async function gerar() {
     if (!clienteSelecionado || !periodoStart || !periodoEnd) return
     setGerando(true); setErro('')
+
+    // Match fuzzy: compara palavras significativas (>2 chars) entre nomes de conta e cliente selecionado
+    function matchNome(accNome: string, query: string): boolean {
+      if (accNome === query) return true
+      const normalize = (s: string) => s.toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2)
+      const accWords = new Set(normalize(accNome))
+      return normalize(query).some(w => accWords.has(w))
+    }
+
     try {
-      const [metaRes, googleRes, chartJsText, logoData] = await Promise.all([
+      const [metaRes, googleRes, tiktokRes, chartJsText, logoData] = await Promise.all([
         fetch(`/api/meta-ads?start=${periodoStart}&end=${periodoEnd}`).then(r => r.json()).catch(() => ({ data: [] })),
         fetch(`/api/google-ads?start=${periodoStart}&end=${periodoEnd}`).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`/api/tiktok-ads?start=${periodoStart}&end=${periodoEnd}`).then(r => r.json()).catch(() => ({ data: [] })),
         fetch('https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js').then(r => r.text()).catch(() => ''),
         fetch('/logo-esquina.png').then(r => r.arrayBuffer()).then(buf => {
           let binary = ''
@@ -625,8 +635,11 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
         }).catch(() => ''),
       ])
 
-      const metaDados = (metaRes.data ?? []).filter((a: any) => a.nome === clienteSelecionado)
-      const googleDados = (googleRes.data ?? []).filter((a: any) => a.nome === clienteSelecionado)
+      const metaDados = (metaRes.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!))
+      const googleDados = (googleRes.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!))
+      const tiktokDadosPDF = (tiktokRes.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!))
+      const tiktokImpressoesPDF = tiktokDadosPDF.reduce((s: number, a: any) => s + (a.impressions ?? 0), 0)
+      const tiktokCliquesPDF = tiktokDadosPDF.reduce((s: number, a: any) => s + (a.clicks ?? 0), 0)
 
       const html = buildRelatorioHTML({
         cliente: clienteSelecionado,
@@ -635,8 +648,8 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
         seguidoresSemana: Number(seguidoresSemana) || 0,
         seguidoresMes: Number(seguidoresMes) || 0,
         visitasPerfil: Number(visitasPerfil) || 0,
-        tiktokImpressoes: Number(tiktokImpressoes) || 0,
-        tiktokCliques: Number(tiktokCliques) || 0,
+        tiktokImpressoes: tiktokImpressoesPDF,
+        tiktokCliques: tiktokCliquesPDF,
         chartJsText,
         logoB64: logoData,
       })
@@ -739,8 +752,6 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
               ['Seguidores novos (semana)', seguidoresSemana, setSeguidoresSemana],
               ['Seguidores novos (mês)', seguidoresMes, setSeguidoresMes],
               ['Visitas ao perfil', visitasPerfil, setVisitasPerfil],
-              ['TikTok – Impressões', tiktokImpressoes, setTiktokImpressoes],
-              ['TikTok – Cliques', tiktokCliques, setTiktokCliques],
             ].map(([label, val, setter]) => (
               <div key={label as string}>
                 <div style={{ fontSize: 10, color: '#555', marginBottom: 4 }}>{label as string}</div>

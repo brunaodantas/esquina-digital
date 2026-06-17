@@ -67,7 +67,7 @@ Quarto botão no header do dashboard (cor verde, ícone ✉). Abre um modal com:
 
 Frequência Meta Ads calculada como `impressões / alcance` (matematicamente correto ao agregar múltiplas contas).
 
-**Regra crítica — filtro de cliente obrigatório:** O campo cliente não é mais texto livre. Sem seleção no autocomplete o botão "Gerar Relatório" fica desabilitado. O filtro aplica `a.nome === clienteSelecionado` nos arrays de Meta e Google antes de calcular qualquer métrica, garantindo que nunca sejam somados dados de todos os clientes juntos.
+**Regra crítica — filtro de cliente obrigatório:** O campo cliente não é mais texto livre. Sem seleção no autocomplete o botão "Gerar Relatório" fica desabilitado. O filtro usa `matchNome()` — normaliza nomes (minúsculas, sem acentos, sem pontuação) e verifica sobreposição de palavras significativas (>2 chars). Isso resolve o mismatch entre nomes do mesmo cliente em plataformas diferentes (ex: "PMC – Prefeitura de Campinas" no Meta vs "PMC - CAMPINAS" no Google Ads).
 
 **Audiência no relatório WA:**
 - Meta: Alcance, Frequência + breakdown de Gênero, Faixa etária e Dispositivos (% de impressões)
@@ -85,6 +85,29 @@ document.body.removeChild(a)
 setTimeout(() => URL.revokeObjectURL(url), 100)
 ```
 Aplicado em `meta-ads/page.tsx` e `google-ads/page.tsx`.
+
+## Botão Boletim PDF (dashboard/page.tsx)
+
+Quinto botão no header (cor azul, ícone 📄). Abre `RelatorioSemanalModal` que gera um relatório semanal em slides HTML com `window.print()` automático.
+
+**Arquitetura:**
+- 100% client-side, zero custo: sem API routes, sem serverless, sem Playwright no servidor
+- Modal: cliente (autocomplete igual ao WA), período (date pickers), seções (checkboxes), dados manuais (seguidores, visitas ao perfil — campos de TikTok removidos pois os dados vêm da API)
+- `gerar()`: fetches `/api/meta-ads`, `/api/google-ads`, `/api/tiktok-ads`, Chart.js CDN, `/logo-esquina.png` em paralelo → `buildRelatorioHTML()` → `window.open()` → `window.print()` após 1,5s
+- `buildRelatorioHTML()`: gera HTML completo autocontido com Chart.js inline, logo base64, CSS `@media print A4 landscape`
+
+**Separação de campanhas:**
+- Google Display: `tipoRaw === 'DISPLAY'`
+- YouTube: `tipoRaw === 'VIDEO'`; conversões = inscritos
+- Meta TD: campanhas cujo nome NÃO contém `/\bvp\b|visita|perfil/i`
+- Meta VP: campanhas cujo nome contém esse padrão (se não existirem, toda a Meta cai em TD)
+
+**Logo:** `public/logo-esquina.png` (copiada de `templates/assets/logo-esquina.png`)
+
+**beforeprint handler:** redimensiona canvases com alturas por número de barras: 5+=200px, 4=175px, ≤3=160px, donut=220px
+
+**Seções geradas (cada uma = 1 página A4 paisagem):**
+Hero → Google Display → YouTube → Meta TD → Meta VP → TikTok → Diagnóstico → Conclusão → Footer
 
 ## Deploy
 Push para `main` no GitHub dispara deploy automático na Vercel (conta `bruno@esquina.online`).
