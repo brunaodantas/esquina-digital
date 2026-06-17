@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { AccountData, CampaignData, AdGroupData, AdData, DailyPoint } from '@/app/api/google-ads/route'
+import type { AccountData, CampaignData, AdGroupData, AdData, DailyPoint, AudienceData } from '@/app/api/google-ads/route'
 
 type Theme = 'dark' | 'light'
 type Preset = 'personalizado' | 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'ytd-2026'
@@ -372,6 +372,63 @@ function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: num
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Audiência Section ─────────────────────────────────────────────────────────
+function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof C['dark'] }) {
+  function aggregate(key: keyof AudienceData) {
+    const map = new Map<string, { impressoes: number; cliques: number; custo: number }>()
+    for (const acc of filtrado) {
+      for (const item of acc.audiencia?.[key] ?? []) {
+        const ex = map.get(item.label) ?? { impressoes: 0, cliques: 0, custo: 0 }
+        map.set(item.label, { impressoes: ex.impressoes + item.impressoes, cliques: ex.cliques + item.cliques, custo: ex.custo + item.custo })
+      }
+    }
+    const items = Array.from(map.entries()).map(([label, v]) => ({ label, ...v, pct: 0 }))
+    const total = items.reduce((s, i) => s + i.impressoes, 0)
+    items.forEach(i => { i.pct = total > 0 ? Math.round((i.impressoes / total) * 1000) / 10 : 0 })
+    return items.sort((a, b) => b.impressoes - a.impressoes)
+  }
+
+  const genero = aggregate('genero')
+  const idade = aggregate('idade')
+  const dispositivos = aggregate('dispositivos')
+  if (!genero.length && !idade.length && !dispositivos.length) return null
+
+  const barColors = ['#4dabf7', '#c77dff', '#56cfe1', '#74c69d', '#ffd166', '#ff9f1c']
+
+  function BreakdownGroup({ title, items }: { title: string; items: ReturnType<typeof aggregate> }) {
+    if (!items.length) return null
+    return (
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {items.map((item, i) => (
+            <div key={item.label}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: t.textSecondary }}>{item.label}</span>
+                <span style={{ fontSize: 12, color: t.textMuted }}>{item.pct.toFixed(1).replace('.', ',')}%</span>
+              </div>
+              <div style={{ height: 6, background: t.barTrack, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${item.pct}%`, background: barColors[i % barColors.length], borderRadius: 3, transition: 'width 0.4s ease' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 16 }}>Audiência</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28 }}>
+        <BreakdownGroup title="Gênero" items={genero} />
+        <BreakdownGroup title="Idade" items={idade} />
+        <BreakdownGroup title="Dispositivos" items={dispositivos} />
+      </div>
     </div>
   )
 }
@@ -880,6 +937,8 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
               {filtrado.map(acc => <AccountCard key={acc.id} acc={acc} totalCusto={totalCusto} t={t} />)}
             </div>
           )}
+          {/* Audiência breakdown */}
+          <AudienciaSection filtrado={filtrado} t={t} />
           {/* Cidades breakdown */}
           <CidadesSection filtrado={filtrado} t={t} />
 

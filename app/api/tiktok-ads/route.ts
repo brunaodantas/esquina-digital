@@ -68,14 +68,44 @@ export interface TikTokCampaignData {
 
 let _cache: { key: string; ts: number; data: TikTokAccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v8'
+const CACHE_V = 'v9'
 
-async function tiktokGet(path: string, params: Record<string, string>): Promise<any> {
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+// Códigos de rate limit / throttle do TikTok que valem retry
+const THROTTLE_CODES = new Set([40100, 40016, 50002, 51000])
+
+async function tiktokGet(path: string, params: Record<string, string>, retries = 3): Promise<any> {
   const url = new URL(`${BASE}${path}`)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), { headers: { 'Access-Token': TOKEN } })
-  if (!res.ok) throw new Error(`TikTok ${path}: HTTP ${res.status}`)
-  return res.json()
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(url.toString(), { headers: { 'Access-Token': TOKEN } })
+    if (res.status === 429 || res.status >= 500) {
+      if (attempt < retries) { await sleep(400 * (attempt + 1) + Math.floor(attempt * 150)); continue }
+      throw new Error(`TikTok ${path}: HTTP ${res.status}`)
+    }
+    if (!res.ok) throw new Error(`TikTok ${path}: HTTP ${res.status}`)
+    const json = await res.json()
+    // Throttle reportado no corpo com HTTP 200
+    if (THROTTLE_CODES.has(json?.code) && attempt < retries) {
+      await sleep(400 * (attempt + 1)); continue
+    }
+    return json
+  }
+}
+
+// Executa tarefas com limite de concorrência (evita estourar o QPS do TikTok)
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let next = 0
+  async function worker() {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i], i)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
 }
 
 async function getAdvertiserNames(ids: string[]): Promise<Map<string, string>> {
@@ -99,44 +129,37 @@ async function getAdvertiserNames(ids: string[]): Promise<Map<string, string>> {
   return map
 }
 
-const GENDER_LABELS: Record<string, string> = { MALE: 'Masculino', FEMALE: 'Feminino', UNKNOWN: 'Desconhecido' }
-const PLATFORM_LABELS: Record<string, string> = { ANDROID: 'Android', IOS: 'iOS', PC: 'PC/Web', UNKNOWN: 'Outros' }
+// Dimensões confirmadas via probe na API (escopo de reporting):
+//   gender → MALE/FEMALE/NONE · age → AGE_18_24…AGE_55_100/NONE · platform → ANDROID/IPHONE/IPAD/WAP
+//   platform_type, device_*, os_* → NÃO suportados (40002)
+const GENDER_LABELS: Record<string, string> = { MALE: 'Masculino', FEMALE: 'Feminino', NONE: 'Não identificado', UNKNOWN: 'Não identificado' }
+const AGE_LABELS: Record<string, string> = {
+  AGE_13_17: '13-17', AGE_18_24: '18-24', AGE_25_34: '25-34', AGE_35_44: '35-44',
+  AGE_45_54: '45-54', AGE_55_100: '55+', NONE: 'Não identificado',
+}
+const PLATFORM_LABELS: Record<string, string> = { ANDROID: 'Android', IPHONE: 'iPhone', IPAD: 'iPad', WAP: 'Web', PC: 'PC/Web', UNKNOWN: 'Outros' }
 
-async function getAudienceData(advertiserId: string, start: string, end: string): Promise<TikTokAudienceData> {
-  const base = { advertiser_id: advertiserId, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), page_size: '50' }
-
-  const [genderRes, ageRes, platformRes] = await Promise.allSettled([
-    tiktokGet('/report/integrated/get/', { ...base, dimensions: JSON.stringify(['gender']) }),
-    tiktokGet('/report/integrated/get/', { ...base, dimensions: JSON.stringify(['age']) }),
-    tiktokGet('/report/integrated/get/', { ...base, dimensions: JSON.stringify(['platform_type']) }),
-  ])
-
-  function parseItems(res: PromiseSettledResult<any>, dimKey: string, labelMap?: Record<string, string>): TikTokAudienceItem[] {
-    if (res.status !== 'fulfilled') return []
-    return (res.value?.data?.list ?? []).map((item: any) => {
-      const raw = String(item.dimensions?.[dimKey] ?? '')
-      return {
-        label: labelMap?.[raw] ?? raw,
-        impressions: Number(item.metrics?.impressions ?? 0),
-        clicks: Number(item.metrics?.clicks ?? 0),
-        spend: Number(item.metrics?.spend ?? 0),
-      }
-    }).filter((i: TikTokAudienceItem) => i.impressions > 0)
-      .sort((a: TikTokAudienceItem, b: TikTokAudienceItem) => b.impressions - a.impressions)
-  }
-
-  return {
-    genero: parseItems(genderRes, 'gender', GENDER_LABELS),
-    idade: parseItems(ageRes, 'age'),
-    plataforma: parseItems(platformRes, 'platform_type', PLATFORM_LABELS),
-  }
+function parseAudItems(res: PromiseSettledResult<any>, dimKey: string, labelMap?: Record<string, string>): TikTokAudienceItem[] {
+  if (res.status !== 'fulfilled') return []
+  return (res.value?.data?.list ?? []).map((item: any) => {
+    const raw = String(item.dimensions?.[dimKey] ?? '')
+    return {
+      label: labelMap?.[raw] ?? raw,
+      impressions: Number(item.metrics?.impressions ?? 0),
+      clicks: Number(item.metrics?.clicks ?? 0),
+      spend: Number(item.metrics?.spend ?? 0),
+    }
+  }).filter((i: TikTokAudienceItem) => i.impressions > 0)
+    .sort((a: TikTokAudienceItem, b: TikTokAudienceItem) => b.impressions - a.impressions)
 }
 
 async function getAccountMetrics(advertiserId: string, start: string, end: string) {
   const baseParams = { advertiser_id: advertiserId, report_type: 'BASIC', start_date: start, end_date: end }
 
-  const campMetrics = JSON.stringify(['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm'])
-  const [accountRes, dailyRes, campResWithName, campResNoName, audRes, adNamesRes] = await Promise.allSettled([
+  // campaign_name vem como MÉTRICA (confirmado via probe); como dimensão dá 40002.
+  const campMetrics = JSON.stringify(['campaign_name', 'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm'])
+  const audBase = { advertiser_id: advertiserId, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), page_size: '50' }
+  const [accountRes, dailyRes, campRes, genderRes, ageRes, platformRes] = await Promise.allSettled([
     tiktokGet('/report/integrated/get/', {
       ...baseParams, data_level: 'AUCTION_ADVERTISER',
       dimensions: JSON.stringify(['advertiser_id']),
@@ -149,28 +172,15 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
       metrics: JSON.stringify(['spend', 'impressions', 'clicks']),
       page_size: '100',
     }),
-    // Tenta campaign_name como dimensão no nível de campanha
-    tiktokGet('/report/integrated/get/', {
-      ...baseParams, data_level: 'AUCTION_CAMPAIGN',
-      dimensions: JSON.stringify(['campaign_id', 'campaign_name']),
-      metrics: campMetrics,
-      page_size: '50',
-    }),
-    // Fallback garantido sem campaign_name (sempre funciona)
     tiktokGet('/report/integrated/get/', {
       ...baseParams, data_level: 'AUCTION_CAMPAIGN',
       dimensions: JSON.stringify(['campaign_id']),
       metrics: campMetrics,
-      page_size: '50',
+      page_size: '100',
     }),
-    getAudienceData(advertiserId, start, end),
-    // Nível de anúncio: campaign_name sempre disponível como dimensão no escopo de reporting
-    tiktokGet('/report/integrated/get/', {
-      ...baseParams, data_level: 'AUCTION_AD',
-      dimensions: JSON.stringify(['campaign_id', 'campaign_name']),
-      metrics: JSON.stringify(['spend']),
-      page_size: '200',
-    }),
+    tiktokGet('/report/integrated/get/', { ...audBase, dimensions: JSON.stringify(['gender']) }),
+    tiktokGet('/report/integrated/get/', { ...audBase, dimensions: JSON.stringify(['age']) }),
+    tiktokGet('/report/integrated/get/', { ...audBase, dimensions: JSON.stringify(['platform']) }),
   ])
 
   const account = { spend: 0, impressions: 0, clicks: 0, reach: 0, frequency: 0, ctr: 0, cpc: 0, cpm: 0 }
@@ -199,43 +209,12 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     serie.sort((a, b) => a.date.localeCompare(b.date))
   }
 
-  // Constrói mapa campaign_id → campaign_name a partir de múltiplas fontes
-  const campNamesMap = new Map<string, string>()
-
-  // Fonte 1: campaign_name como dimensão no AUCTION_CAMPAIGN (pode não ser suportado)
-  const withNameOk = campResWithName.status === 'fulfilled' && campResWithName.value?.code === 0
-  const withNameList: any[] = withNameOk ? campResWithName.value?.data?.list ?? [] : []
-  for (const item of withNameList) {
-    const cid = String(item.dimensions?.campaign_id ?? '')
-    const cname = String(item.dimensions?.campaign_name ?? '').trim()
-    if (cid && cname) campNamesMap.set(cid, cname)
-  }
-  if (campResWithName.status === 'fulfilled' && campResWithName.value?.code !== 0) {
-    console.error(`TikTok camp+name ${advertiserId}: code=${campResWithName.value?.code} msg=${campResWithName.value?.message}`)
-  }
-
-  // Fonte 2: AUCTION_AD — campaign_name está sempre disponível como dimensão no nível de anúncio
-  if (adNamesRes.status === 'fulfilled' && adNamesRes.value?.code === 0) {
-    for (const item of adNamesRes.value?.data?.list ?? []) {
-      const cid = String(item.dimensions?.campaign_id ?? '')
-      const cname = String(item.dimensions?.campaign_name ?? '').trim()
-      if (cid && cname && !campNamesMap.has(cid)) campNamesMap.set(cid, cname)
-    }
-  } else if (adNamesRes.status === 'fulfilled' && adNamesRes.value?.code !== 0) {
-    console.error(`TikTok ad names ${advertiserId}: code=${adNamesRes.value?.code} msg=${adNamesRes.value?.message}`)
-  }
-
-  // Lista de métricas: usa relatório com nome se disponível (métricas são idênticas), senão usa sem nome
-  let campListRaw: any[]
-  if (withNameOk && withNameList.length > 0) {
-    campListRaw = withNameList
-  } else {
-    campListRaw = campResNoName.status === 'fulfilled' && campResNoName.value?.code === 0
-      ? campResNoName.value?.data?.list ?? []
-      : []
-    if (campResNoName.status === 'fulfilled' && campResNoName.value?.code !== 0) {
-      console.error(`TikTok campanha ${advertiserId}: code=${campResNoName.value?.code} msg=${campResNoName.value?.message}`)
-    }
+  // campaign_name vem em metrics.campaign_name (confirmado via probe)
+  const campListRaw: any[] = campRes.status === 'fulfilled' && campRes.value?.code === 0
+    ? campRes.value?.data?.list ?? []
+    : []
+  if (campRes.status === 'fulfilled' && campRes.value?.code !== 0) {
+    console.error(`TikTok campanha ${advertiserId}: code=${campRes.value?.code} msg=${campRes.value?.message}`)
   }
 
   const campanhas: TikTokCampaignData[] = []
@@ -244,8 +223,7 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     const campId = String(item.dimensions?.campaign_id ?? '')
     const spend = Number(m.spend ?? 0)
     if (spend === 0) continue
-    // Usa campNamesMap (fontes 1 ou 2); sem nome → exibe só o ID
-    const campName = campNamesMap.get(campId) ?? campId
+    const campName = String(m.campaign_name ?? '').trim() || campId
     campanhas.push({
       id: campId,
       nome: campName,
@@ -255,7 +233,11 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
   }
   campanhas.sort((a, b) => b.spend - a.spend)
 
-  const audiencia: TikTokAudienceData = audRes.status === 'fulfilled' ? audRes.value : { genero: [], idade: [], plataforma: [] }
+  const audiencia: TikTokAudienceData = {
+    genero: parseAudItems(genderRes, 'gender', GENDER_LABELS),
+    idade: parseAudItems(ageRes, 'age', AGE_LABELS),
+    plataforma: parseAudItems(platformRes, 'platform', PLATFORM_LABELS),
+  }
 
   // Fallback 1: conta retornou 0 mas campanhas têm dados — soma das campanhas
   if (account.spend === 0 && campanhas.length > 0) {
@@ -288,25 +270,6 @@ export async function GET(req: NextRequest) {
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
-  // ── DEBUG: respostas cruas da API para um advertiser (sequencial, evita throttle) ──
-  const debugId = searchParams.get('debug')
-  if (debugId) {
-    const id = debugId === '1' ? ADVERTISER_IDS[4] : debugId // default PMC Campinas
-    const base = { advertiser_id: id, report_type: 'BASIC', start_date: start, end_date: end }
-    const out: Record<string, any> = {}
-    async function probe(label: string, params: Record<string, string>) {
-      try {
-        const r = await tiktokGet('/report/integrated/get/', params)
-        out[label] = { code: r?.code, message: r?.message, count: r?.data?.list?.length ?? 0, list: (r?.data?.list ?? []).map((it: any) => ({ d: it.dimensions, imp: it.metrics?.impressions })) }
-      } catch (e: any) { out[label] = { error: String(e?.message ?? e) } }
-    }
-    const aud = { advertiser_id: id, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), page_size: '50' }
-    for (const dim of ['platform', 'device_os', 'os', 'operating_system', 'app_id']) {
-      await probe(`aud_${dim}`, { ...aud, dimensions: JSON.stringify([dim]) })
-    }
-    return NextResponse.json({ advertiser: id, period: { start, end }, probes: out })
-  }
-
   const cacheKey = `${CACHE_V}|${start}|${end}`
   const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -316,19 +279,19 @@ export async function GET(req: NextRequest) {
   try {
     const nomeMap = await getAdvertiserNames(ADVERTISER_IDS)
 
-    const results = (await Promise.all(
-      ADVERTISER_IDS.map(async (id) => {
-        try {
-          const { account, serie, campanhas, audiencia } = await getAccountMetrics(id, start, end)
-          if (account.spend === 0 && campanhas.length === 0) return null
-          // nome sempre vem do fallback para consistência com o dropdown
-          return { id, nome: ADVERTISER_NAMES_FALLBACK[id] ?? nomeMap.get(id) ?? `ID ${id}`, ...account, serie, campanhas, audiencia } as TikTokAccountData
-        } catch (e) {
-          console.error(`TikTok skip ${id}:`, e)
-          return null
-        }
-      })
-    )).filter((a): a is TikTokAccountData => a !== null)
+    // Concorrência limitada (3 contas por vez): cada conta faz 6 chamadas; 8×6=48 simultâneas
+    // estouravam o QPS do TikTok e derrubavam contas aleatoriamente. 3×6=18 fica dentro do limite.
+    const results = (await mapLimit(ADVERTISER_IDS, 3, async (id) => {
+      try {
+        const { account, serie, campanhas, audiencia } = await getAccountMetrics(id, start, end)
+        if (account.spend === 0 && campanhas.length === 0 && serie.length === 0) return null
+        // nome sempre vem do fallback para consistência com o dropdown
+        return { id, nome: ADVERTISER_NAMES_FALLBACK[id] ?? nomeMap.get(id) ?? `ID ${id}`, ...account, serie, campanhas, audiencia } as TikTokAccountData
+      } catch (e) {
+        console.error(`TikTok skip ${id}:`, e)
+        return null
+      }
+    })).filter((a): a is TikTokAccountData => a !== null)
 
     results.sort((a, b) => b.spend - a.spend)
     // nomes inclui todas as contas do fallback, mesmo sem gasto no período

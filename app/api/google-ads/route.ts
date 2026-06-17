@@ -138,6 +138,19 @@ export interface GeoCidadeData {
   custo: number
 }
 
+export interface AudienceItem {
+  label: string
+  impressoes: number
+  cliques: number
+  custo: number
+}
+
+export interface AudienceData {
+  genero: AudienceItem[]
+  idade: AudienceItem[]
+  dispositivos: AudienceItem[]
+}
+
 export interface AccountData {
   id: string
   nome: string
@@ -156,11 +169,25 @@ export interface AccountData {
   anuncios: AdData[]
   serie: DailyPoint[]
   cidades: GeoCidadeData[]
+  audiencia: AudienceData
 }
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v3'
+const CACHE_V = 'v4'
+
+const GENDER_LABELS: Record<string, string> = {
+  MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
+}
+const AGE_LABELS: Record<string, string> = {
+  AGE_RANGE_18_24: '18-24', AGE_RANGE_25_34: '25-34', AGE_RANGE_35_44: '35-44',
+  AGE_RANGE_45_54: '45-54', AGE_RANGE_55_64: '55-64', AGE_RANGE_65_UP: '65+',
+  AGE_RANGE_UNDETERMINED: 'Não identificado',
+}
+const DEVICE_LABELS: Record<string, string> = {
+  MOBILE: 'Celular', DESKTOP: 'Desktop', TABLET: 'Tablet',
+  CONNECTED_TV: 'TV conectada', OTHER: 'Outros',
+}
 
 function buildMetrics(cliques: number, impressoes: number, custo: number, conversoes: number) {
   return {
@@ -216,10 +243,10 @@ export async function GET(req: NextRequest) {
       await Promise.all(
         accounts.map(async (acc: { id: string; nome: string }) => {
           try {
-            const [campRows, agRows, adRows, dailyRows, geoRows] = await Promise.all([
+            const [campRows, agRows, adRows, dailyRows, geoRows, genderRows, ageRows, deviceRows] = await Promise.all([
               gaql(acc.id,
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'`,
@@ -237,7 +264,7 @@ export async function GET(req: NextRequest) {
                 `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status,
                    ad_group.id, ad_group.name,
                    campaign.id, campaign.name,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
                  FROM ad_group_ad
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND ad_group_ad.status != 'REMOVED'
@@ -260,6 +287,27 @@ export async function GET(req: NextRequest) {
                    AND geographic_view.location_type = 'CITY'
                  ORDER BY metrics.clicks DESC
                  LIMIT 20`,
+                token).catch(() => []),
+              gaql(acc.id,
+                `SELECT gender_view.resource_name, ad_group_criterion.gender.type,
+                   metrics.clicks, metrics.impressions, metrics.cost_micros
+                 FROM gender_view
+                 WHERE segments.date BETWEEN '${start}' AND '${end}'
+                   AND metrics.impressions > 0`,
+                token).catch(() => []),
+              gaql(acc.id,
+                `SELECT age_range_view.resource_name, ad_group_criterion.age_range.type,
+                   metrics.clicks, metrics.impressions, metrics.cost_micros
+                 FROM age_range_view
+                 WHERE segments.date BETWEEN '${start}' AND '${end}'
+                   AND metrics.impressions > 0`,
+                token).catch(() => []),
+              gaql(acc.id,
+                `SELECT segments.device, metrics.clicks, metrics.impressions, metrics.cost_micros
+                 FROM campaign
+                 WHERE segments.date BETWEEN '${start}' AND '${end}'
+                   AND campaign.status != 'REMOVED'
+                   AND metrics.impressions > 0`,
                 token).catch(() => []),
             ])
 
@@ -371,11 +419,7 @@ export async function GET(req: NextRequest) {
                 cpm: d.impressoes > 0 ? (d.custo / d.impressoes) * 1000 : 0,
               }))
 
-            // Propaga videoViews dos ads para as campanhas correspondentes
-            for (const ad of adMap.values()) {
-              const camp = campMap.get(ad.campanhaId)
-              if (camp && ad.videoViews > 0) camp.videoViews += ad.videoViews
-            }
+            // videoViews vem direto de metrics.video_views no nível de campanha/anúncio (não propagar — duplicaria)
 
             if (custoMicros === 0) return null
 
@@ -422,6 +466,27 @@ export async function GET(req: NextRequest) {
               }
             }
 
+            // ── Audiência (gênero, idade, dispositivo) ─────────────────
+            function parseAud(rows: any[], typePath: (r: any) => string, labels: Record<string, string>): AudienceItem[] {
+              const m = new Map<string, AudienceItem>()
+              for (const row of rows) {
+                const raw = String(typePath(row) ?? '')
+                if (!raw) continue
+                const label = labels[raw] ?? raw
+                const ex = m.get(label) ?? { label, impressoes: 0, cliques: 0, custo: 0 }
+                ex.impressoes += Number(row.metrics?.impressions ?? 0)
+                ex.cliques += Number(row.metrics?.clicks ?? 0)
+                ex.custo += Number(row.metrics?.costMicros ?? 0) / 1_000_000
+                m.set(label, ex)
+              }
+              return Array.from(m.values()).filter(i => i.impressoes > 0).sort((a, b) => b.impressoes - a.impressoes)
+            }
+            const audiencia: AudienceData = {
+              genero: parseAud(genderRows, r => r.adGroupCriterion?.gender?.type, GENDER_LABELS),
+              idade: parseAud(ageRows, r => r.adGroupCriterion?.ageRange?.type, AGE_LABELS),
+              dispositivos: parseAud(deviceRows, r => r.segments?.device, DEVICE_LABELS),
+            }
+
             const custo = custoMicros / 1_000_000
             const videoViews = Array.from(campMap.values()).reduce((s, c) => s + c.videoViews, 0)
             return {
@@ -432,6 +497,7 @@ export async function GET(req: NextRequest) {
               anuncios: Array.from(adMap.values()).filter(a => a.custo > 0).sort((a, b) => b.custo - a.custo),
               serie,
               cidades,
+              audiencia,
             } as AccountData
           } catch (e) {
             console.error(`Skipping ${acc.id} (${acc.nome}):`, e)
