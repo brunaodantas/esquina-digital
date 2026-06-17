@@ -87,11 +87,11 @@ Página em `app/dashboard/tiktok-ads/page.tsx`, rota em `app/api/tiktok-ads/rout
 
 3. **Dropdown incompleto / nome errado na conta ANFAVEA:** `ADVERTISER_NAMES_FALLBACK['7646886376989982741']` estava mapeado como `'Conta TK'` em vez de `'ANFAVEA'`. Corrigido. Também: nomes do fallback nunca devem ser sobrescritos pelo retorno da API `/advertiser/info/` pois a API retorna nomes internos ("BIODIESEL_ESQUINA") que não batem com o dropdown — use `ADVERTISER_NAMES_FALLBACK[id] ?? nomeMap.get(id)` na ordem certa.
 
-4. **Nomes de campanha exibidos como IDs ("Campanha 1867..."):** `/campaign/get/` era chamado antes de ter os IDs do relatório, e erros eram silenciados. Fix: extrai IDs do `campRes` primeiro, depois chama `/campaign/get/` com `campaign_ids` específicos. Também trata ambos os formatos de campo (`campaign_id`/`id`, `campaign_name`/`name`). Erro agora é logado com `console.error`.
+4. **Nomes de campanha exibidos como IDs (problema persistente — 4 tentativas):** A API TikTok com escopo de reporting não suporta `/campaign/get/` (token sem escopo de gerenciamento) nem `campaign_name` como métrica (code 40002). `campaign_name` como dimensão no `AUCTION_CAMPAIGN` é aceito mas retorna null. Fix final (v8): usar `AUCTION_AD` como 6ª chamada paralela — neste nível `campaign_name` está sempre disponível como dimensão no escopo de reporting. Constrói `campNamesMap` em duas fontes: (1) `AUCTION_CAMPAIGN` com `campaign_name` na dimensão, (2) `AUCTION_AD` com `campaign_id + campaign_name`. O nome é resolvido por `campNamesMap.get(campId) ?? campId`.
 
 5. **PMC Campinas (e outras contas) desaparecendo intermitentemente:** TikTok retorna 0 nos relatórios AUCTION_ADVERTISER e AUCTION_CAMPAIGN de forma inconsistente, mas os dados diários (`stat_time_day`) ainda retornam corretamente. Fix: Fallback 2 — se `account.spend === 0 && campanhas.length === 0 && serie.length > 0`, reconstrói os totais da conta somando os dados da série diária.
 
-**Cache versionado:** `CACHE_V = 'v6'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
+**Cache versionado:** `CACHE_V = 'v8'`. Incrementar ao fazer deploy com mudança estrutural na rota para evitar instâncias Vercel warm servindo cache antigo.
 
 ## matchNome — filtragem fuzzy de clientes
 

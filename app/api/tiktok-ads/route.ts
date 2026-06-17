@@ -68,7 +68,7 @@ export interface TikTokCampaignData {
 
 let _cache: { key: string; ts: number; data: TikTokAccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v7'
+const CACHE_V = 'v8'
 
 async function tiktokGet(path: string, params: Record<string, string>): Promise<any> {
   const url = new URL(`${BASE}${path}`)
@@ -136,7 +136,7 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
   const baseParams = { advertiser_id: advertiserId, report_type: 'BASIC', start_date: start, end_date: end }
 
   const campMetrics = JSON.stringify(['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm'])
-  const [accountRes, dailyRes, campResWithName, campResNoName, audRes] = await Promise.allSettled([
+  const [accountRes, dailyRes, campResWithName, campResNoName, audRes, adNamesRes] = await Promise.allSettled([
     tiktokGet('/report/integrated/get/', {
       ...baseParams, data_level: 'AUCTION_ADVERTISER',
       dimensions: JSON.stringify(['advertiser_id']),
@@ -149,7 +149,7 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
       metrics: JSON.stringify(['spend', 'impressions', 'clicks']),
       page_size: '100',
     }),
-    // Tenta obter campaign_name como dimensão (não suportado em todas as contas)
+    // Tenta campaign_name como dimensão no nível de campanha
     tiktokGet('/report/integrated/get/', {
       ...baseParams, data_level: 'AUCTION_CAMPAIGN',
       dimensions: JSON.stringify(['campaign_id', 'campaign_name']),
@@ -164,6 +164,13 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
       page_size: '50',
     }),
     getAudienceData(advertiserId, start, end),
+    // Nível de anúncio: campaign_name sempre disponível como dimensão no escopo de reporting
+    tiktokGet('/report/integrated/get/', {
+      ...baseParams, data_level: 'AUCTION_AD',
+      dimensions: JSON.stringify(['campaign_id', 'campaign_name']),
+      metrics: JSON.stringify(['spend']),
+      page_size: '200',
+    }),
   ])
 
   const account = { spend: 0, impressions: 0, clicks: 0, reach: 0, frequency: 0, ctr: 0, cpc: 0, cpm: 0 }
@@ -192,18 +199,37 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     serie.sort((a, b) => a.date.localeCompare(b.date))
   }
 
-  // Prefere relatório com campaign_name na dimensão; fallback para relatório sem nome
+  // Constrói mapa campaign_id → campaign_name a partir de múltiplas fontes
+  const campNamesMap = new Map<string, string>()
+
+  // Fonte 1: campaign_name como dimensão no AUCTION_CAMPAIGN (pode não ser suportado)
   const withNameOk = campResWithName.status === 'fulfilled' && campResWithName.value?.code === 0
   const withNameList: any[] = withNameOk ? campResWithName.value?.data?.list ?? [] : []
-  const hasNameInDim = withNameList.length > 0 && withNameList[0]?.dimensions?.campaign_name != null
+  for (const item of withNameList) {
+    const cid = String(item.dimensions?.campaign_id ?? '')
+    const cname = String(item.dimensions?.campaign_name ?? '').trim()
+    if (cid && cname) campNamesMap.set(cid, cname)
+  }
+  if (campResWithName.status === 'fulfilled' && campResWithName.value?.code !== 0) {
+    console.error(`TikTok camp+name ${advertiserId}: code=${campResWithName.value?.code} msg=${campResWithName.value?.message}`)
+  }
 
+  // Fonte 2: AUCTION_AD — campaign_name está sempre disponível como dimensão no nível de anúncio
+  if (adNamesRes.status === 'fulfilled' && adNamesRes.value?.code === 0) {
+    for (const item of adNamesRes.value?.data?.list ?? []) {
+      const cid = String(item.dimensions?.campaign_id ?? '')
+      const cname = String(item.dimensions?.campaign_name ?? '').trim()
+      if (cid && cname && !campNamesMap.has(cid)) campNamesMap.set(cid, cname)
+    }
+  } else if (adNamesRes.status === 'fulfilled' && adNamesRes.value?.code !== 0) {
+    console.error(`TikTok ad names ${advertiserId}: code=${adNamesRes.value?.code} msg=${adNamesRes.value?.message}`)
+  }
+
+  // Lista de métricas: usa relatório com nome se disponível (métricas são idênticas), senão usa sem nome
   let campListRaw: any[]
   if (withNameOk && withNameList.length > 0) {
     campListRaw = withNameList
   } else {
-    if (campResWithName.status === 'fulfilled' && campResWithName.value?.code !== 0) {
-      console.error(`TikTok camp+name ${advertiserId}: code=${campResWithName.value?.code} msg=${campResWithName.value?.message}`)
-    }
     campListRaw = campResNoName.status === 'fulfilled' && campResNoName.value?.code === 0
       ? campResNoName.value?.data?.list ?? []
       : []
@@ -218,10 +244,8 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     const campId = String(item.dimensions?.campaign_id ?? '')
     const spend = Number(m.spend ?? 0)
     if (spend === 0) continue
-    // Tenta nome da dimensão; se não disponível, usa ID
-    const campName = hasNameInDim
-      ? (String(item.dimensions?.campaign_name ?? '')).trim() || `Campanha ${campId}`
-      : `Campanha ${campId}`
+    // Usa campNamesMap (fontes 1 ou 2); sem nome → exibe só o ID
+    const campName = campNamesMap.get(campId) ?? campId
     campanhas.push({
       id: campId,
       nome: campName,
