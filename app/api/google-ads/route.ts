@@ -235,7 +235,7 @@ export async function GET(req: NextRequest) {
               gaql(acc.id,
                 `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status,
                    ad_group.id, ad_group.name,
-                   campaign.id, campaign.name, campaign.advertising_channel_type,
+                   campaign.id, campaign.name,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions, metrics.video_views
                  FROM ad_group_ad
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
@@ -342,7 +342,6 @@ export async function GET(req: NextRequest) {
                   status: ada.status === 'PAUSED' ? 'pausado' : 'ativo',
                   grupoId: String(ag.id ?? ''), grupoNome: (ag.name ?? '').trim(),
                   campanhaId: String(camp.id ?? ''), campanhaNome: (camp.name ?? '').trim(),
-                  tipoRaw: (camp.advertisingChannelType ?? 'UNKNOWN') as string,
                   cliques: cl, impressoes: imp, videoViews: vv, custo, conversoes: conv,
                   ...buildMetrics(cl, imp, custo, conv),
                 })

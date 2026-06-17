@@ -233,8 +233,9 @@ export async function GET(req: NextRequest) {
     )).filter((a): a is TikTokAccountData => a !== null)
 
     results.sort((a, b) => b.spend - a.spend)
-    const nomes = results.map((a) => a.nome)
-    _cache = { key: cacheKey, ts: Date.now(), data: results, nomes }
+    // nomes inclui todas as contas do fallback, mesmo sem gasto no período
+    const allNomes = ADVERTISER_IDS.map(id => nomeMap.get(id) ?? `ID ${id}`)
+    _cache = { key: cacheKey, ts: Date.now(), data: results, nomes: allNomes }
     return NextResponse.json({ nomes, data: results })
   } catch (err: any) {
     console.error('TikTok Ads API error:', err)
