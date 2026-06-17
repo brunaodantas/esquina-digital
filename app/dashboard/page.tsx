@@ -8,8 +8,9 @@ import { useRouter } from 'next/navigation'
 import EntregasPage from './entregas/page'
 import GoogleAdsPage from './google-ads/page'
 import MetaAdsPage from './meta-ads/page'
+import TikTokAdsPage from './tiktok-ads/page'
 
-type Tab = 'meta' | 'entregas' | 'google-ads'
+type Tab = 'meta' | 'entregas' | 'google-ads' | 'tiktok'
 type Theme = 'dark' | 'light'
 type PresetWA = 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'personalizado'
 
@@ -1235,6 +1236,7 @@ export default function Dashboard() {
         <button onClick={() => setActiveTab('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? '#1A3CFF' : '#252525', color: activeTab === 'meta' ? '#fff' : '#999', outline: activeTab !== 'meta' ? '1px solid #333' : 'none' }}>Meta Ads</button>
         <button onClick={() => setActiveTab('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : '#252525', color: activeTab === 'entregas' ? '#fff' : '#999', outline: activeTab !== 'entregas' ? '1px solid #333' : 'none' }}>Entregas</button>
         <button onClick={() => setActiveTab('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? '#1A3CFF' : '#252525', color: activeTab === 'google-ads' ? '#fff' : '#999', outline: activeTab !== 'google-ads' ? '1px solid #333' : 'none' }}>Google Ads</button>
+        <button onClick={() => setActiveTab('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#00994D' : '#252525', color: activeTab === 'tiktok' ? '#fff' : '#999', outline: activeTab !== 'tiktok' ? '1px solid #333' : 'none' }}>TikTok</button>
         <button onClick={() => setShowRelatorio(true)} title="Gerar relatório para WhatsApp" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a4a2a', transition: 'all 0.15s', background: '#1a2e1a', color: '#4ade80', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>✉</span> Relatório WA
         </button>
@@ -1261,6 +1263,9 @@ export default function Dashboard() {
       </div>
       <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'google-ads' ? 'flex' : 'none', flexDirection: 'column' }}>
         <GoogleAdsPage theme={theme} />
+      </div>
+      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'tiktok' ? 'flex' : 'none', flexDirection: 'column' }}>
+        <TikTokAdsPage theme={theme} />
       </div>
 
       {showRelatorio && <RelatorioModal onClose={() => setShowRelatorio(false)} />}
