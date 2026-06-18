@@ -77,9 +77,10 @@ const OBJETIVO_TABS: { key: ObjetivoTab; label: string }[] = [
 
 function classifyObjetivo(nome: string): ObjetivoTab {
   const n = nome.toUpperCase()
-  if (n.includes('RECONHEC') || n.includes('ALCANCE') || n.includes('AWARENESS') || n.includes('BRAND') || n.includes('[CPM]')) return 'reconhecimento'
-  if (n.includes('ENGAJAMENTO') || n.includes('ENGAJ') || n.includes('VIDEO') || n.includes('VÍDEO') || n.includes('VIEWS') || n.includes('BUMPER') || n.includes('IN-STREAM') || n.includes('YOUTUBE') || n.includes('[CPV]')) return 'engajamento'
-  if (n.includes('TRÁFEGO') || n.includes('TRAFEGO') || n.includes('CONVERS') || n.includes('LEAD') || n.includes('CLICK') || n.includes('CLIQUE') || n.includes('[CPA]') || n.includes('[CPC]')) return 'trafego'
+  // Modelo de compra (CPV/CPE/CPC/CPM) costuma vir como "| CPV |" — usar \b em vez de [CPV]
+  if (/ENGAJ|VISUALIZ|\bVIDEO\b|VÍDEO|VIEWS|BUMPER|IN-STREAM|YOUTUBE|\bCPV\b|\bCPE\b/.test(n)) return 'engajamento'
+  if (/TRÁFEGO|TRAFEGO|CONVERS|LEAD|CLICK|CLIQUE|\bCPA\b|\bCPC\b/.test(n)) return 'trafego'
+  if (/RECONHEC|ALCANCE|AWARENESS|BRAND|\bCPM\b/.test(n)) return 'reconhecimento'
   return 'reconhecimento'
 }
 
