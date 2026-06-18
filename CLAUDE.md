@@ -45,6 +45,14 @@ Ordem dos botões da esquerda para a direita: **Meta Ads · Google Ads · TikTok
 Google Ads e Entregas atualizam automaticamente no próximo horário par (1h, 3h, 5h… BRT).
 Cache da API: 30 min para Google Ads e Meta Ads; 1800s para Entregas (Sheets).
 
+## Métricas por nível nas tabelas
+
+- **TikTok** (campanha/grupo/anúncio): INVEST · IMPR · ALCANCE · CLIQUES · VISUALIZAÇÕES · CTR · CPM · CPC · CPV. `reach` e `video_play_actions` (= Visualizações) funcionam nos 3 níveis (probe); CPV = spend/views.
+- **Google** (campanha/grupo/anúncio): inclui VISUALIZAÇÕES (video_views real via v21), TAXA VIS. (views/impressões), CPV (custo/views). VISUALIZAÇÕES/TAXA VIS./CPV só têm valor em campanhas VIDEO; nos demais tipos e em grupo/anúncio ficam "—" (views só vêm consolidadas por campanha).
+- **Meta** (campanha/conjunto): VISUALIZAÇÕES (= thruplays, `video_thruplay_watched_actions`), TAXA VIS. (thruplays/impressões), CPV (custo/thruplay), CPE (`inline_post_engagement` → spend/engajamento). O rótulo antigo "Thruplays" virou "Visualizações" em toda a aba (tabela, gráfico, KPIs).
+
+**Anúncios Google vazios em contas só de Vídeo/Demand Gen:** o Google NÃO reporta métricas por anúncio (`ad_group_ad`) nesses tipos — os criativos voltam com custo e impressões zerados. Por isso a aba Anúncios fica vazia em contas como PMC e PREFEITURAS (que só têm vídeo). O filtro de anúncios é `custo>0 || impressões>0`. Onde há Search/Display, os anúncios aparecem.
+
 ## Descoberta de contas (Meta Ads) — `app/api/meta-ads/route.ts`
 A lista de contas NÃO é mais hardcoded. `discoverAccounts()` lista as contas do token via `GET /me/adaccounts?fields=account_id,name,currency` (com paginação). Conta nova entra sozinha; conta sem gasto no período some.
 - **Fase A (leve):** probe de `spend` nível account por conta (concorrência 8 via `mapLimit`) → mantém só `spend > 0` no período.
