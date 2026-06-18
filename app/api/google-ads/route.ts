@@ -81,6 +81,7 @@ export interface CampaignData {
   cpcMedio: number
   cpm: number
   cpv: number
+  taxaVisualizacao: number
   conversoes: number
   custoConversao: number
 }
@@ -99,6 +100,7 @@ export interface AdGroupData {
   cpcMedio: number
   cpm: number
   cpv: number
+  taxaVisualizacao: number
   conversoes: number
   custoConversao: number
 }
@@ -120,6 +122,7 @@ export interface AdData {
   cpcMedio: number
   cpm: number
   cpv: number
+  taxaVisualizacao: number
   conversoes: number
   custoConversao: number
 }
@@ -165,6 +168,7 @@ export interface AccountData {
   cpcMedio: number
   cpm: number
   cpv: number
+  taxaVisualizacao: number
   custo: number
   conversoes: number
   custoConversao: number
@@ -178,7 +182,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v7'
+const CACHE_V = 'v8'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -199,6 +203,7 @@ function buildMetrics(cliques: number, impressoes: number, custo: number, conver
     cpcMedio: cliques > 0 ? custo / cliques : 0,
     cpm: impressoes > 0 ? (custo / impressoes) * 1000 : 0,
     cpv: 0,
+    taxaVisualizacao: 0, // VTR — preenchido só em campanhas de vídeo, após carregar as views
     custoConversao: conversoes > 0 ? custo / conversoes : 0,
   }
 }
@@ -219,22 +224,6 @@ export async function GET(req: NextRequest) {
     searchParams.get('start') ??
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
-
-  // ── DEBUG: por que ad_group_ad volta vazio em algumas contas ──
-  if (searchParams.get('debug') === 'ads') {
-    const token = await getToken()
-    const out: Record<string, any> = {}
-    for (const cid of ['4119606741', '3488191619']) {
-      try {
-        const types = await gaql(cid, `SELECT campaign.advertising_channel_type, metrics.cost_micros FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.cost_micros > 0`, token)
-        const tc: Record<string, number> = {}
-        for (const r of types) { const tt = r.campaign?.advertisingChannelType ?? '?'; tc[tt] = (tc[tt] || 0) + 1 }
-        const ads: any = await gaql(cid, `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, campaign.advertising_channel_type, metrics.cost_micros, metrics.impressions FROM ad_group_ad WHERE segments.date BETWEEN '${start}' AND '${end}' AND ad_group_ad.status != 'REMOVED' AND campaign.status != 'REMOVED' LIMIT 10`, token).catch((e: any) => ({ err: String(e?.message).slice(0, 220) }))
-        out[cid] = { tiposCampanha: tc, adsCount: Array.isArray(ads) ? ads.length : ads, adSample: Array.isArray(ads) ? ads.slice(0, 4).map((r: any) => ({ nome: r.adGroupAd?.ad?.name, tipo: r.campaign?.advertisingChannelType, custo: r.metrics?.costMicros, imp: r.metrics?.impressions })) : ads }
-      } catch (e: any) { out[cid] = { error: String(e?.message).slice(0, 220) } }
-    }
-    return NextResponse.json({ debug: 'ads', period: { start, end }, out })
-  }
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -379,6 +368,7 @@ export async function GET(req: NextRequest) {
             }
             for (const camp of campMap.values()) {
               if (camp.videoViews > 0) camp.cpv = camp.custo / camp.videoViews
+              if (camp.impressoes > 0 && camp.videoViews > 0) camp.taxaVisualizacao = (camp.videoViews / camp.impressoes) * 100
             }
 
             // ── Ad Groups ──────────────────────────────────────────────
@@ -532,7 +522,7 @@ export async function GET(req: NextRequest) {
               ...buildMetrics(cliques, impressoes, custo, conversoes),
               campanhas: Array.from(campMap.values()).filter(c => c.custo > 0).sort((a, b) => b.custo - a.custo),
               grupos: Array.from(agMap.values()).filter(g => g.custo > 0).sort((a, b) => b.custo - a.custo),
-              anuncios: Array.from(adMap.values()).filter(a => a.custo > 0).sort((a, b) => b.custo - a.custo),
+              anuncios: Array.from(adMap.values()).filter(a => a.custo > 0 || a.impressoes > 0).sort((a, b) => b.custo - a.custo),
               serie,
               cidades,
               audiencia,

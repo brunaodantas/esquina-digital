@@ -62,10 +62,13 @@ export interface TikTokCampaignData {
   nome: string
   spend: number
   impressions: number
+  reach: number
   clicks: number
+  videoViews: number
   ctr: number
   cpc: number
   cpm: number
+  cpv: number
 }
 
 export interface TikTokAdSetData {
@@ -74,10 +77,13 @@ export interface TikTokAdSetData {
   campanha: string
   spend: number
   impressions: number
+  reach: number
   clicks: number
+  videoViews: number
   ctr: number
   cpc: number
   cpm: number
+  cpv: number
 }
 
 export interface TikTokAdData {
@@ -87,15 +93,18 @@ export interface TikTokAdData {
   campanha: string
   spend: number
   impressions: number
+  reach: number
   clicks: number
+  videoViews: number
   ctr: number
   cpc: number
   cpm: number
+  cpv: number
 }
 
 let _cache: { key: string; ts: number; data: TikTokAccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v10'
+const CACHE_V = 'v11'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -184,9 +193,10 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
   const baseParams = { advertiser_id: advertiserId, report_type: 'BASIC', start_date: start, end_date: end }
 
   // *_name vêm como MÉTRICA (confirmado via probe); como dimensão dão 40002.
-  const campMetrics = JSON.stringify(['campaign_name', 'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm'])
-  const adgroupMetrics = JSON.stringify(['adgroup_name', 'campaign_name', 'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm'])
-  const adMetrics = JSON.stringify(['ad_name', 'adgroup_name', 'campaign_name', 'spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm'])
+  // reach e video_play_actions (= visualizações) funcionam em campanha/grupo/anúncio (probe).
+  const campMetrics = JSON.stringify(['campaign_name', 'spend', 'impressions', 'reach', 'clicks', 'video_play_actions', 'ctr', 'cpc', 'cpm'])
+  const adgroupMetrics = JSON.stringify(['adgroup_name', 'campaign_name', 'spend', 'impressions', 'reach', 'clicks', 'video_play_actions', 'ctr', 'cpc', 'cpm'])
+  const adMetrics = JSON.stringify(['ad_name', 'adgroup_name', 'campaign_name', 'spend', 'impressions', 'reach', 'clicks', 'video_play_actions', 'ctr', 'cpc', 'cpm'])
   const audBase = { advertiser_id: advertiserId, report_type: 'AUDIENCE', data_level: 'AUCTION_ADVERTISER', start_date: start, end_date: end, metrics: JSON.stringify(['spend', 'impressions', 'clicks']), page_size: '50' }
   const [accountRes, dailyRes, campRes, genderRes, ageRes, platformRes, adgroupRes, adRes] = await Promise.allSettled([
     tiktokGet('/report/integrated/get/', {
@@ -265,11 +275,14 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     const spend = Number(m.spend ?? 0)
     if (spend === 0) continue
     const campName = String(m.campaign_name ?? '').trim() || campId
+    const views = Number(m.video_play_actions ?? 0)
     campanhas.push({
       id: campId,
       nome: campName,
-      spend, impressions: Number(m.impressions ?? 0), clicks: Number(m.clicks ?? 0),
+      spend, impressions: Number(m.impressions ?? 0), reach: Number(m.reach ?? 0), clicks: Number(m.clicks ?? 0),
+      videoViews: views,
       ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
+      cpv: views > 0 ? spend / views : 0,
     })
   }
   campanhas.sort((a, b) => b.spend - a.spend)
@@ -283,12 +296,15 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     const gid = String(item.dimensions?.adgroup_id ?? '')
     const spend = Number(m.spend ?? 0)
     if (spend === 0) continue
+    const gviews = Number(m.video_play_actions ?? 0)
     grupos.push({
       id: gid,
       nome: String(m.adgroup_name ?? '').trim() || gid,
       campanha: String(m.campaign_name ?? '').trim(),
-      spend, impressions: Number(m.impressions ?? 0), clicks: Number(m.clicks ?? 0),
+      spend, impressions: Number(m.impressions ?? 0), reach: Number(m.reach ?? 0), clicks: Number(m.clicks ?? 0),
+      videoViews: gviews,
       ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
+      cpv: gviews > 0 ? spend / gviews : 0,
     })
   }
   grupos.sort((a, b) => b.spend - a.spend)
@@ -302,13 +318,16 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     const aid = String(item.dimensions?.ad_id ?? '')
     const spend = Number(m.spend ?? 0)
     if (spend === 0) continue
+    const aviews = Number(m.video_play_actions ?? 0)
     anuncios.push({
       id: aid,
       nome: String(m.ad_name ?? '').trim() || aid,
       adset: String(m.adgroup_name ?? '').trim(),
       campanha: String(m.campaign_name ?? '').trim(),
-      spend, impressions: Number(m.impressions ?? 0), clicks: Number(m.clicks ?? 0),
+      spend, impressions: Number(m.impressions ?? 0), reach: Number(m.reach ?? 0), clicks: Number(m.clicks ?? 0),
+      videoViews: aviews,
       ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
+      cpv: aviews > 0 ? spend / aviews : 0,
     })
   }
   anuncios.sort((a, b) => b.spend - a.spend)
@@ -349,21 +368,6 @@ export async function GET(req: NextRequest) {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
-
-  // ── DEBUG: reach + video_play_actions nos níveis grupo e anúncio ──
-  if (searchParams.get('debug') === 'metrics') {
-    const id = '7621991089315774471' // PMC Campinas
-    const levels: [string, string][] = [['AUCTION_ADGROUP', 'adgroup_id'], ['AUCTION_AD', 'ad_id']]
-    const out: Record<string, any> = {}
-    for (const [lvl, dim] of levels) {
-      const base = { advertiser_id: id, report_type: 'BASIC', data_level: lvl, start_date: start, end_date: end, dimensions: JSON.stringify([dim]), page_size: '3' }
-      try {
-        const r = await tiktokGet('/report/integrated/get/', { ...base, metrics: JSON.stringify(['spend', 'reach', 'video_play_actions']) })
-        out[lvl] = { code: r?.code, msg: r?.message, sample: r?.data?.list?.[0]?.metrics }
-      } catch (e: any) { out[lvl] = { error: String(e?.message ?? e).slice(0, 150) } }
-    }
-    return NextResponse.json({ debug: 'metrics', out })
-  }
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)

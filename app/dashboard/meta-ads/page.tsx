@@ -207,7 +207,7 @@ const META_BAR_OPTIONS: { key: MetaBarMetric; label: string; color: string }[] =
   { key: 'impressions',label: 'Impressões',   color: '#c77dff' },
   { key: 'clicks',     label: 'Cliques',      color: '#22c55e' },
   { key: 'reach',      label: 'Alcance',      color: '#56cfe1' },
-  { key: 'thruplays',  label: 'Thruplays',    color: '#f59e0b' },
+  { key: 'thruplays',  label: 'Visualizações', color: '#f59e0b' },
 ]
 const META_LINE_OPTIONS: { key: MetaLineMetric; label: string; color: string }[] = [
   { key: 'cpm',       label: 'CPM',       color: '#ff9f1c' },
@@ -515,11 +515,11 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   function exportCSV() {
     let headers: string[]; let rows: (string | number)[][]
     if (nivel === 'campanhas') {
-      headers = ['Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'Thruplays', 'Frequência']
-      rows = sortedCampanhas.map(c => [c.nome, c.status, c.spend, c.impressions, c.reach, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.thruplays, c.frequency.toFixed(4)])
+      headers = ['Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'CPE', 'Visualizações', 'Taxa Vis.%', 'CPV', 'Frequência']
+      rows = sortedCampanhas.map(c => [c.nome, c.status, c.spend, c.impressions, c.reach, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.cpe.toFixed(4), c.thruplays, c.taxaVisualizacao.toFixed(2), c.cpv.toFixed(4), c.frequency.toFixed(4)])
     } else if (nivel === 'conjuntos') {
-      headers = ['Conjunto', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'Thruplays', 'Frequência']
-      rows = sortedAdsets.map(c => [c.nome, c.campanha, c.status, c.spend, c.impressions, c.reach, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.thruplays, c.frequency.toFixed(4)])
+      headers = ['Conjunto', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'CPE', 'Visualizações', 'Taxa Vis.%', 'CPV', 'Frequência']
+      rows = sortedAdsets.map(c => [c.nome, c.campanha, c.status, c.spend, c.impressions, c.reach, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.cpe.toFixed(4), c.thruplays, c.taxaVisualizacao.toFixed(2), c.cpv.toFixed(4), c.frequency.toFixed(4)])
     } else {
       headers = ['Anúncio', 'Conjunto', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
       rows = sortedAds.map(c => [c.nome, c.adset, c.campanha, c.status, c.spend, c.impressions, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2)])
@@ -610,15 +610,15 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             <thead>
               <tr>
                 <th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>
-                {(['spend','impressions','reach','clicks','ctr','cpm','cpc','thruplays','frequency'] as const).map((col, i) => {
-                  const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','THRUPLAYS','FREQ.']
+                {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
+                  const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                 })}
               </tr>
             </thead>
             <tbody>
               {sortedCampanhas.length === 0 ? (
-                <tr><td colSpan={10} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
+                <tr><td colSpan={13} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
               ) : sortedCampanhas.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 const obj = classifyObjetivo(c.nome)
@@ -644,7 +644,10 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpe > 0 ? <CopiavelNum compact={fmtBRL(c.cpe)} /> : '—'}</td>
                     <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? <CopiavelNum compact={fmtNum(c.thruplays)} full={fmtNumFull(c.thruplays)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(c.taxaVisualizacao)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpv > 0 ? <CopiavelNum compact={fmtBRL(c.cpv)} /> : '—'}</td>
                     <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? <CopiavelNum compact={c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /> : '—'}</td>
                   </tr>
                 )
@@ -659,15 +662,15 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
               <tr>
                 <th style={{ ...thS, minWidth: 200 }}>CONJUNTO DE ANÚNCIOS</th>
                 <th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>
-                {(['spend','impressions','reach','clicks','ctr','cpm','cpc','thruplays','frequency'] as const).map((col, i) => {
-                  const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','THRUPLAYS','FREQ.']
+                {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
+                  const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                 })}
               </tr>
             </thead>
             <tbody>
               {sortedAdsets.length === 0 ? (
-                <tr><td colSpan={11} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
+                <tr><td colSpan={14} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
               ) : sortedAdsets.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
@@ -689,7 +692,10 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpe > 0 ? <CopiavelNum compact={fmtBRL(c.cpe)} /> : '—'}</td>
                     <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? <CopiavelNum compact={fmtNum(c.thruplays)} full={fmtNumFull(c.thruplays)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(c.taxaVisualizacao)} /> : '—'}</td>
+                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpv > 0 ? <CopiavelNum compact={fmtBRL(c.cpv)} /> : '—'}</td>
                     <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? <CopiavelNum compact={c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /> : '—'}</td>
                   </tr>
                 )
@@ -951,7 +957,7 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
               t={t}
             />
             <KpiTile
-              label="Thruplays"
+              label="Visualizações"
               value={totalThruplays > 0 ? fmtNum(totalThruplays) : '—'}
               color={TILE_COLORS[8]}
               t={t}
@@ -960,7 +966,7 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
             <KpiTile
               label="CPV"
               value={totalThruplays > 0 ? fmtBRL(totalSpend / totalThruplays) : '—'}
-              note="Custo por Thruplay"
+              note="Custo por visualização"
               color={TILE_COLORS[9]}
               t={t}
             />

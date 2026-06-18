@@ -81,6 +81,10 @@ export interface MetaCampaignData {
   cpc: number
   frequency: number
   thruplays: number
+  engajamento: number
+  cpe: number
+  cpv: number
+  taxaVisualizacao: number
 }
 
 export interface MetaAdSetData {
@@ -97,6 +101,10 @@ export interface MetaAdSetData {
   cpc: number
   frequency: number
   thruplays: number
+  engajamento: number
+  cpe: number
+  cpv: number
+  taxaVisualizacao: number
 }
 
 export interface MetaAdData {
@@ -169,29 +177,14 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
-  const cacheKey = `metav2|${start}|${end}`
+  const cacheKey = `metav3|${start}|${end}`
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
 
   const timeRange = JSON.stringify({ since: start, until: end })
 
-  // ── DEBUG: campos de engajamento / thruplay disponíveis ──
-  if (searchParams.get('debug') === 'eng') {
-    const acc = '485257655640935' // PMC
-    const out: Record<string, any> = {}
-    for (const f of ['inline_post_engagement', 'actions', 'cost_per_thruplay', 'video_thruplay_watched_actions', 'cost_per_inline_post_engagement']) {
-      try {
-        const p = new URLSearchParams({ fields: f, level: 'account', time_range: timeRange, access_token: TOKEN })
-        const r = await fetch(`${API}/act_${acc}/insights?${p}`)
-        const j = await r.json()
-        out[f] = j.error ? { error: j.error.message } : { data: j.data?.[0] ?? null }
-      } catch (e: any) { out[f] = { error: String(e?.message ?? e).slice(0, 150) } }
-    }
-    return NextResponse.json({ debug: 'eng', out })
-  }
-
-  const COMMON_METRICS = 'spend,impressions,reach,clicks,ctr,cpm,cpc,frequency,video_thruplay_watched_actions'
+  const COMMON_METRICS = 'spend,impressions,reach,clicks,ctr,cpm,cpc,frequency,video_thruplay_watched_actions,inline_post_engagement'
 
   const accountParams = new URLSearchParams({
     fields: COMMON_METRICS,
@@ -327,6 +320,10 @@ export async function GET(req: NextRequest) {
               cpc: parseFloat(c.cpc || '0'),
               frequency: parseFloat(c.frequency || '0'),
               thruplays: parseThruplays(c.video_thruplay_watched_actions),
+              engajamento: parseInt(c.inline_post_engagement || '0', 10),
+              cpe: (() => { const e = parseInt(c.inline_post_engagement || '0', 10); return e > 0 ? parseFloat(c.spend || '0') / e : 0 })(),
+              cpv: (() => { const tp = parseThruplays(c.video_thruplay_watched_actions); return tp > 0 ? parseFloat(c.spend || '0') / tp : 0 })(),
+              taxaVisualizacao: (() => { const tp = parseThruplays(c.video_thruplay_watched_actions); const imp = parseInt(c.impressions || '0', 10); return imp > 0 ? (tp / imp) * 100 : 0 })(),
             }))
             .sort((a: MetaCampaignData, b: MetaCampaignData) => b.spend - a.spend)
 
@@ -346,6 +343,10 @@ export async function GET(req: NextRequest) {
               cpc: parseFloat(c.cpc || '0'),
               frequency: parseFloat(c.frequency || '0'),
               thruplays: parseThruplays(c.video_thruplay_watched_actions),
+              engajamento: parseInt(c.inline_post_engagement || '0', 10),
+              cpe: (() => { const e = parseInt(c.inline_post_engagement || '0', 10); return e > 0 ? parseFloat(c.spend || '0') / e : 0 })(),
+              cpv: (() => { const tp = parseThruplays(c.video_thruplay_watched_actions); return tp > 0 ? parseFloat(c.spend || '0') / tp : 0 })(),
+              taxaVisualizacao: (() => { const tp = parseThruplays(c.video_thruplay_watched_actions); const imp = parseInt(c.impressions || '0', 10); return imp > 0 ? (tp / imp) * 100 : 0 })(),
             }))
             .sort((a: MetaAdSetData, b: MetaAdSetData) => b.spend - a.spend)
 

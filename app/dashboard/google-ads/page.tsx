@@ -544,14 +544,14 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     const metricKeys = ['custo','cliques','impressoes','ctr','cpcMedio','cpm','cpv','conversoes','custoConversao']
     let headers: string[]; let rows: (string | number)[][]
     if (nivel === 'campanhas') {
-      headers = ['Campanha','Tipo','Status','Custo','Cliques','Impressões','Visualizações','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
-      rows = sortedCamp.map(c => [c.nome, c.tipo, c.status, c.custo, c.cliques, c.impressoes, c.videoViews, c.ctr.toFixed(4), c.cpcMedio.toFixed(2), c.cpm.toFixed(2), c.cpv.toFixed(2), c.conversoes, c.custoConversao.toFixed(2)])
+      headers = ['Campanha','Tipo','Status','Custo','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      rows = sortedCamp.map(c => [c.nome, c.tipo, c.status, c.custo, c.cliques, c.impressoes, c.videoViews, c.taxaVisualizacao.toFixed(2), c.ctr.toFixed(4), c.cpcMedio.toFixed(2), c.cpm.toFixed(2), c.cpv.toFixed(4), c.conversoes, c.custoConversao.toFixed(2)])
     } else if (nivel === 'grupos') {
-      headers = ['Grupo','Campanha','Status','Custo','Cliques','Impressões','Visualizações','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
-      rows = sortedGrupos.map(g => [g.nome, g.campanhaNome, g.status, g.custo, g.cliques, g.impressoes, g.videoViews, g.ctr.toFixed(4), g.cpcMedio.toFixed(2), g.cpm.toFixed(2), g.cpv.toFixed(2), g.conversoes, g.custoConversao.toFixed(2)])
+      headers = ['Grupo','Campanha','Status','Custo','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      rows = sortedGrupos.map(g => [g.nome, g.campanhaNome, g.status, g.custo, g.cliques, g.impressoes, g.videoViews, g.taxaVisualizacao.toFixed(2), g.ctr.toFixed(4), g.cpcMedio.toFixed(2), g.cpm.toFixed(2), g.cpv.toFixed(4), g.conversoes, g.custoConversao.toFixed(2)])
     } else {
-      headers = ['Anúncio','Grupo','Campanha','Status','Custo','Cliques','Impressões','Visualizações','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
-      rows = sortedAnuncios.map(a => [a.nome, a.grupoNome, a.campanhaNome, a.status, a.custo, a.cliques, a.impressoes, a.videoViews, a.ctr.toFixed(4), a.cpcMedio.toFixed(2), a.cpm.toFixed(2), a.cpv.toFixed(2), a.conversoes, a.custoConversao.toFixed(2)])
+      headers = ['Anúncio','Grupo','Campanha','Status','Custo','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      rows = sortedAnuncios.map(a => [a.nome, a.grupoNome, a.campanhaNome, a.status, a.custo, a.cliques, a.impressoes, a.videoViews, a.taxaVisualizacao.toFixed(2), a.ctr.toFixed(4), a.cpcMedio.toFixed(2), a.cpm.toFixed(2), a.cpv.toFixed(4), a.conversoes, a.custoConversao.toFixed(2)])
     }
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -577,12 +577,13 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     </span>
   )
 
-  const metricCols = (item: { custo: number; cliques: number; impressoes: number; videoViews: number; ctr: number; cpcMedio: number; cpm: number; cpv: number; conversoes: number; custoConversao: number }, share: number) => (
+  const metricCols = (item: { custo: number; cliques: number; impressoes: number; videoViews: number; taxaVisualizacao: number; ctr: number; cpcMedio: number; cpm: number; cpv: number; conversoes: number; custoConversao: number }, share: number) => (
     <>
       <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.custo)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.cliques)} full={fmtNumFull(item.cliques)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressoes)} full={fmtNumFull(item.impressoes)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}>{item.videoViews > 0 ? <CopiavelNum compact={fmtNum(item.videoViews)} full={fmtNumFull(item.videoViews)} /> : '—'}</td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(item.taxaVisualizacao)} /> : '—'}</td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}>{item.cpcMedio > 0 ? <CopiavelNum compact={fmtBRL(item.cpcMedio)} /> : '—'}</td>
       <td style={{ ...tdS, textAlign: 'right' }}>{item.cpm > 0 ? <CopiavelNum compact={fmtBRL(item.cpm)} /> : '—'}</td>
@@ -597,6 +598,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     { col: 'cliques', label: 'CLIQUES' },
     { col: 'impressoes', label: 'IMPRESSÕES' },
     { col: 'videoViews', label: 'VISUALIZAÇÕES' },
+    { col: 'taxaVisualizacao', label: 'TAXA VIS.' },
     { col: 'ctr', label: 'CTR' },
     { col: 'cpcMedio', label: 'CPC MÉD.' },
     { col: 'cpm', label: 'CPM' },
@@ -678,7 +680,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               <tr><th style={{ ...thS, minWidth: 220 }}>CAMPANHA</th>{metricHeaders}</tr>
             </thead>
             <tbody>
-              {sortedCamp.length === 0 ? emptyRow(11) : sortedCamp.map(c => {
+              {sortedCamp.length === 0 ? emptyRow(12) : sortedCamp.map(c => {
                 const share = totalCusto > 0 ? (c.custo / totalCusto) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
@@ -708,7 +710,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               </tr>
             </thead>
             <tbody>
-              {sortedGrupos.length === 0 ? emptyRow(12) : sortedGrupos.map(g => (
+              {sortedGrupos.length === 0 ? emptyRow(13) : sortedGrupos.map(g => (
                 <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
                     <div style={{ fontWeight: 600, color: t.textPrimary }}>{g.nome}</div>
@@ -733,7 +735,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               </tr>
             </thead>
             <tbody>
-              {sortedAnuncios.length === 0 ? emptyRow(13) : sortedAnuncios.map(a => (
+              {sortedAnuncios.length === 0 ? emptyRow(14) : sortedAnuncios.map(a => (
                 <tr key={a.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
                     <div style={{ fontWeight: 600, color: t.textPrimary }}>{a.nome}</div>

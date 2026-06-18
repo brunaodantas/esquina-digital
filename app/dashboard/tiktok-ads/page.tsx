@@ -434,14 +434,14 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
   function exportCSV() {
     let headers: string[]; let rows: (string | number)[][]
     if (nivel === 'campanhas') {
-      headers = ['Campanha', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
-      rows = sortedCamp.map(c => [c.nome, c.spend, c.impressions, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2)])
+      headers = ['Campanha', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'Visualizações', 'CTR%', 'CPM', 'CPC', 'CPV']
+      rows = sortedCamp.map(c => [c.nome, c.spend, c.impressions, c.reach, c.clicks, c.videoViews, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.cpv.toFixed(4)])
     } else if (nivel === 'conjuntos') {
-      headers = ['Conjunto', 'Campanha', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
-      rows = sortedGrupos.map(g => [g.nome, g.campanha, g.spend, g.impressions, g.clicks, g.ctr.toFixed(4), g.cpm.toFixed(2), g.cpc.toFixed(2)])
+      headers = ['Conjunto', 'Campanha', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'Visualizações', 'CTR%', 'CPM', 'CPC', 'CPV']
+      rows = sortedGrupos.map(g => [g.nome, g.campanha, g.spend, g.impressions, g.reach, g.clicks, g.videoViews, g.ctr.toFixed(4), g.cpm.toFixed(2), g.cpc.toFixed(2), g.cpv.toFixed(4)])
     } else {
-      headers = ['Anúncio', 'Conjunto', 'Campanha', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
-      rows = sortedAnuncios.map(a => [a.nome, a.adset, a.campanha, a.spend, a.impressions, a.clicks, a.ctr.toFixed(4), a.cpm.toFixed(2), a.cpc.toFixed(2)])
+      headers = ['Anúncio', 'Conjunto', 'Campanha', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'Visualizações', 'CTR%', 'CPM', 'CPC', 'CPV']
+      rows = sortedAnuncios.map(a => [a.nome, a.adset, a.campanha, a.spend, a.impressions, a.reach, a.clicks, a.videoViews, a.ctr.toFixed(4), a.cpm.toFixed(2), a.cpc.toFixed(2), a.cpv.toFixed(4)])
     }
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -456,20 +456,23 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
 
   const metricHeaders = (
     <>
-      {(['spend', 'impressions', 'clicks', 'ctr', 'cpm', 'cpc'] as const).map((col, i) => {
-        const labels = ['INVEST.', 'IMPR.', 'CLIQUES', 'CTR', 'CPM', 'CPC']
+      {(['spend', 'impressions', 'reach', 'clicks', 'videoViews', 'ctr', 'cpm', 'cpc', 'cpv'] as const).map((col, i) => {
+        const labels = ['INVEST.', 'IMPR.', 'ALCANCE', 'CLIQUES', 'VISUALIZAÇÕES', 'CTR', 'CPM', 'CPC', 'CPV']
         return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
       })}
     </>
   )
-  const metricCells = (item: { spend: number; impressions: number; clicks: number; ctr: number; cpm: number; cpc: number }) => (
+  const metricCells = (item: { spend: number; impressions: number; reach: number; clicks: number; videoViews: number; ctr: number; cpm: number; cpc: number; cpv: number }) => (
     <>
       <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.spend)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressions)} full={fmtNumFull(item.impressions)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.reach > 0 ? <CopiavelNum compact={fmtNum(item.reach)} full={fmtNumFull(item.reach)} /> : '—'}</td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.clicks)} full={fmtNumFull(item.clicks)} /></td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.videoViews > 0 ? <CopiavelNum compact={fmtNum(item.videoViews)} full={fmtNumFull(item.videoViews)} /> : '—'}</td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(item.cpm)} /></td>
       <td style={{ ...tdS, textAlign: 'right' }}>{item.cpc > 0 ? <CopiavelNum compact={fmtBRL(item.cpc)} /> : '—'}</td>
+      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpv > 0 ? <CopiavelNum compact={fmtBRL(item.cpv)} /> : '—'}</td>
     </>
   )
 
@@ -499,7 +502,7 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
             <thead><tr><th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
             <tbody>
               {sortedCamp.length === 0 ? (
-                <tr><td colSpan={7} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
+                <tr><td colSpan={10} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
               ) : sortedCamp.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
@@ -521,7 +524,7 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
             <thead><tr><th style={{ ...thS, minWidth: 200 }}>CONJUNTO DE ANÚNCIOS</th><th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
             <tbody>
               {sortedGrupos.length === 0 ? (
-                <tr><td colSpan={8} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
+                <tr><td colSpan={11} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
               ) : sortedGrupos.map(g => {
                 const share = totalSpend > 0 ? (g.spend / totalSpend) * 100 : 0
                 return (
@@ -544,7 +547,7 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
             <thead><tr><th style={{ ...thS, minWidth: 200 }}>ANÚNCIO</th><th style={{ ...thS, minWidth: 160 }}>CONJUNTO</th><th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
             <tbody>
               {sortedAnuncios.length === 0 ? (
-                <tr><td colSpan={9} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum anúncio encontrado</td></tr>
+                <tr><td colSpan={12} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum anúncio encontrado</td></tr>
               ) : sortedAnuncios.map(a => {
                 const share = totalSpend > 0 ? (a.spend / totalSpend) * 100 : 0
                 return (
