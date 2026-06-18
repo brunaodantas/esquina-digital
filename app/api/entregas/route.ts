@@ -257,6 +257,34 @@ export async function GET(req: NextRequest) {
   // Descobre todas as abas dinamicamente
   const sheetNames = await fetchSheetList(auth)
 
+  // ── DEBUG: abas com entrega (entregue>0) no período vs abas que entram na lista final ──
+  if (searchParams.get('debug') === 'entrega') {
+    const rowsByTab = await fetchTabsBatch(sheetNames, auth)
+    const out: Record<string, any> = {}
+    for (const nome of sheetNames) {
+      const rows = rowsByTab.get(nome) ?? []
+      const camps = parseRows(rows, periodoStart, periodoFim, hoje)
+      // contagem leniente: linhas com entregue>0 e qualquer data presente
+      const hi = findHeaderRow(rows)
+      const header = rows[hi]?.map(c => c?.toString() ?? '') ?? []
+      const iEnt = findCol(header, ['entregamos', 'ENTREGAMOS', 'Entregamos', 'ENTREGUE', 'Entregue', 'entregue', 'REALIZADO', 'Realizado'])
+      const iIni = findCol(header, ['INICIO', 'INÍCIO', 'início', 'inicio'])
+      const iTer = findCol(header, ['TÉRMINO', 'TERMINO', 'término', 'termino'])
+      let entreguesNoPeriodo = 0
+      for (let i = hi + 1; i < rows.length; i++) {
+        const r = rows[i]; if (!r) continue
+        const ent = iEnt >= 0 ? parseNum(r[iEnt]) : 0
+        const ini = iIni >= 0 ? parseDate(r[iIni]) : null
+        const ter = iTer >= 0 ? parseDate(r[iTer]) : null
+        if (ent > 0 && ini && ter && !(ini > periodoFim || ter < periodoStart)) entreguesNoPeriodo++
+      }
+      if (entreguesNoPeriodo > 0 || camps.length > 0) {
+        out[nome] = { parsed: camps.length, entreguesNoPeriodo, naListaFinal: camps.length > 0 }
+      }
+    }
+    return NextResponse.json({ out })
+  }
+
   const abas = sheetNames.map(nome => ({
     nome,
     cliente: (NOME_MAP[nome] ?? nome).trim(),
