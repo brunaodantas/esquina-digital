@@ -106,13 +106,28 @@ async function fetchSheetList(auth: string): Promise<string[]> {
     .filter((title: string) => title && !SKIP_SHEETS.has(title))
 }
 
-async function fetchAba(nome: string, auth: string): Promise<string[][]> {
-  const encoded = encodeURIComponent(nome)
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encoded}!A:Z`
-  const res = await fetch(url, { headers: { Authorization: auth }, next: { revalidate: 1800 } })
-  if (!res.ok) return []
-  const json = await res.json()
-  return json.values ?? []
+// Busca várias abas numa única chamada (values:batchGet) — evita estourar o rate limit
+// do Sheets que derrubava abas aleatórias quando buscávamos ~50 abas em paralelo.
+async function fetchTabsBatch(nomes: string[], auth: string): Promise<Map<string, string[][]>> {
+  const map = new Map<string, string[][]>()
+  const CHUNK = 30
+  for (let i = 0; i < nomes.length; i += CHUNK) {
+    const chunk = nomes.slice(i, i + CHUNK)
+    const params = chunk
+      .map(n => `ranges=${encodeURIComponent(`'${n.replace(/'/g, "''")}'!A:Z`)}`)
+      .join('&')
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values:batchGet?${params}`
+    const res = await fetch(url, { headers: { Authorization: auth }, next: { revalidate: 1800 } })
+    if (!res.ok) {
+      // fallback: deixa as abas deste chunk vazias (parseRows lida com [])
+      chunk.forEach(n => { if (!map.has(n)) map.set(n, []) })
+      continue
+    }
+    const json = await res.json()
+    const ranges = json.valueRanges ?? []
+    chunk.forEach((n, idx) => map.set(n, ranges[idx]?.values ?? []))
+  }
+  return map
 }
 
 function findHeaderRow(rows: string[][]): number {
@@ -241,22 +256,6 @@ export async function GET(req: NextRequest) {
   // Descobre todas as abas dinamicamente
   const sheetNames = await fetchSheetList(auth)
 
-  // ── DEBUG: lista abas brutas + quantas campanhas cada uma gera ──
-  if (searchParams.get('debug') === 'tabs') {
-    const allUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`
-    const allRes = await fetch(allUrl, { headers: { Authorization: auth } })
-    const allJson = await allRes.json()
-    const allTitles = (allJson.sheets ?? []).map((s: any) => s.properties.title)
-    const detail: Record<string, any> = {}
-    await Promise.all(sheetNames.map(async (nome) => {
-      const rows = await fetchAba(nome, auth)
-      const camps = parseRows(rows, periodoStart, periodoFim, hoje)
-      const hi = findHeaderRow(rows)
-      detail[nome] = { linhas: rows.length, headerRow: hi, header: rows[hi]?.slice(0, 12), campanhasNoPeriodo: camps.length }
-    }))
-    return NextResponse.json({ todasAsAbas: allTitles, abasConsideradas: sheetNames, detalhe: detail })
-  }
-
   const abas = sheetNames.map(nome => ({
     nome,
     cliente: (NOME_MAP[nome] ?? nome).trim(),
@@ -266,23 +265,23 @@ export async function GET(req: NextRequest) {
   // sheets é calculado DEPOIS de montar clienteMap — só clientes com dados reais aparecem
   // (abas vazias como "Página 4" somem naturalmente)
 
-  // Carrega campanhas de todas as abas em paralelo
+  // Busca TODAS as abas numa única chamada batchGet (evita rate limit do Sheets,
+  // que antes derrubava abas aleatórias quando buscávamos ~50 abas em paralelo)
+  const rowsByTab = await fetchTabsBatch(sheetNames, auth)
   const clienteMap = new Map<string, ClienteData>()
 
-  await Promise.all(
-    abas.map(async (aba) => {
-      const rows = await fetchAba(aba.nome, auth)
-      const campanhas = parseRows(rows, periodoStart, periodoFim, hoje)
-      if (!campanhas.length) return
+  for (const aba of abas) {
+    const rows = rowsByTab.get(aba.nome) ?? []
+    const campanhas = parseRows(rows, periodoStart, periodoFim, hoje)
+    if (!campanhas.length) continue
 
-      const existing = clienteMap.get(aba.cliente)
-      if (existing) {
-        existing.campanhas.push(...campanhas)
-      } else {
-        clienteMap.set(aba.cliente, { cliente: aba.cliente, grupo: aba.grupo, campanhas })
-      }
-    })
-  )
+    const existing = clienteMap.get(aba.cliente)
+    if (existing) {
+      existing.campanhas.push(...campanhas)
+    } else {
+      clienteMap.set(aba.cliente, { cliente: aba.cliente, grupo: aba.grupo, campanhas })
+    }
+  }
 
   const data = Array.from(clienteMap.values()).filter(c => c.campanhas.length > 0)
 
