@@ -109,6 +109,8 @@ function fmtNum(n: number) {
 function fmtNumFull(n: number) { return n.toLocaleString('pt-BR') }
 function fmtBRL(n: number) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtPct(n: number) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
+// Remove tags entre colchetes (ex: [CPM]); se o nome for SÓ colchetes (caso AMERICANA), mantém o original
+function nomeLimpo(n: string) { const s = (n ?? '').replace(/\[.*?\]/g, '').trim(); return s || (n ?? '').trim() }
 
 function CopiavelNum({ compact, full = compact }: { compact: string; full?: string }) {
   const [tip, setTip] = useState<'hover' | 'copied' | null>(null)
@@ -624,7 +626,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome.replace(/\[.*?\]/g, '').trim()}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{nomeLimpo(c.nome)}</div>
                       <div style={{ display: 'flex', gap: 4, marginBottom: share > 0 ? 5 : 0 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: objColor + '22', color: objColor, fontWeight: 600 }}>
                           {obj === 'reconhecimento' ? 'Reconhecimento' : obj === 'engajamento' ? 'Engajamento' : 'Tráfego'}
@@ -671,7 +673,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome.replace(/\[.*?\]/g, '').trim()}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{nomeLimpo(c.nome)}</div>
                       <div style={{ marginBottom: share > 0 ? 5 : 0 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: c.status === 'ativo' ? '#22c55e22' : '#f59e0b22', color: c.status === 'ativo' ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>
                           {c.status === 'ativo' ? 'Ativo' : 'Pausado'}
@@ -716,7 +718,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome.replace(/\[.*?\]/g, '').trim()}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{nomeLimpo(c.nome)}</div>
                       <div style={{ marginBottom: share > 0 ? 5 : 0 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: c.status === 'ativo' ? '#22c55e22' : '#f59e0b22', color: c.status === 'ativo' ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>
                           {c.status === 'ativo' ? 'Ativo' : 'Pausado'}

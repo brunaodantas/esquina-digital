@@ -85,6 +85,8 @@ function fmtNum(n: number) {
 function fmtNumFull(n: number) { return n.toLocaleString('pt-BR') }
 function fmtBRL(n: number) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtPct(n: number) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
+// Remove tags entre colchetes (ex: [CPM]); se o nome for SÓ colchetes, mantém o original
+function nomeLimpo(n: string) { const s = (n ?? '').replace(/\[.*?\]/g, '').trim(); return s || (n ?? '').trim() }
 
 function CopiavelNum({ compact, full = compact }: { compact: string; full?: string }) {
   const [tip, setTip] = useState<'hover' | 'copied' | null>(null)
@@ -679,7 +681,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary }}>{c.nome.replace(/\[.*?\]/g, '').trim()}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary }}>{nomeLimpo(c.nome)}</div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 3 }}>
                         <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600, background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF2a' }}>{c.tipo}</span>
                         {statusBadge(c.status)}

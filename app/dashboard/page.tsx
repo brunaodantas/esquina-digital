@@ -144,7 +144,7 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
   }
   function fmtF2(n: number): string { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
   function fmtPct2(n: number): string { return fmtF2(n) + '%' }
-  function cleanName(n: string) { return n.replace(/\[.*?\]/g, '').trim().slice(0, 32) }
+  function cleanName(n: string) { const s = (n ?? '').replace(/\[.*?\]/g, '').trim(); return (s || (n ?? '').trim()).slice(0, 32) }
 
   // ── Google: split Display vs YouTube ──
   const dispCamps: any[] = googleDados.flatMap(a => (a.campanhas ?? []).filter((c: any) => c.tipoRaw === 'DISPLAY'))
@@ -1072,7 +1072,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
         if (top3Meta.length > 0) {
           L.push('🎨 Top 3 Criativos')
           top3Meta.forEach((ad: any) => {
-            const nome = (ad.nome ?? 'Sem nome').replace(/\[.*?\]/g, '').trim()
+            const nome = ((ad.nome ?? 'Sem nome').replace(/\[.*?\]/g, '').trim()) || (ad.nome ?? 'Sem nome').trim()
             const partes = [`Impressões: ${fmtN(ad.impressions ?? 0)}`]
             if ((ad.reach ?? 0) > 0) partes.push(`Alcance: ${fmtN(ad.reach ?? 0)}`)
             partes.push(`Cliques: ${fmtN(ad.clicks ?? 0)}`)
@@ -1120,7 +1120,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
         if (top3Google.length > 0) {
           L.push('🎨 Top 3 Criativos')
           top3Google.forEach((ad: any) => {
-            const nome = (ad.nome ?? 'Sem nome').replace(/\[.*?\]/g, '').trim()
+            const nome = ((ad.nome ?? 'Sem nome').replace(/\[.*?\]/g, '').trim()) || (ad.nome ?? 'Sem nome').trim()
             L.push(nome)
             L.push(`Impressões: ${fmtN(ad.impressoes ?? 0)} | Cliques: ${fmtN(ad.cliques ?? 0)}`)
           })
