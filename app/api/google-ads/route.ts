@@ -178,7 +178,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v6'
+const CACHE_V = 'v7'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -355,11 +355,14 @@ export async function GET(req: NextRequest) {
               }
             }
 
-            // Views reais do TrueView (query isolada na v21)
+            // Views reais do TrueView (query isolada na v21) + CPV = custo / views
             for (const row of vvRows) {
               const cid = String(row.campaign?.id ?? '')
               const camp = campMap.get(cid)
               if (camp) camp.videoViews += Number(row.metrics?.videoViews ?? 0)
+            }
+            for (const camp of campMap.values()) {
+              if (camp.videoViews > 0) camp.cpv = camp.custo / camp.videoViews
             }
 
             // ── Ad Groups ──────────────────────────────────────────────
