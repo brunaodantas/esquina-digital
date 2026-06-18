@@ -175,6 +175,22 @@ export async function GET(req: NextRequest) {
   }
 
   const timeRange = JSON.stringify({ since: start, until: end })
+
+  // ── DEBUG: campos de engajamento / thruplay disponíveis ──
+  if (searchParams.get('debug') === 'eng') {
+    const acc = '485257655640935' // PMC
+    const out: Record<string, any> = {}
+    for (const f of ['inline_post_engagement', 'actions', 'cost_per_thruplay', 'video_thruplay_watched_actions', 'cost_per_inline_post_engagement']) {
+      try {
+        const p = new URLSearchParams({ fields: f, level: 'account', time_range: timeRange, access_token: TOKEN })
+        const r = await fetch(`${API}/act_${acc}/insights?${p}`)
+        const j = await r.json()
+        out[f] = j.error ? { error: j.error.message } : { data: j.data?.[0] ?? null }
+      } catch (e: any) { out[f] = { error: String(e?.message ?? e).slice(0, 150) } }
+    }
+    return NextResponse.json({ debug: 'eng', out })
+  }
+
   const COMMON_METRICS = 'spend,impressions,reach,clicks,ctr,cpm,cpc,frequency,video_thruplay_watched_actions'
 
   const accountParams = new URLSearchParams({
