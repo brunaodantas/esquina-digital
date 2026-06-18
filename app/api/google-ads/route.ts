@@ -31,9 +31,13 @@ async function getToken(): Promise<string> {
   return _token
 }
 
-async function gaql(customerId: string, query: string, token: string): Promise<any[]> {
+// metrics.video_views (views reais do TrueView) só existe até a v21; v22+ removeu o campo.
+// Mantemos as queries principais na v24 e buscamos só as views na v21.
+const VIEWS_VERSION = 'v21'
+
+async function gaql(customerId: string, query: string, token: string, version: string = ADS_VERSION): Promise<any[]> {
   const id = customerId.replace(/-/g, '')
-  const res = await fetch(`${BASE}/customers/${id}/googleAds:search`, {
+  const res = await fetch(`https://googleads.googleapis.com/${version}/customers/${id}/googleAds:search`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -174,7 +178,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v5'
+const CACHE_V = 'v6'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -215,32 +219,6 @@ export async function GET(req: NextRequest) {
     searchParams.get('start') ??
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
-
-  // ── DEBUG: em quais versões da API o metrics.video_views é reconhecido ──
-  if (searchParams.get('debug') === 'vv2') {
-    const token = await getToken()
-    const cid = '5619636645' // BIODIESEL (campanhas YouTube)
-    const versions = ['v17', 'v18', 'v19', 'v20', 'v21', 'v22', 'v24']
-    const out: Record<string, any> = {}
-    const q = `SELECT campaign.id, metrics.video_views FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}' AND campaign.advertising_channel_type = 'VIDEO' AND metrics.impressions > 0 LIMIT 2`
-    for (const v of versions) {
-      try {
-        const res = await fetch(`https://googleads.googleapis.com/${v}/customers/${cid}/googleAds:search`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'developer-token': DEV_TOKEN, 'login-customer-id': MCC_ID, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: q }),
-        })
-        const json = await res.json()
-        if (!res.ok) {
-          const err = json?.error?.details?.[0]?.errors?.[0]
-          out[v] = { ok: false, reason: (err ? `${JSON.stringify(err.errorCode)}: ${err.message}` : json?.error?.message ?? `HTTP ${res.status}`).slice(0, 160) }
-        } else {
-          out[v] = { ok: true, sample: (json.results ?? []).map((r: any) => r.metrics) }
-        }
-      } catch (e: any) { out[v] = { ok: false, reason: String(e?.message ?? e).slice(0, 160) } }
-    }
-    return NextResponse.json({ debug: 'vv2', period: { start, end }, out })
-  }
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -335,15 +313,14 @@ export async function GET(req: NextRequest) {
                    AND campaign.status != 'REMOVED'
                    AND metrics.impressions > 0`,
                 token).catch(() => []),
-              // metrics.video_views não existe na API v24 (UNRECOGNIZED_FIELD).
-              // Visualizações estimadas = impressões × taxa que atingiu 25% do vídeo.
+              // Views reais do TrueView (metrics.video_views) — só existe na v21 (removido na v22+)
               gaql(acc.id,
-                `SELECT campaign.id, metrics.impressions, metrics.video_quartile_p25_rate
+                `SELECT campaign.id, metrics.video_views
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.advertising_channel_type = 'VIDEO'
                    AND metrics.impressions > 0`,
-                token).catch(() => []),
+                token, VIEWS_VERSION).catch(() => []),
             ])
 
             // ── Campaigns ──────────────────────────────────────────────
@@ -378,13 +355,11 @@ export async function GET(req: NextRequest) {
               }
             }
 
-            // Visualizações estimadas (impressões × p25_rate) em query isolada — video_views não existe na v24
+            // Views reais do TrueView (query isolada na v21)
             for (const row of vvRows) {
               const cid = String(row.campaign?.id ?? '')
-              const imp = Number(row.metrics?.impressions ?? 0)
-              const p25 = Number(row.metrics?.videoQuartileP25Rate ?? 0)
               const camp = campMap.get(cid)
-              if (camp) camp.videoViews += Math.round(imp * p25)
+              if (camp) camp.videoViews += Number(row.metrics?.videoViews ?? 0)
             }
 
             // ── Ad Groups ──────────────────────────────────────────────
