@@ -241,6 +241,22 @@ export async function GET(req: NextRequest) {
   // Descobre todas as abas dinamicamente
   const sheetNames = await fetchSheetList(auth)
 
+  // ── DEBUG: lista abas brutas + quantas campanhas cada uma gera ──
+  if (searchParams.get('debug') === 'tabs') {
+    const allUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties.title`
+    const allRes = await fetch(allUrl, { headers: { Authorization: auth } })
+    const allJson = await allRes.json()
+    const allTitles = (allJson.sheets ?? []).map((s: any) => s.properties.title)
+    const detail: Record<string, any> = {}
+    await Promise.all(sheetNames.map(async (nome) => {
+      const rows = await fetchAba(nome, auth)
+      const camps = parseRows(rows, periodoStart, periodoFim, hoje)
+      const hi = findHeaderRow(rows)
+      detail[nome] = { linhas: rows.length, headerRow: hi, header: rows[hi]?.slice(0, 12), campanhasNoPeriodo: camps.length }
+    }))
+    return NextResponse.json({ todasAsAbas: allTitles, abasConsideradas: sheetNames, detalhe: detail })
+  }
+
   const abas = sheetNames.map(nome => ({
     nome,
     cliente: (NOME_MAP[nome] ?? nome).trim(),
