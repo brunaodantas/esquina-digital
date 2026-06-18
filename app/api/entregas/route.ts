@@ -205,9 +205,10 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
     if (meta === 0 && entregue === 0 && status === 'encerrada') continue
 
     // Para períodos atuais: ocultar campanhas encerradas que começaram antes do período selecionado
-    // (campanhas do mês anterior que apenas sobreponham levemente este mês)
+    // (campanhas do mês anterior que apenas sobreponham levemente este mês) —
+    // MAS manter se houve entrega no período (coluna "quanto entregamos" > 0 = teve veiculação)
     const isPeriodoAtual = hoje >= periodoStart && hoje <= periodoFim
-    if (isPeriodoAtual && status === 'encerrada' && inicio < periodoStart) continue
+    if (isPeriodoAtual && status === 'encerrada' && inicio < periodoStart && entregue === 0) continue
 
     // Ocultar linhas com mapeamento de coluna errado (ex: REGIONAIS GOV-BA com milhões de impressões)
     // entregue=1 com meta acima de 2M é sinal de coluna errada
