@@ -350,16 +350,17 @@ export async function GET(req: NextRequest) {
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
-  // ── DEBUG: quais métricas de reach/views/cpv funcionam no nível de campanha ──
+  // ── DEBUG: reach + video_play_actions nos níveis grupo e anúncio ──
   if (searchParams.get('debug') === 'metrics') {
     const id = '7621991089315774471' // PMC Campinas
-    const base = { advertiser_id: id, report_type: 'BASIC', data_level: 'AUCTION_CAMPAIGN', start_date: start, end_date: end, dimensions: JSON.stringify(['campaign_id']), page_size: '5' }
+    const levels: [string, string][] = [['AUCTION_ADGROUP', 'adgroup_id'], ['AUCTION_AD', 'ad_id']]
     const out: Record<string, any> = {}
-    for (const m of ['reach', 'video_play_actions', 'video_watched_2s', 'video_watched_6s', 'video_views_p100', 'total_play', 'cost_per_video_view', 'cost_per_2s_video_view', 'average_video_play']) {
+    for (const [lvl, dim] of levels) {
+      const base = { advertiser_id: id, report_type: 'BASIC', data_level: lvl, start_date: start, end_date: end, dimensions: JSON.stringify([dim]), page_size: '3' }
       try {
-        const r = await tiktokGet('/report/integrated/get/', { ...base, metrics: JSON.stringify(['spend', m]) })
-        out[m] = { code: r?.code, msg: r?.message, sample: r?.data?.list?.[0]?.metrics }
-      } catch (e: any) { out[m] = { error: String(e?.message ?? e).slice(0, 150) } }
+        const r = await tiktokGet('/report/integrated/get/', { ...base, metrics: JSON.stringify(['spend', 'reach', 'video_play_actions']) })
+        out[lvl] = { code: r?.code, msg: r?.message, sample: r?.data?.list?.[0]?.metrics }
+      } catch (e: any) { out[lvl] = { error: String(e?.message ?? e).slice(0, 150) } }
     }
     return NextResponse.json({ debug: 'metrics', out })
   }
