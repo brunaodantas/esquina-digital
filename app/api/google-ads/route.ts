@@ -216,6 +216,32 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  // ── DEBUG: em quais versões da API o metrics.video_views é reconhecido ──
+  if (searchParams.get('debug') === 'vv2') {
+    const token = await getToken()
+    const cid = '5619636645' // BIODIESEL (campanhas YouTube)
+    const versions = ['v17', 'v18', 'v19', 'v20', 'v21', 'v22', 'v24']
+    const out: Record<string, any> = {}
+    const q = `SELECT campaign.id, metrics.video_views FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}' AND campaign.advertising_channel_type = 'VIDEO' AND metrics.impressions > 0 LIMIT 2`
+    for (const v of versions) {
+      try {
+        const res = await fetch(`https://googleads.googleapis.com/${v}/customers/${cid}/googleAds:search`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'developer-token': DEV_TOKEN, 'login-customer-id': MCC_ID, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q }),
+        })
+        const json = await res.json()
+        if (!res.ok) {
+          const err = json?.error?.details?.[0]?.errors?.[0]
+          out[v] = { ok: false, reason: (err ? `${JSON.stringify(err.errorCode)}: ${err.message}` : json?.error?.message ?? `HTTP ${res.status}`).slice(0, 160) }
+        } else {
+          out[v] = { ok: true, sample: (json.results ?? []).map((r: any) => r.metrics) }
+        }
+      } catch (e: any) { out[v] = { ok: false, reason: String(e?.message ?? e).slice(0, 160) } }
+    }
+    return NextResponse.json({ debug: 'vv2', period: { start, end }, out })
+  }
+
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
