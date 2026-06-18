@@ -45,6 +45,9 @@ Ordem dos botões da esquerda para a direita: **Meta Ads · Google Ads · TikTok
 Google Ads e Entregas atualizam automaticamente no próximo horário par (1h, 3h, 5h… BRT).
 Cache da API: 30 min para Google Ads e Meta Ads; 1800s para Entregas (Sheets).
 
+## Entregas — leitura do Google Sheets (`app/api/entregas/route.ts`)
+As abas (1 por cliente) são lidas via **`values:batchGet`** numa única chamada (chunks de 30), NÃO uma `fetch` por aba. Buscar ~50 abas em paralelo estourava o rate limit do Sheets e derrubava abas aleatórias → clientes (Ministérios, Campinas, Biodiesel…) sumiam de forma intermitente. `fetchTabsBatch()` resolve trazendo tudo de uma vez. Abas dinâmicas (descobertas por `fetchSheetList`), exceto `SKIP_SHEETS`.
+
 ## Métricas por nível nas tabelas
 
 - **TikTok** (campanha/grupo/anúncio): INVEST · IMPR · ALCANCE · CLIQUES · VISUALIZAÇÕES · CTR · CPM · CPC · CPV. `reach` e `video_play_actions` (= Visualizações) funcionam nos 3 níveis (probe); CPV = spend/views.
