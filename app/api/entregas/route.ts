@@ -171,12 +171,15 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
   const iBateu = findCol(header, ['BATEU', 'bateu', 'STATUS DA ENTREGA', 'Status da Entrega'])
 
   const campanhas: Campanha[] = []
+  let lastNome = '' // nome da campanha pode estar em célula mesclada — herda da linha anterior
 
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i]
     if (!row || !row.length) continue
 
-    const nome = (iCampanha >= 0 ? (row[iCampanha] ?? '') : '').trim().replace(/_+$/, '').trim()
+    let nome = (iCampanha >= 0 ? (row[iCampanha] ?? '') : '').trim().replace(/_+$/, '').trim()
+    if (nome) lastNome = nome
+    else nome = lastNome // célula mesclada: usa o nome da linha de cima (linhas de total não têm data → filtradas adiante)
     if (!nome) continue
 
     const inicio = iInicio >= 0 ? parseDate(row[iInicio]) : null
@@ -284,7 +287,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const data = Array.from(clienteMap.values()).filter(c => c.campanhas.length > 0)
+  // Só mostra abas que tiveram veiculação no período (alguma campanha com "quanto entregamos" > 0)
+  const data = Array.from(clienteMap.values()).filter(c => c.campanhas.some(x => x.entregue > 0))
 
   data.sort((a, b) => {
     const risco = (c: ClienteData) =>
