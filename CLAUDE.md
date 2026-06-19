@@ -211,6 +211,13 @@ Projeto Supabase `esquina-digital` (`https://ftoarlkapsumybkujtnc.supabase.co`, 
 - **Env vars (Vercel, production):** `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SNAPSHOT_SECRET`, `CRON_SECRET`.
 - **Tabela** (`metric_snapshots`, RLS ligado): colunas `id, dia(date), plataforma(text), conta_id(text), conta_nome(text), metricas(jsonb), campanhas(jsonb), capturado_em(timestamptz)`, unique `(dia, plataforma, conta_id)`, índice `(plataforma, dia)`. RLS ligado é OK porque o job usa a chave secreta (bypassa RLS); bloqueia leitura pública via anon.
 
+### Cache compartilhado (api_cache, TTL 1h)
+As 4 rotas (`meta-ads`/`google-ads`/`tiktok-ads`/`entregas`) guardam a resposta `{nomes,data}` (ou `{sheets,data}`) por período no Supabase (tabela `api_cache`: `chave text pk, payload jsonb, atualizado_em timestamptz`, RLS ligado). Reduz chamadas às APIs quando várias pessoas usam ao mesmo tempo (era dor real — rate limit).
+- **`lib/cache.ts`**: `readCache(chave, maxAgeMs)` / `writeCache(chave, payload)`, ambos em try/catch → se o Supabase cair, retorna null/no-op e a rota segue ao vivo (zero regressão).
+- Padrão na rota: `chave = '<plat>|v1|<start>|<end>'`; lê cache no topo (pulado se `?fresh=1`), grava antes do return. O cache em memória (`_cache`) continua como L1 (também pulado se `fresh`).
+- **`?fresh=1`** fura cache (memória + Supabase), busca ao vivo e regrava. O botão "Atualizar" das páginas chama com `fresh=1` (`handleManualRefresh` → `fetchData(p, true)`); o auto-refresh dos horários pares usa cache normal.
+- **Backup de brinde:** se a coleta ao vivo falhar mas houver cache válido, o usuário vê o último valor salvo.
+
 **Fase 2 (futuro, não feito):** visão "Histórico" no dashboard lendo do Supabase (tendência mensal por cliente/plataforma).
 
 ## Deploy
