@@ -1,3 +1,6 @@
 {
-  "alias": ["digital-esquina.vercel.app"]
+  "alias": ["digital-esquina.vercel.app"],
+  "crons": [
+    { "path": "/api/snapshot", "schedule": "10 7 * * *" }
+  ]
 }
