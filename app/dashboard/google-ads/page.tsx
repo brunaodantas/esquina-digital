@@ -411,8 +411,8 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
                 <span style={{ fontSize: 12, color: t.textSecondary }}>{item.label}</span>
                 <span style={{ fontSize: 12, color: t.textMuted }}>{item.pct.toFixed(1).replace('.', ',')}%</span>
               </div>
-              <div style={{ height: 6, background: t.barTrack, borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${item.pct}%`, background: barColors[i % barColors.length], borderRadius: 3, transition: 'width 0.4s ease' }} />
+              <div style={{ height: 8, background: t.barTrack, borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${item.pct}%`, background: barColors[i % barColors.length], borderRadius: 999, transition: 'width 0.4s ease' }} />
               </div>
             </div>
           ))}
