@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readCache, writeCache } from '@/lib/cache'
 
 const BASE = 'https://business-api.tiktok.com/open_api/v1.3'
 const TOKEN = process.env.TIKTOK_ACCESS_TOKEN ?? ''
@@ -369,10 +370,17 @@ export async function GET(req: NextRequest) {
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  const fresh = searchParams.get('fresh') === '1'
+  const chave = `tiktok|v1|${start}|${end}`
+
   const cacheKey = `${CACHE_V}|${start}|${end}`
   const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)
-  if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
+  if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: allNomesStatic, data: _cache.data })
+  }
+  if (!fresh) {
+    const cacheado = await readCache(chave, 3_600_000)
+    if (cacheado) return NextResponse.json(cacheado)
   }
 
   try {
@@ -397,7 +405,9 @@ export async function GET(req: NextRequest) {
     // nomes inclui todas as contas do fallback, mesmo sem gasto no período
     const allNomes = ADVERTISER_IDS.map(id => nomeMap.get(id) ?? `ID ${id}`)
     _cache = { key: cacheKey, ts: Date.now(), data: results, nomes: allNomes }
-    return NextResponse.json({ nomes: allNomesStatic, data: results })
+    const out = { nomes: allNomesStatic, data: results }
+    await writeCache(chave, out)
+    return NextResponse.json(out)
   } catch (err: any) {
     console.error('TikTok Ads API error:', err)
     return NextResponse.json({ error: err.message ?? 'Erro interno' }, { status: 500 })

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readCache, writeCache } from '@/lib/cache'
 import { JWT } from 'google-auth-library'
 
 const SHEET_ID = process.env.SHEETS_ID!
@@ -255,6 +256,13 @@ export async function GET(req: NextRequest) {
     ? new Date(endParam + 'T23:59:59')
     : new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
 
+  const fresh = searchParams.get('fresh') === '1'
+  const chave = `entregas|v1|${periodoStart.toISOString().slice(0, 10)}|${periodoFim.toISOString().slice(0, 10)}`
+  if (!fresh && searchParams.get('debug') !== 'tabs') {
+    const cacheado = await readCache(chave, 3_600_000)
+    if (cacheado) return NextResponse.json(cacheado)
+  }
+
   const auth = await getAuthHeader()
 
   // Descobre todas as abas dinamicamente
@@ -299,5 +307,7 @@ export async function GET(req: NextRequest) {
   // Apenas clientes com campanhas reais no período (abas vazias excluídas automaticamente)
   const sheets = data.map(d => d.cliente).sort()
 
-  return NextResponse.json({ sheets, data })
+  const out = { sheets, data }
+  await writeCache(chave, out)
+  return NextResponse.json(out)
 }

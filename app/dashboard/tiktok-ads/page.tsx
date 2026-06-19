@@ -589,9 +589,9 @@ export default function TikTokAdsPage({ theme = 'dark', visible = true }: { them
   const periodoRef = useRef(getPeriodo('mes-atual'))
   const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function fetchData(p: { start: string; end: string }) {
+  function fetchData(p: { start: string; end: string }, fresh = false) {
     setLoading(true); setError('')
-    fetch(`/api/tiktok-ads?start=${p.start}&end=${p.end}`)
+    fetch(`/api/tiktok-ads?start=${p.start}&end=${p.end}${fresh ? '&fresh=1' : ''}`)
       .then(r => r.json())
       .then(res => {
         if (res.error) { setError(res.error); setLoading(false); return }
@@ -606,7 +606,7 @@ export default function TikTokAdsPage({ theme = 'dark', visible = true }: { them
   function handleManualRefresh() {
     if (cooldown || loading) return
     setCooldown(true)
-    fetchData(periodoRef.current)
+    fetchData(periodoRef.current, true)
     if (cooldownRef.current) clearTimeout(cooldownRef.current)
     cooldownRef.current = setTimeout(() => setCooldown(false), 30000)
   }

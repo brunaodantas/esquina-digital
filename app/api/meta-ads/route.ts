@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readCache, writeCache } from '@/lib/cache'
 
 const TOKEN = process.env.META_ACCESS_TOKEN ?? ''
 const API = 'https://graph.facebook.com/v21.0'
@@ -177,9 +178,16 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  const fresh = searchParams.get('fresh') === '1'
+  const chave = `meta|v1|${start}|${end}`
+
   const cacheKey = `metav3|${start}|${end}`
-  if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
+  if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
+  }
+  if (!fresh) {
+    const cacheado = await readCache(chave, 3_600_000)
+    if (cacheado) return NextResponse.json(cacheado)
   }
 
   const timeRange = JSON.stringify({ since: start, until: end })
@@ -427,5 +435,7 @@ export async function GET(req: NextRequest) {
   const nomes = results.map(a => a.nome).sort()
 
   _cache = { key: cacheKey, ts: Date.now(), data: results, nomes }
-  return NextResponse.json({ nomes, data: results })
+  const out = { nomes, data: results }
+  await writeCache(chave, out)
+  return NextResponse.json(out)
 }

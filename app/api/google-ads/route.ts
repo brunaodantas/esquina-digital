@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readCache, writeCache } from '@/lib/cache'
 
 const ADS_VERSION = 'v24'
 const BASE = `https://googleads.googleapis.com/${ADS_VERSION}`
@@ -225,9 +226,16 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  const fresh = searchParams.get('fresh') === '1'
+  const chave = `google|v1|${start}|${end}`
+
   const cacheKey = `${CACHE_V}|${start}|${end}`
-  if (_cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
+  if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
+  }
+  if (!fresh) {
+    const cacheado = await readCache(chave, 3_600_000)
+    if (cacheado) return NextResponse.json(cacheado)
   }
 
   try {
@@ -539,7 +547,9 @@ export async function GET(req: NextRequest) {
     // Retorna TODOS os nomes do MCC (não só os com gasto) para o dropdown dinâmico
     const nomes = accounts.map((a: { id: string; nome: string }) => a.nome).sort()
     _cache = { key: cacheKey, ts: Date.now(), data: results, nomes }
-    return NextResponse.json({ nomes, data: results })
+    const out = { nomes, data: results }
+    await writeCache(chave, out)
+    return NextResponse.json(out)
   } catch (err: any) {
     console.error('Google Ads API error:', err)
     return NextResponse.json({ error: err.message ?? 'Erro interno' }, { status: 500 })

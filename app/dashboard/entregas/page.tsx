@@ -573,10 +573,10 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
     return { data: Array.isArray(res) ? res : [], sheets: [] }
   }
 
-  function fetchData(p: { start: string; end: string }) {
+  function fetchData(p: { start: string; end: string }, fresh = false) {
     setLoading(true)
     setError('')
-    fetch(`/api/entregas?start=${p.start}&end=${p.end}`)
+    fetch(`/api/entregas?start=${p.start}&end=${p.end}${fresh ? '&fresh=1' : ''}`)
       .then(r => r.json())
       .then(res => {
         const parsed = parseResponse(res)
@@ -591,7 +591,7 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
   function handleManualRefresh() {
     if (cooldown || loading) return
     setCooldown(true)
-    fetchData(periodoRef.current)
+    fetchData(periodoRef.current, true)
     if (cooldownRef.current) clearTimeout(cooldownRef.current)
     cooldownRef.current = setTimeout(() => setCooldown(false), 30000)
   }
