@@ -1342,7 +1342,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('meta')
-  const [theme, setTheme] = useState<Theme>('dark')
+  const [theme, setTheme] = useState<Theme>('light')
   const [showRelatorio, setShowRelatorio] = useState(false)
   const [showRelatorioSemanal, setShowRelatorioSemanal] = useState(false)
   const router = useRouter()
