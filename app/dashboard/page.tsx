@@ -432,9 +432,12 @@ function buildRelatorioHTML(p: RelSemanalParams): string {
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="color-scheme" content="light">
 <title>Boletim Semanal — ${cliente} — ${periodoLabel}</title>
 <style>
+:root{color-scheme:light}
 *{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#fff}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 
 /* ── Every section fills exactly one page ── */
