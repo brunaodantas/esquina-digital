@@ -201,6 +201,18 @@ Quinto botão no header (cor azul, ícone 📄). Abre `RelatorioSemanalModal` qu
 **Seções geradas (cada uma = 1 página A4 paisagem):**
 Hero → Google Display → YouTube → Meta TD → Meta VP → TikTok → Diagnóstico → Conclusão → Footer
 
+## Supabase — histórico/cache de métricas (Fase 1: ingestão)
+
+Projeto Supabase `esquina-digital` (`https://ftoarlkapsumybkujtnc.supabase.co`, região São Paulo, free). Guarda snapshots diários das métricas — base para histórico/tendências e cache. **Puramente aditivo: não toca login (Firebase) nem as rotas/UI existentes.**
+
+- **`lib/supabase.ts`** — client server-side (`getSupabase()`), usa `SUPABASE_SERVICE_KEY` (chave nova `sb_secret_...`, ignora RLS). Nunca importar em client component.
+- **`app/api/snapshot/route.ts`** — job de ingestão. Chama as 4 rotas existentes (`meta-ads`/`google-ads`/`tiktok-ads`/`entregas`) do mês corrente em paralelo e faz `upsert` em `metric_snapshots` (1 linha por dia/plataforma/conta). Idempotente por `(dia, plataforma, conta_id)`. `metricas` = conta sem os arrays pesados (campanhas/grupos/anuncios/serie removidos); `campanhas` = lista de campanhas à parte. Protegido: header `Authorization: Bearer $CRON_SECRET` (Vercel Cron) ou `?key=$SNAPSHOT_SECRET` (teste manual).
+- **`vercel.json`** — cron diário `10 7 * * *` (≈04:10 BRT) chamando `/api/snapshot`.
+- **Env vars (Vercel, production):** `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SNAPSHOT_SECRET`, `CRON_SECRET`.
+- **Tabela** (`metric_snapshots`, RLS ligado): colunas `id, dia(date), plataforma(text), conta_id(text), conta_nome(text), metricas(jsonb), campanhas(jsonb), capturado_em(timestamptz)`, unique `(dia, plataforma, conta_id)`, índice `(plataforma, dia)`. RLS ligado é OK porque o job usa a chave secreta (bypassa RLS); bloqueia leitura pública via anon.
+
+**Fase 2 (futuro, não feito):** visão "Histórico" no dashboard lendo do Supabase (tendência mensal por cliente/plataforma).
+
 ## Deploy
 Push para `main` no GitHub dispara deploy automático na Vercel (conta `bruno@esquina.online`).
 
