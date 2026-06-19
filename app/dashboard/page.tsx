@@ -1392,6 +1392,14 @@ export default function Dashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
+      {/* Faixa de marca com a logo Esquina centralizada */}
+      <div style={{
+        display: 'flex', justifyContent: 'center', alignItems: 'center',
+        padding: '10px 0', flexShrink: 0, background: '#1A3CFF',
+      }}>
+        <img src="/logo-esquina-wordmark.png" alt="Esquina" style={{ height: 28, width: 'auto', filter: 'brightness(0) invert(1)' }} />
+      </div>
+
       {/* Header sempre visível */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
