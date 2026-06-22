@@ -128,6 +128,7 @@ export interface MetaBreakdownItem {
   impressions: number
   reach: number
   clicks: number
+  thruplays: number
   spend: number
   pct: number
 }
@@ -179,9 +180,9 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `meta|v1|${start}|${end}`
+  const chave = `meta|v2|${start}|${end}`
 
-  const cacheKey = `metav3|${start}|${end}`
+  const cacheKey = `metav4|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
@@ -233,7 +234,7 @@ export async function GET(req: NextRequest) {
     access_token: TOKEN,
   })
 
-  const BREAKDOWN_FIELDS = 'impressions,reach,clicks,spend'
+  const BREAKDOWN_FIELDS = 'impressions,reach,clicks,spend,video_thruplay_watched_actions'
   const generoParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'gender', time_range: timeRange, access_token: TOKEN })
   const idadeParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'age', time_range: timeRange, access_token: TOKEN })
   const dispositivoParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'device_platform', time_range: timeRange, access_token: TOKEN })
@@ -247,6 +248,7 @@ export async function GET(req: NextRequest) {
       impressions: parseInt(d.impressions || '0', 10),
       reach: parseInt(d.reach || '0', 10),
       clicks: parseInt(d.clicks || '0', 10),
+      thruplays: parseThruplays(d.video_thruplay_watched_actions),
       spend: parseFloat(d.spend || '0'),
       pct: 0,
     }))

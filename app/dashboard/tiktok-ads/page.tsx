@@ -389,8 +389,8 @@ function AudienciaSection({ filtrado, t }: { filtrado: TikTokAccountData[]; t: t
   }
 
   function exportCSV() {
-    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Percentual %']]
-    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressions, i.pct.toFixed(1)]))
+    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Cliques', 'Investimento', 'Percentual %']]
+    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressions, i.clicks, i.spend.toFixed(2), i.pct.toFixed(1)]))
     add('Gênero', genero); add('Faixa Etária', idade); add('Plataforma', plataforma)
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })

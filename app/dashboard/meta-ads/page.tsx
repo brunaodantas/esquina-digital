@@ -406,11 +406,11 @@ function AccountCard({ acc, totalSpend, t }: { acc: MetaAccountData; totalSpend:
 // ─── Audiência Section ─────────────────────────────────────────────────────────
 function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typeof C['dark'] }) {
   function aggregate(key: 'genero' | 'idade' | 'dispositivos') {
-    const map = new Map<string, { impressions: number; reach: number; clicks: number; spend: number }>()
+    const map = new Map<string, { impressions: number; reach: number; clicks: number; thruplays: number; spend: number }>()
     for (const acc of filtrado) {
       for (const item of acc.audiencia?.[key] ?? []) {
-        const ex = map.get(item.label) ?? { impressions: 0, reach: 0, clicks: 0, spend: 0 }
-        map.set(item.label, { impressions: ex.impressions + item.impressions, reach: ex.reach + item.reach, clicks: ex.clicks + item.clicks, spend: ex.spend + item.spend })
+        const ex = map.get(item.label) ?? { impressions: 0, reach: 0, clicks: 0, thruplays: 0, spend: 0 }
+        map.set(item.label, { impressions: ex.impressions + item.impressions, reach: ex.reach + item.reach, clicks: ex.clicks + item.clicks, thruplays: ex.thruplays + (item.thruplays ?? 0), spend: ex.spend + item.spend })
       }
     }
     const items = Array.from(map.entries()).map(([label, v]) => ({ label, ...v, pct: 0 }))
@@ -449,8 +449,8 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
   }
 
   function exportCSV() {
-    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Percentual %']]
-    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressions, i.pct.toFixed(1)]))
+    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Alcance', 'Cliques', 'ThruPlays', 'Investimento', 'Percentual %']]
+    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressions, i.reach, i.clicks, i.thruplays, i.spend.toFixed(2), i.pct.toFixed(1)]))
     add('Gênero', genero); add('Idade', idade); add('Dispositivos', dispositivos)
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })

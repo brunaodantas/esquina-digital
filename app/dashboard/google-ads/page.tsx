@@ -422,8 +422,8 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
   }
 
   function exportCSV() {
-    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Percentual %']]
-    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressoes, i.pct.toFixed(1)]))
+    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Cliques', 'Custo', 'Percentual %']]
+    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressoes, i.cliques, i.custo.toFixed(2), i.pct.toFixed(1)]))
     add('Gênero', genero); add('Idade', idade); add('Dispositivos', dispositivos)
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
