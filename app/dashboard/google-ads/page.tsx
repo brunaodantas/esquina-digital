@@ -377,7 +377,17 @@ function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: num
 }
 
 // ─── Audiência Section ─────────────────────────────────────────────────────────
+const AUD_METRICAS_GOOGLE = [
+  { key: 'impressoes', label: 'Impressões', money: false },
+  { key: 'cliques', label: 'Cliques', money: false },
+  { key: 'custo', label: 'Custo', money: true },
+] as const
+type AudMetricaGoogle = typeof AUD_METRICAS_GOOGLE[number]['key']
+
 function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof C['dark'] }) {
+  const [metrica, setMetrica] = useState<AudMetricaGoogle>('impressoes')
+  const info = AUD_METRICAS_GOOGLE.find(m => m.key === metrica)!
+
   function aggregate(key: keyof AudienceData) {
     const map = new Map<string, { impressoes: number; cliques: number; custo: number }>()
     for (const acc of filtrado) {
@@ -387,9 +397,9 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
       }
     }
     const items = Array.from(map.entries()).map(([label, v]) => ({ label, ...v, pct: 0 }))
-    const total = items.reduce((s, i) => s + i.impressoes, 0)
-    items.forEach(i => { i.pct = total > 0 ? Math.round((i.impressoes / total) * 1000) / 10 : 0 })
-    return items.sort((a, b) => b.impressoes - a.impressoes)
+    const total = items.reduce((s, i) => s + (i[metrica] as number), 0)
+    items.forEach(i => { i.pct = total > 0 ? Math.round(((i[metrica] as number) / total) * 1000) / 10 : 0 })
+    return items.sort((a, b) => (b[metrica] as number) - (a[metrica] as number))
   }
 
   const genero = aggregate('genero')
@@ -398,6 +408,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
   if (!genero.length && !idade.length && !dispositivos.length) return null
 
   const barColors = ['#4dabf7', '#c77dff', '#56cfe1', '#74c69d', '#ffd166', '#ff9f1c']
+  const fmtVal = (v: number) => info.money ? fmtBRL(v) : fmtNum(v)
 
   function BreakdownGroup({ title, items }: { title: string; items: ReturnType<typeof aggregate> }) {
     if (!items.length) return null
@@ -409,7 +420,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
             <div key={item.label}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 12, color: t.textSecondary }}>{item.label}</span>
-                <span style={{ fontSize: 12, color: t.textMuted }}>{item.pct.toFixed(1).replace('.', ',')}%</span>
+                <span style={{ fontSize: 12, color: t.textMuted }}>{fmtVal(item[metrica] as number)} · {item.pct.toFixed(1).replace('.', ',')}%</span>
               </div>
               <div style={{ height: 8, background: t.barTrack, borderRadius: 999, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${item.pct}%`, background: barColors[i % barColors.length], borderRadius: 999, transition: 'width 0.4s ease' }} />
@@ -420,6 +431,12 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
       </div>
     )
   }
+
+  const chip = (active: boolean): React.CSSProperties => ({
+    padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+    border: `1px solid ${active ? '#1A3CFF' : t.border}`, background: active ? '#1A3CFF22' : 'transparent',
+    color: active ? '#7ba3ff' : t.textMuted, transition: 'all 0.15s',
+  })
 
   function exportCSV() {
     const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Cliques', 'Custo', 'Percentual %']]
@@ -435,9 +452,15 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
 
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
-        <button onClick={exportCSV} title="Exportar audiência em CSV" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted, whiteSpace: 'nowrap' }}>↓ CSV</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: t.textMuted, marginRight: 2 }}>Ver por:</span>
+          {AUD_METRICAS_GOOGLE.map(m => (
+            <button key={m.key} onClick={() => setMetrica(m.key)} style={chip(metrica === m.key)}>{m.label}</button>
+          ))}
+          <button onClick={exportCSV} title="Exportar audiência em CSV" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted, whiteSpace: 'nowrap', marginLeft: 6 }}>↓ CSV</button>
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28 }}>
         <BreakdownGroup title="Gênero" items={genero} />

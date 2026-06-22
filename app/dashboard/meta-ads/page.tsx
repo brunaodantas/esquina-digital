@@ -404,7 +404,19 @@ function AccountCard({ acc, totalSpend, t }: { acc: MetaAccountData; totalSpend:
 }
 
 // ─── Audiência Section ─────────────────────────────────────────────────────────
+const AUD_METRICAS_META = [
+  { key: 'impressions', label: 'Impressões', money: false },
+  { key: 'reach', label: 'Alcance', money: false },
+  { key: 'clicks', label: 'Cliques', money: false },
+  { key: 'thruplays', label: 'ThruPlays', money: false },
+  { key: 'spend', label: 'Investimento', money: true },
+] as const
+type AudMetricaMeta = typeof AUD_METRICAS_META[number]['key']
+
 function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typeof C['dark'] }) {
+  const [metrica, setMetrica] = useState<AudMetricaMeta>('impressions')
+  const info = AUD_METRICAS_META.find(m => m.key === metrica)!
+
   function aggregate(key: 'genero' | 'idade' | 'dispositivos') {
     const map = new Map<string, { impressions: number; reach: number; clicks: number; thruplays: number; spend: number }>()
     for (const acc of filtrado) {
@@ -414,9 +426,9 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
       }
     }
     const items = Array.from(map.entries()).map(([label, v]) => ({ label, ...v, pct: 0 }))
-    const total = items.reduce((s, i) => s + i.impressions, 0)
-    items.forEach(i => { i.pct = total > 0 ? Math.round((i.impressions / total) * 1000) / 10 : 0 })
-    return items.sort((a, b) => b.impressions - a.impressions)
+    const total = items.reduce((s, i) => s + (i[metrica] as number), 0)
+    items.forEach(i => { i.pct = total > 0 ? Math.round(((i[metrica] as number) / total) * 1000) / 10 : 0 })
+    return items.sort((a, b) => (b[metrica] as number) - (a[metrica] as number))
   }
 
   const genero = aggregate('genero')
@@ -425,6 +437,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
   if (!genero.length && !idade.length && !dispositivos.length) return null
 
   const barColors = ['#4dabf7', '#c77dff', '#56cfe1', '#74c69d', '#ffd166', '#ff9f1c']
+  const fmtVal = (v: number) => info.money ? fmtBRL(v) : fmtNum(v)
 
   function BreakdownGroup({ title, items }: { title: string; items: ReturnType<typeof aggregate> }) {
     if (!items.length) return null
@@ -436,7 +449,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
             <div key={item.label}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <span style={{ fontSize: 12, color: t.textSecondary }}>{item.label}</span>
-                <span style={{ fontSize: 12, color: t.textMuted }}>{item.pct.toFixed(1).replace('.', ',')}%</span>
+                <span style={{ fontSize: 12, color: t.textMuted }}>{fmtVal(item[metrica] as number)} · {item.pct.toFixed(1).replace('.', ',')}%</span>
               </div>
               <div style={{ height: 8, background: t.barTrack, borderRadius: 999, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${item.pct}%`, background: barColors[i % barColors.length], borderRadius: 999, transition: 'width 0.4s ease' }} />
@@ -460,11 +473,23 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
     setTimeout(() => URL.revokeObjectURL(url), 100)
   }
 
+  const chip = (active: boolean): React.CSSProperties => ({
+    padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+    border: `1px solid ${active ? '#1A3CFF' : t.border}`, background: active ? '#1A3CFF22' : 'transparent',
+    color: active ? '#7ba3ff' : t.textMuted, transition: 'all 0.15s',
+  })
+
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
-        <button onClick={exportCSV} title="Exportar audiência em CSV" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted, whiteSpace: 'nowrap' }}>↓ CSV</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, color: t.textMuted, marginRight: 2 }}>Ver por:</span>
+          {AUD_METRICAS_META.map(m => (
+            <button key={m.key} onClick={() => setMetrica(m.key)} style={chip(metrica === m.key)}>{m.label}</button>
+          ))}
+          <button onClick={exportCSV} title="Exportar audiência em CSV" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted, whiteSpace: 'nowrap', marginLeft: 6 }}>↓ CSV</button>
+        </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28 }}>
         <BreakdownGroup title="Gênero" items={genero} />
