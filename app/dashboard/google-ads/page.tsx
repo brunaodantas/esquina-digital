@@ -379,7 +379,9 @@ function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: num
 // ─── Audiência Section ─────────────────────────────────────────────────────────
 const AUD_METRICAS_GOOGLE = [
   { key: 'impressoes', label: 'Impressões', money: false },
+  { key: 'videoViews', label: 'Visualizações', money: false },
   { key: 'cliques', label: 'Cliques', money: false },
+  { key: 'conversoes', label: 'Conversões', money: false },
   { key: 'custo', label: 'Custo', money: true },
 ] as const
 type AudMetricaGoogle = typeof AUD_METRICAS_GOOGLE[number]['key']
@@ -389,11 +391,11 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
   const info = AUD_METRICAS_GOOGLE.find(m => m.key === metrica)!
 
   function aggregate(key: keyof AudienceData) {
-    const map = new Map<string, { impressoes: number; cliques: number; custo: number }>()
+    const map = new Map<string, { impressoes: number; videoViews: number; cliques: number; conversoes: number; custo: number }>()
     for (const acc of filtrado) {
       for (const item of acc.audiencia?.[key] ?? []) {
-        const ex = map.get(item.label) ?? { impressoes: 0, cliques: 0, custo: 0 }
-        map.set(item.label, { impressoes: ex.impressoes + item.impressoes, cliques: ex.cliques + item.cliques, custo: ex.custo + item.custo })
+        const ex = map.get(item.label) ?? { impressoes: 0, videoViews: 0, cliques: 0, conversoes: 0, custo: 0 }
+        map.set(item.label, { impressoes: ex.impressoes + item.impressoes, videoViews: ex.videoViews + (item.videoViews ?? 0), cliques: ex.cliques + item.cliques, conversoes: ex.conversoes + (item.conversoes ?? 0), custo: ex.custo + item.custo })
       }
     }
     const items = Array.from(map.entries()).map(([label, v]) => ({ label, ...v, pct: 0 }))
@@ -439,8 +441,8 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
   })
 
   function exportCSV() {
-    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Cliques', 'Custo', 'Percentual %']]
-    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressoes, i.cliques, i.custo.toFixed(2), i.pct.toFixed(1)]))
+    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Visualizações', 'Cliques', 'Conversões', 'Custo', 'Percentual %']]
+    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressoes, i.videoViews, i.cliques, i.conversoes.toFixed(2), i.custo.toFixed(2), i.pct.toFixed(1)]))
     add('Gênero', genero); add('Idade', idade); add('Dispositivos', dispositivos)
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })

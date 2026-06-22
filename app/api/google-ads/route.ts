@@ -151,6 +151,8 @@ export interface AudienceItem {
   impressoes: number
   cliques: number
   custo: number
+  conversoes: number
+  videoViews: number
 }
 
 export interface AudienceData {
@@ -183,7 +185,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v8'
+const CACHE_V = 'v9'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -226,28 +228,8 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
-  // ── DEBUG: conversões e views por audiência ──
-  if (searchParams.get('debug') === 'audprobe') {
-    const token = await getToken()
-    const cid = '5619636645' // BIODIESEL (tem vídeo + display)
-    const out: Record<string, any> = {}
-    async function probe(label: string, q: string, version?: string) {
-      try {
-        const rows = await gaql(cid, q, token, version)
-        out[label] = { ok: true, count: rows.length, sample: rows.slice(0, 2).map((r: any) => r.metrics) }
-      } catch (e: any) { out[label] = { ok: false, err: String(e?.message).replace(/\s+/g, ' ').slice(0, 160) } }
-    }
-    const w = `WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`
-    await probe('gender_conv_v24', `SELECT ad_group_criterion.gender.type, metrics.conversions FROM gender_view ${w}`)
-    await probe('age_conv_v24', `SELECT ad_group_criterion.age_range.type, metrics.conversions FROM age_range_view ${w}`)
-    await probe('device_conv_v24', `SELECT segments.device, metrics.conversions FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`)
-    await probe('gender_views_v21', `SELECT ad_group_criterion.gender.type, metrics.video_views FROM gender_view ${w}`, 'v21')
-    await probe('age_views_v21', `SELECT ad_group_criterion.age_range.type, metrics.video_views FROM age_range_view ${w}`, 'v21')
-    return NextResponse.json({ debug: 'audprobe', out })
-  }
-
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `google|v1|${start}|${end}`
+  const chave = `google|v2|${start}|${end}`
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -280,7 +262,7 @@ export async function GET(req: NextRequest) {
       await Promise.all(
         accounts.map(async (acc: { id: string; nome: string }) => {
           try {
-            const [campRows, agRows, adRows, dailyRows, geoRows, genderRows, ageRows, deviceRows, vvRows] = await Promise.all([
+            const [campRows, agRows, adRows, dailyRows, geoRows, genderRows, ageRows, deviceRows, vvRows, genderViewsRows, ageViewsRows, deviceViewsRows] = await Promise.all([
               gaql(acc.id,
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
@@ -327,20 +309,20 @@ export async function GET(req: NextRequest) {
                 token).catch(() => []),
               gaql(acc.id,
                 `SELECT gender_view.resource_name, ad_group_criterion.gender.type,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
                  FROM gender_view
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND metrics.impressions > 0`,
                 token).catch(() => []),
               gaql(acc.id,
                 `SELECT age_range_view.resource_name, ad_group_criterion.age_range.type,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
                  FROM age_range_view
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND metrics.impressions > 0`,
                 token).catch(() => []),
               gaql(acc.id,
-                `SELECT segments.device, metrics.clicks, metrics.impressions, metrics.cost_micros
+                `SELECT segments.device, metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'
@@ -353,6 +335,23 @@ export async function GET(req: NextRequest) {
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.advertising_channel_type = 'VIDEO'
                    AND metrics.impressions > 0`,
+                token, VIEWS_VERSION).catch(() => []),
+              // Views por audiência (gênero/idade/dispositivo) — também só na v21
+              gaql(acc.id,
+                `SELECT ad_group_criterion.gender.type, metrics.video_views
+                 FROM gender_view
+                 WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`,
+                token, VIEWS_VERSION).catch(() => []),
+              gaql(acc.id,
+                `SELECT ad_group_criterion.age_range.type, metrics.video_views
+                 FROM age_range_view
+                 WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`,
+                token, VIEWS_VERSION).catch(() => []),
+              gaql(acc.id,
+                `SELECT segments.device, metrics.video_views
+                 FROM campaign
+                 WHERE segments.date BETWEEN '${start}' AND '${end}'
+                   AND campaign.status != 'REMOVED' AND metrics.impressions > 0`,
                 token, VIEWS_VERSION).catch(() => []),
             ])
 
@@ -523,24 +522,36 @@ export async function GET(req: NextRequest) {
             }
 
             // ── Audiência (gênero, idade, dispositivo) ─────────────────
-            function parseAud(rows: any[], typePath: (r: any) => string, labels: Record<string, string>): AudienceItem[] {
+            // mapa de views (v21) por rótulo, pra mesclar nas categorias
+            function viewsMap(rows: any[], typePath: (r: any) => string, labels: Record<string, string>): Map<string, number> {
+              const m = new Map<string, number>()
+              for (const row of rows) {
+                const raw = String(typePath(row) ?? ''); if (!raw) continue
+                const label = labels[raw] ?? raw
+                m.set(label, (m.get(label) ?? 0) + Number(row.metrics?.videoViews ?? 0))
+              }
+              return m
+            }
+            function parseAud(rows: any[], typePath: (r: any) => string, labels: Record<string, string>, views: Map<string, number>): AudienceItem[] {
               const m = new Map<string, AudienceItem>()
               for (const row of rows) {
                 const raw = String(typePath(row) ?? '')
                 if (!raw) continue
                 const label = labels[raw] ?? raw
-                const ex = m.get(label) ?? { label, impressoes: 0, cliques: 0, custo: 0 }
+                const ex = m.get(label) ?? { label, impressoes: 0, cliques: 0, custo: 0, conversoes: 0, videoViews: 0 }
                 ex.impressoes += Number(row.metrics?.impressions ?? 0)
                 ex.cliques += Number(row.metrics?.clicks ?? 0)
                 ex.custo += Number(row.metrics?.costMicros ?? 0) / 1_000_000
+                ex.conversoes += Number(row.metrics?.conversions ?? 0)
                 m.set(label, ex)
               }
+              for (const it of m.values()) it.videoViews = views.get(it.label) ?? 0
               return Array.from(m.values()).filter(i => i.impressoes > 0).sort((a, b) => b.impressoes - a.impressoes)
             }
             const audiencia: AudienceData = {
-              genero: parseAud(genderRows, r => r.adGroupCriterion?.gender?.type, GENDER_LABELS),
-              idade: parseAud(ageRows, r => r.adGroupCriterion?.ageRange?.type, AGE_LABELS),
-              dispositivos: parseAud(deviceRows, r => r.segments?.device, DEVICE_LABELS),
+              genero: parseAud(genderRows, r => r.adGroupCriterion?.gender?.type, GENDER_LABELS, viewsMap(genderViewsRows, r => r.adGroupCriterion?.gender?.type, GENDER_LABELS)),
+              idade: parseAud(ageRows, r => r.adGroupCriterion?.ageRange?.type, AGE_LABELS, viewsMap(ageViewsRows, r => r.adGroupCriterion?.ageRange?.type, AGE_LABELS)),
+              dispositivos: parseAud(deviceRows, r => r.segments?.device, DEVICE_LABELS, viewsMap(deviceViewsRows, r => r.segments?.device, DEVICE_LABELS)),
             }
 
             const custo = custoMicros / 1_000_000
