@@ -448,9 +448,24 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
     )
   }
 
+  function exportCSV() {
+    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Percentual %']]
+    const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressions, i.pct.toFixed(1)]))
+    add('Gênero', genero); add('Idade', idade); add('Dispositivos', dispositivos)
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'meta-ads-audiencia.csv'
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 100)
+  }
+
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 16 }}>Audiência</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
+        <button onClick={exportCSV} title="Exportar audiência em CSV" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted, whiteSpace: 'nowrap' }}>↓ CSV</button>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28 }}>
         <BreakdownGroup title="Gênero" items={genero} />
         <BreakdownGroup title="Idade" items={idade} />
