@@ -226,6 +226,26 @@ export async function GET(req: NextRequest) {
     `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  // ── DEBUG: conversões e views por audiência ──
+  if (searchParams.get('debug') === 'audprobe') {
+    const token = await getToken()
+    const cid = '5619636645' // BIODIESEL (tem vídeo + display)
+    const out: Record<string, any> = {}
+    async function probe(label: string, q: string, version?: string) {
+      try {
+        const rows = await gaql(cid, q, token, version)
+        out[label] = { ok: true, count: rows.length, sample: rows.slice(0, 2).map((r: any) => r.metrics) }
+      } catch (e: any) { out[label] = { ok: false, err: String(e?.message).replace(/\s+/g, ' ').slice(0, 160) } }
+    }
+    const w = `WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`
+    await probe('gender_conv_v24', `SELECT ad_group_criterion.gender.type, metrics.conversions FROM gender_view ${w}`)
+    await probe('age_conv_v24', `SELECT ad_group_criterion.age_range.type, metrics.conversions FROM age_range_view ${w}`)
+    await probe('device_conv_v24', `SELECT segments.device, metrics.conversions FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`)
+    await probe('gender_views_v21', `SELECT ad_group_criterion.gender.type, metrics.video_views FROM gender_view ${w}`, 'v21')
+    await probe('age_views_v21', `SELECT ad_group_criterion.age_range.type, metrics.video_views FROM age_range_view ${w}`, 'v21')
+    return NextResponse.json({ debug: 'audprobe', out })
+  }
+
   const fresh = searchParams.get('fresh') === '1'
   const chave = `google|v1|${start}|${end}`
 
