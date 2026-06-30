@@ -274,6 +274,21 @@ export async function GET(req: NextRequest) {
       .map((r: any) => ({ id: String(r.customerClient?.id ?? ''), nome: (r.customerClient?.descriptiveName ?? '').trim() }))
       .filter((a: any) => a.id && a.nome)
 
+    // PROBE TEMPORÁRIO: compara a query de anúncios com/sem policy_summary por conta. Remover depois.
+    if (searchParams.get('probe') === 'ads') {
+      const out: any[] = []
+      for (const acc of accounts) {
+        const base = `WHERE segments.date BETWEEN '${start}' AND '${end}' AND ad_group_ad.status != 'REMOVED' AND campaign.status != 'REMOVED' LIMIT 200`
+        const comPolicy = `SELECT ad_group_ad.ad.id, ad_group_ad.status, ad_group_ad.policy_summary.approval_status, ad_group_ad.policy_summary.review_status, ad_group_ad.policy_summary.policy_topic_entries, campaign.id, metrics.impressions FROM ad_group_ad ${base}`
+        const semPolicy = `SELECT ad_group_ad.ad.id, ad_group_ad.status, campaign.id, metrics.impressions FROM ad_group_ad ${base}`
+        let r1: any = 0, r2: any = 0
+        try { r1 = (await gaql(acc.id, comPolicy, token)).length } catch (e: any) { r1 = 'ERRO: ' + String(e.message).slice(0, 120) }
+        try { r2 = (await gaql(acc.id, semPolicy, token)).length } catch (e: any) { r2 = 'ERRO: ' + String(e.message).slice(0, 120) }
+        out.push({ conta: acc.nome, comPolicy: r1, semPolicy: r2 })
+      }
+      return NextResponse.json({ probe: 'ads', start, end, contas: out })
+    }
+
     const results = (
       await Promise.all(
         accounts.map(async (acc: { id: string; nome: string }) => {
