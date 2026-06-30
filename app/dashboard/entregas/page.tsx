@@ -69,7 +69,8 @@ const PRESETS: { key: Preset; label: string }[] = [
 ]
 
 function fmtDate(d: Date) {
-  return d.toISOString().slice(0, 10)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
 function getPeriodo(preset: Preset, custom?: { start: string; end: string }): { start: string; end: string; label: string } {
@@ -662,7 +663,7 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
           }}
         >
           <option value="">Todos os clientes</option>
-          {sheets.map(c => <option key={c} value={c}>{c}</option>)}
+          {sheets.filter(c => (data ?? []).some(d => d.cliente === c)).map(c => <option key={c} value={c}>{c}</option>)}
         </select>
 
         <button

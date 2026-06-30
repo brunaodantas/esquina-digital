@@ -59,7 +59,7 @@ const NIVEL_TABS: { key: Nivel; label: string }[] = [
   { key: 'anuncios', label: 'Anúncios' },
 ]
 
-function fmtDate(d: Date) { return d.toISOString().slice(0, 10) }
+function fmtDate(d: Date) { const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
 
 function getPeriodo(preset: Preset, custom?: { start: string; end: string }): { start: string; end: string; label: string } {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
@@ -965,7 +965,7 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
         <PeriodoDropdown preset={preset} custom={custom} t={t} onApply={aplicarPeriodo} />
         <select value={filtroCliente} onChange={e => setFiltroCliente(e.target.value)} style={{ background: t.selectBg, border: `1px solid ${t.selectBorder}`, color: t.selectText, borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', outline: 'none', height: 34 }}>
           <option value="">Todas as contas</option>
-          {nomes.map(n => <option key={n} value={n}>{n}</option>)}
+          {nomes.filter(n => (data ?? []).some(d => d.nome === n)).map(n => <option key={n} value={n}>{n}</option>)}
         </select>
         <button
           onClick={handleManualRefresh}

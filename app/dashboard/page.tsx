@@ -15,7 +15,7 @@ type Theme = 'dark' | 'light'
 type PresetWA = 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'personalizado'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-function fmtD(d: Date) { return d.toISOString().slice(0, 10) }
+function fmtD(d: Date) { const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
 
 function getPeriodoWA(preset: PresetWA, custom: { start: string; end: string }): { start: string; end: string; label: string; labelCurto: string } {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
@@ -685,14 +685,14 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
     // Default: last 7 days
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
     const start = new Date(hoje); start.setDate(start.getDate() - 6)
-    setPeriodoStart(start.toISOString().slice(0, 10))
-    setPeriodoEnd(hoje.toISOString().slice(0, 10))
+    setPeriodoStart(fmtD(start))
+    setPeriodoEnd(fmtD(hoje))
   }, [])
 
   useEffect(() => {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
     const start = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
-    const end = hoje.toISOString().slice(0, 10)
+    const end = fmtD(hoje)
     Promise.all([
       fetch(`/api/meta-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
       fetch(`/api/google-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
@@ -891,7 +891,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
     const start = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
-    const end = hoje.toISOString().slice(0, 10)
+    const end = fmtD(hoje)
     Promise.all([
       fetch(`/api/meta-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),
       fetch(`/api/google-ads?start=${start}&end=${end}`).then(r => r.json()).catch(() => ({})),

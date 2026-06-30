@@ -54,7 +54,7 @@ const PRESETS: { key: Preset; label: string }[] = [
   { key: 'ytd-2026', label: '2026 (YTD)' },
 ]
 
-function fmtDate(d: Date) { return d.toISOString().slice(0, 10) }
+function fmtDate(d: Date) { const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
 
 function getPeriodo(preset: Preset, custom?: { start: string; end: string }): { start: string; end: string; label: string } {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
@@ -784,7 +784,7 @@ export default function TikTokAdsPage({ theme = 'dark', visible = true }: { them
         <PeriodoDropdown preset={preset} custom={custom} t={t} onApply={aplicarPeriodo} />
         <select value={filtroCliente} onChange={e => setFiltroCliente(e.target.value)} style={{ background: t.selectBg, border: `1px solid ${t.selectBorder}`, color: t.selectText, borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer', outline: 'none', height: 34 }}>
           <option value="">Todas as contas</option>
-          {nomes.map(n => <option key={n} value={n}>{n}</option>)}
+          {nomes.filter(n => (data ?? []).some(d => d.nome === n)).map(n => <option key={n} value={n}>{n}</option>)}
         </select>
         <button onClick={handleManualRefresh} disabled={cooldown || loading} title={cooldown ? 'Aguarde 30s' : 'Atualizar dados'} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: cooldown || loading ? 'not-allowed' : 'pointer', border: `1px solid ${t.border}`, background: t.filtroBtn, color: cooldown || loading ? t.textMuted : t.textSecondary, transition: 'all 0.15s', flexShrink: 0 }}>
           <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>↻</span>
