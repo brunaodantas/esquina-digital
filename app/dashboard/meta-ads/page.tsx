@@ -119,7 +119,7 @@ function CopiavelNum({ compact, full = compact }: { compact: string; full?: stri
       onMouseEnter={() => setTip('hover')}
       onMouseLeave={() => setTip(null)}
       onClick={() => {
-        navigator.clipboard.writeText(full)
+        navigator.clipboard.writeText(full.replace(/^R\$\s*/, ''))
         setTip('copied')
         setTimeout(() => setTip(null), 1200)
       }}

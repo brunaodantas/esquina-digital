@@ -253,7 +253,7 @@ function NumWithTooltip({ abbrev, exact, color }: { abbrev: string; exact: strin
         onMouseLeave={() => { setPos(null); setCopied(false) }}
         onClick={() => {
           if (!canCopy) return
-          navigator.clipboard.writeText(exact)
+          navigator.clipboard.writeText(exact.replace(/^R\$\s*/, ''))
           setCopied(true)
           setTimeout(() => setCopied(false), 1200)
         }}

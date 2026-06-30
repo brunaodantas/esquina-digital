@@ -94,7 +94,7 @@ function CopiavelNum({ compact, full = compact }: { compact: string; full?: stri
   return (
     <span style={{ position: 'relative', cursor: 'copy', userSelect: 'none' }}
       onMouseEnter={() => setTip('hover')} onMouseLeave={() => setTip(null)}
-      onClick={() => { navigator.clipboard.writeText(full); setTip('copied'); setTimeout(() => setTip(null), 1200) }}>
+      onClick={() => { navigator.clipboard.writeText(full.replace(/^R\$\s*/, '')); setTip('copied'); setTimeout(() => setTip(null), 1200) }}>
       {compact}
       {tip && (
         <span style={{ position: 'absolute', bottom: 'calc(100% + 6px)', right: '50%', transform: 'translateX(50%)', background: '#0f172a', border: '1px solid #334155', borderRadius: 5, padding: '3px 8px', fontSize: 11, whiteSpace: 'nowrap', zIndex: 200, pointerEvents: 'none', color: tip === 'copied' ? '#4ade80' : '#e2e8f0', fontWeight: 400 }}>
