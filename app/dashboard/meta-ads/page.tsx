@@ -140,6 +140,42 @@ function CopiavelNum({ compact, full = compact }: { compact: string; full?: stri
   )
 }
 
+// Cor do selo de status conforme o rótulo (verde=ok, amarelo=atenção, vermelho=problema)
+function statusCor(label: string): { fg: string; bg: string; bd: string } {
+  const l = label.toLowerCase()
+  if (/(reprovad|rejeitad|com problema|recusad)/.test(l)) return { fg: '#f87171', bg: '#ef444418', bd: '#ef444430' }
+  if (/(análise|analise|limitad|pausad|pendente|revis)/.test(l)) return { fg: '#f59e0b', bg: '#f59e0b18', bd: '#f59e0b30' }
+  return { fg: '#4ade80', bg: '#00cc6618', bd: '#00cc6630' }
+}
+
+// Selo de status do anúncio; mostra o motivo no hover quando houver.
+function StatusPill({ label, motivo }: { label: string; motivo?: string }) {
+  const [hover, setHover] = useState(false)
+  const c = statusCor(label)
+  const temMotivo = !!(motivo && motivo.trim())
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-block', cursor: temMotivo ? 'help' : 'default' }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.bd}`, whiteSpace: 'nowrap' }}>
+        {label}{temMotivo ? ' ⓘ' : ''}
+      </span>
+      {hover && temMotivo && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
+          background: '#0f172a', border: '1px solid #334155', borderRadius: 5, padding: '5px 9px',
+          fontSize: 11, maxWidth: 280, whiteSpace: 'normal', zIndex: 200, pointerEvents: 'none',
+          color: '#e2e8f0', fontWeight: 400, lineHeight: '1.5', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          {motivo}
+        </span>
+      )}
+    </span>
+  )
+}
+
 // ─── Period Dropdown ───────────────────────────────────────────────────────────
 function PeriodoDropdown({ preset, custom, t, onApply }: {
   preset: Preset; custom: { start: string; end: string }; t: typeof C['dark']
@@ -748,6 +784,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             <thead>
               <tr>
                 <th style={{ ...thS, minWidth: 200 }}>ANÚNCIO</th>
+                <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
                 <th style={{ ...thS, minWidth: 160 }}>CONJUNTO</th>
                 {(['spend','impressions','clicks','ctr','cpm','cpc'] as const).map((col, i) => {
                   const labels = ['INVEST.','IMPR.','CLIQUES','CTR','CPM','CPC']
@@ -757,20 +794,16 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             </thead>
             <tbody>
               {sortedAds.length === 0 ? (
-                <tr><td colSpan={8} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum anúncio encontrado</td></tr>
+                <tr><td colSpan={9} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum anúncio encontrado</td></tr>
               ) : sortedAds.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
-                      <div style={{ marginBottom: share > 0 ? 5 : 0 }}>
-                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: c.status === 'ativo' ? '#22c55e22' : '#f59e0b22', color: c.status === 'ativo' ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>
-                          {c.status === 'ativo' ? 'Ativo' : 'Pausado'}
-                        </span>
-                      </div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: share > 0 ? 5 : 0 }}>{c.nome}</div>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
+                    <td style={tdS}><StatusPill label={c.statusRevisao} motivo={c.statusMotivo} /></td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{c.adset}</td>
                     <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>

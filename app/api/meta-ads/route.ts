@@ -55,6 +55,58 @@ function parseThruplays(actions: any[]): number {
   return v ? parseInt(v.value ?? '0', 10) : 0
 }
 
+// effective_status do anúncio → rótulo PT-BR para a coluna de status
+function metaStatusLabel(s: string): string {
+  switch (s) {
+    case 'ACTIVE': return 'Ativo'
+    case 'PAUSED': case 'CAMPAIGN_PAUSED': case 'ADSET_PAUSED': return 'Pausado'
+    case 'PENDING_REVIEW': case 'IN_PROCESS': return 'Em análise'
+    case 'DISAPPROVED': return 'Reprovado'
+    case 'WITH_ISSUES': return 'Com problemas'
+    case 'PREAPPROVED': return 'Pré-aprovado'
+    case 'PENDING_BILLING_INFO': return 'Pendente faturamento'
+    case 'ARCHIVED': case 'DELETED': return 'Arquivado'
+    default: return 'Ativo'
+  }
+}
+
+// ad_review_feedback vem como objeto aninhado (global / placement_specific) com textos
+// legíveis do motivo da reprovação. Achata todos os textos num só string.
+function extractReviewFeedback(fb: any): string {
+  if (!fb || typeof fb !== 'object') return ''
+  const msgs: string[] = []
+  const collect = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return
+    for (const v of Object.values(obj)) {
+      if (typeof v === 'string') msgs.push(v.trim())
+      else if (v && typeof v === 'object') collect(v)
+    }
+  }
+  collect(fb)
+  return Array.from(new Set(msgs.filter(Boolean))).join(' · ')
+}
+
+// Busca status de revisão dos anúncios (o endpoint /insights não traz isso).
+// Retorna Map<ad_id, { effective_status, motivo }>. Falha não quebra a tabela.
+async function fetchAdStatuses(accountId: string): Promise<Map<string, { effective_status: string; motivo: string }>> {
+  const map = new Map<string, { effective_status: string; motivo: string }>()
+  let url: string | null = `${API}/act_${accountId}/ads?fields=id,effective_status,ad_review_feedback&limit=500&access_token=${encodeURIComponent(TOKEN)}`
+  let guard = 0
+  while (url && guard < 20) {
+    guard++
+    const res = await fetch(url, { next: { revalidate: 0 } })
+    const json: any = await res.json()
+    if (json.error) break
+    for (const a of json.data ?? []) {
+      const id = String(a.id ?? '')
+      if (!id) continue
+      map.set(id, { effective_status: a.effective_status ?? 'ACTIVE', motivo: extractReviewFeedback(a.ad_review_feedback) })
+    }
+    url = json.paging?.next ?? null
+  }
+  return map
+}
+
 export interface MetaDailyPoint {
   date: string
   spend: number
@@ -114,6 +166,8 @@ export interface MetaAdData {
   adset: string
   campanha: string
   status: string
+  statusRevisao: string
+  statusMotivo: string
   spend: number
   impressions: number
   reach: number
@@ -180,9 +234,9 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `meta|v2|${start}|${end}`
+  const chave = `meta|v3|${start}|${end}`
 
-  const cacheKey = `metav4|${start}|${end}`
+  const cacheKey = `metav5|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
@@ -282,6 +336,8 @@ export async function GET(req: NextRequest) {
     await Promise.all(
       active.map(async (acc) => {
         try {
+          // status de revisão dos anúncios roda em paralelo (endpoint /ads, não /insights)
+          const adStatusPromise = fetchAdStatuses(acc.id).catch(() => new Map<string, { effective_status: string; motivo: string }>())
           const [accRes, campRes, adsetRes, adRes, dailyRes, generoRes, idadeRes, dispositivoRes] = await Promise.all([
             fetch(`${API}/act_${acc.id}/insights?${accountParams}`, { next: { revalidate: 0 } }),
             fetch(`${API}/act_${acc.id}/insights?${campaignParams}`, { next: { revalidate: 0 } }),
@@ -360,22 +416,30 @@ export async function GET(req: NextRequest) {
             }))
             .sort((a: MetaAdSetData, b: MetaAdSetData) => b.spend - a.spend)
 
+          const adStatusMap = await adStatusPromise
+
           const ads: MetaAdData[] = (adData.data ?? [])
             .filter((c: any) => parseFloat(c.spend || '0') > 0)
-            .map((c: any): MetaAdData => ({
-              id: c.ad_id ?? '',
-              nome: c.ad_name ?? '',
-              adset: c.adset_name ?? '',
-              campanha: c.campaign_name ?? '',
-              status: mapStatus(c.effective_status ?? 'ACTIVE'),
-              spend: parseFloat(c.spend || '0'),
-              impressions: parseInt(c.impressions || '0', 10),
-              reach: parseInt(c.reach || '0', 10),
-              clicks: parseInt(c.clicks || '0', 10),
-              ctr: parseFloat(c.ctr || '0'),
-              cpm: parseFloat(c.cpm || '0'),
-              cpc: parseFloat(c.cpc || '0'),
-            }))
+            .map((c: any): MetaAdData => {
+              const st = adStatusMap.get(String(c.ad_id ?? ''))
+              const eff = st?.effective_status ?? 'ACTIVE'
+              return {
+                id: c.ad_id ?? '',
+                nome: c.ad_name ?? '',
+                adset: c.adset_name ?? '',
+                campanha: c.campaign_name ?? '',
+                status: mapStatus(eff),
+                statusRevisao: metaStatusLabel(eff),
+                statusMotivo: st?.motivo ?? '',
+                spend: parseFloat(c.spend || '0'),
+                impressions: parseInt(c.impressions || '0', 10),
+                reach: parseInt(c.reach || '0', 10),
+                clicks: parseInt(c.clicks || '0', 10),
+                ctr: parseFloat(c.ctr || '0'),
+                cpm: parseFloat(c.cpm || '0'),
+                cpc: parseFloat(c.cpc || '0'),
+              }
+            })
             .sort((a: MetaAdData, b: MetaAdData) => b.spend - a.spend)
 
           const serie: MetaDailyPoint[] = (dailyData.data ?? [])

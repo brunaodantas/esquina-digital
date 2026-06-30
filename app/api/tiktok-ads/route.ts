@@ -92,6 +92,8 @@ export interface TikTokAdData {
   nome: string
   adset: string
   campanha: string
+  statusRevisao: string
+  statusMotivo: string
   spend: number
   impressions: number
   reach: number
@@ -105,7 +107,7 @@ export interface TikTokAdData {
 
 let _cache: { key: string; ts: number; data: TikTokAccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v11'
+const CACHE_V = 'v12'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -143,6 +145,53 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
   return results
+}
+
+// secondary_status / operation_status do anúncio TikTok → rótulo PT-BR
+function tiktokStatusLabel(operation: string, secondary: string): string {
+  const s = (secondary || '').toUpperCase()
+  if (s) {
+    if (s === 'AD_STATUS_DELIVERY_OK') return 'Veiculando'
+    if (s === 'AD_STATUS_NOT_START') return 'Não iniciado'
+    if (s === 'AD_STATUS_DELETE') return 'Excluído'
+    if (s.includes('DENY') || s.includes('REJECT') || s.includes('NOT_APPROVE')) return 'Reprovado'
+    if (s.includes('AUDIT') || s.includes('REVIEW')) return 'Em análise'
+    if (s.includes('DISABLE') || s.includes('SUSPEND')) return 'Pausado'
+    if (s.includes('BUDGET') || s.includes('BALANCE') || s.includes('NOT_DELIVERY')) return 'Veiculação limitada'
+  }
+  if ((operation || '').toUpperCase() === 'DISABLE') return 'Pausado'
+  return 'Ativo'
+}
+
+// Busca status de revisão dos anúncios via /ad/get/ (o /report/ não traz status).
+// Retorna Map<ad_id, { operation, secondary, motivo }>. Falha não quebra a tabela.
+async function fetchTikTokAdStatuses(advertiserId: string): Promise<Map<string, { operation: string; secondary: string; motivo: string }>> {
+  const map = new Map<string, { operation: string; secondary: string; motivo: string }>()
+  let page = 1
+  let guard = 0
+  while (guard < 20) {
+    guard++
+    const res = await tiktokGet('/ad/get/', {
+      advertiser_id: advertiserId,
+      fields: JSON.stringify(['ad_id', 'operation_status', 'secondary_status']),
+      page: String(page),
+      page_size: '100',
+    })
+    if (res?.code !== 0) break
+    for (const a of res?.data?.list ?? []) {
+      const id = String(a.ad_id ?? '')
+      if (!id) continue
+      map.set(id, {
+        operation: String(a.operation_status ?? ''),
+        secondary: String(a.secondary_status ?? ''),
+        motivo: '',
+      })
+    }
+    const info = res?.data?.page_info
+    if (!info || page >= Number(info.total_page ?? 1)) break
+    page++
+  }
+  return map
 }
 
 async function getAdvertiserNames(ids: string[]): Promise<Map<string, string>> {
@@ -325,6 +374,7 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
       nome: String(m.ad_name ?? '').trim() || aid,
       adset: String(m.adgroup_name ?? '').trim(),
       campanha: String(m.campaign_name ?? '').trim(),
+      statusRevisao: 'Ativo', statusMotivo: '',
       spend, impressions: Number(m.impressions ?? 0), reach: Number(m.reach ?? 0), clicks: Number(m.clicks ?? 0),
       videoViews: aviews,
       ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
@@ -332,6 +382,22 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     })
   }
   anuncios.sort((a, b) => b.spend - a.spend)
+
+  // Status de revisão dos anúncios (endpoint /ad/get/, separado do relatório). Best-effort.
+  if (anuncios.length > 0) {
+    try {
+      const statusMap = await fetchTikTokAdStatuses(advertiserId)
+      for (const a of anuncios) {
+        const st = statusMap.get(a.id)
+        if (st) {
+          a.statusRevisao = tiktokStatusLabel(st.operation, st.secondary)
+          a.statusMotivo = st.motivo
+        }
+      }
+    } catch (e) {
+      console.error(`TikTok ad status ${advertiserId}:`, e)
+    }
+  }
 
   const audiencia: TikTokAudienceData = {
     genero: parseAudItems(genderRes, 'gender', GENDER_LABELS),
@@ -370,8 +436,23 @@ export async function GET(req: NextRequest) {
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
+  // PROBE TEMPORÁRIO: confirma os campos/valores de status do /ad/get/ em produção. Remover depois.
+  if (searchParams.get('probe') === 'adstatus') {
+    try {
+      const id = searchParams.get('adv') ?? ADVERTISER_IDS[1]
+      const raw = await tiktokGet('/ad/get/', {
+        advertiser_id: id,
+        fields: JSON.stringify(['ad_id', 'ad_name', 'operation_status', 'secondary_status']),
+        page_size: '10',
+      })
+      return NextResponse.json({ probedAdvertiser: id, raw })
+    } catch (e: any) {
+      return NextResponse.json({ probeError: e?.message ?? String(e) })
+    }
+  }
+
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `tiktok|v1|${start}|${end}`
+  const chave = `tiktok|v2|${start}|${end}`
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)

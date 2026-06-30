@@ -114,6 +114,41 @@ function CopiavelNum({ compact, full = compact }: { compact: string; full?: stri
     </span>
   )
 }
+// Cor do selo de status conforme o rótulo (verde=ok, amarelo=atenção, vermelho=problema)
+function statusCor(label: string): { fg: string; bg: string; bd: string } {
+  const l = label.toLowerCase()
+  if (/(reprovad|rejeitad|com problema|recusad)/.test(l)) return { fg: '#f87171', bg: '#ef444418', bd: '#ef444430' }
+  if (/(análise|analise|limitad|pausad|pendente|revis)/.test(l)) return { fg: '#f59e0b', bg: '#f59e0b18', bd: '#f59e0b30' }
+  return { fg: '#4ade80', bg: '#00cc6618', bd: '#00cc6630' }
+}
+
+// Selo de status do anúncio; mostra o motivo no hover quando houver.
+function StatusPill({ label, motivo }: { label: string; motivo?: string }) {
+  const [hover, setHover] = useState(false)
+  const c = statusCor(label)
+  const temMotivo = !!(motivo && motivo.trim())
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-block', cursor: temMotivo ? 'help' : 'default' }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.bd}`, whiteSpace: 'nowrap' }}>
+        {label}{temMotivo ? ' ⓘ' : ''}
+      </span>
+      {hover && temMotivo && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
+          background: '#0f172a', border: '1px solid #334155', borderRadius: 5, padding: '5px 9px',
+          fontSize: 11, maxWidth: 280, whiteSpace: 'normal', zIndex: 200, pointerEvents: 'none',
+          color: '#e2e8f0', fontWeight: 400, lineHeight: '1.5', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          {motivo}
+        </span>
+      )}
+    </span>
+  )
+}
 function fmtDateLabel(iso: string) { const [, m, d] = iso.split('-'); return `${d}/${m}` }
 
 // ─── Period Dropdown ──────────────────────────────────────────────────────────
@@ -767,18 +802,19 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
             <thead>
               <tr>
                 <th style={{ ...thS, minWidth: 200 }}>ANÚNCIO</th>
+                <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
                 <th style={{ ...thS, minWidth: 140 }}>GRUPO</th>
                 <th style={{ ...thS, minWidth: 140 }}>CAMPANHA</th>
                 {metricHeaders}
               </tr>
             </thead>
             <tbody>
-              {sortedAnuncios.length === 0 ? emptyRow(14) : sortedAnuncios.map(a => (
+              {sortedAnuncios.length === 0 ? emptyRow(15) : sortedAnuncios.map(a => (
                 <tr key={a.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
                     <div style={{ fontWeight: 600, color: t.textPrimary }}>{a.nome}</div>
-                    <div style={{ marginTop: 3 }}>{statusBadge(a.status)}</div>
                   </td>
+                  <td style={tdS}><StatusPill label={a.statusRevisao} motivo={a.statusMotivo} /></td>
                   <td style={{ ...tdS, color: t.textMuted, fontSize: 12 }}>{a.grupoNome}</td>
                   <td style={{ ...tdS, color: t.textMuted, fontSize: 12 }}>{a.campanhaNome}</td>
                   {metricCols(a, 0)}

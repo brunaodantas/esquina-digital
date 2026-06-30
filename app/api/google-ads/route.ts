@@ -68,6 +68,20 @@ const TIPO_MAP: Record<string, string> = {
   SMART: 'Smart',
 }
 
+// Normaliza o status de revisão de um anúncio do Google → rótulo PT-BR.
+// adStatus: ENABLED/PAUSED · approval: policy_summary.approval_status · review: policy_summary.review_status
+function googleAdStatusLabel(adStatus: string, approval?: string, review?: string): string {
+  if (adStatus === 'PAUSED') return 'Pausado'
+  if (review === 'REVIEW_IN_PROGRESS') return 'Em análise'
+  switch (approval) {
+    case 'DISAPPROVED': return 'Reprovado'
+    case 'APPROVED_LIMITED': return 'Aprovado (limitado)'
+    case 'AREA_OF_INTEREST_ONLY': return 'Veiculação limitada'
+    case 'APPROVED': return 'Aprovado'
+    default: return 'Ativo'
+  }
+}
+
 export interface CampaignData {
   id: string
   nome: string
@@ -110,6 +124,8 @@ export interface AdData {
   id: string
   nome: string
   status: 'ativo' | 'pausado'
+  statusRevisao: string
+  statusMotivo: string
   grupoId: string
   grupoNome: string
   campanhaId: string
@@ -185,7 +201,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v9'
+const CACHE_V = 'v10'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -229,7 +245,7 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `google|v2|${start}|${end}`
+  const chave = `google|v3|${start}|${end}`
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -281,6 +297,9 @@ export async function GET(req: NextRequest) {
                 token),
               gaql(acc.id,
                 `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status,
+                   ad_group_ad.policy_summary.approval_status,
+                   ad_group_ad.policy_summary.review_status,
+                   ad_group_ad.policy_summary.policy_topic_entries,
                    ad_group.id, ad_group.name,
                    campaign.id, campaign.name,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
@@ -441,9 +460,16 @@ export async function GET(req: NextRequest) {
               const ex = adMap.get(adid)
               const rawName = (ada.ad?.name ?? '').trim()
               if (!ex) {
+                const ps = ada.policySummary ?? {}
+                const motivo = (ps.policyTopicEntries ?? [])
+                  .map((e: any) => String(e.topic ?? '').trim())
+                  .filter(Boolean)
+                  .join(', ')
                 adMap.set(adid, {
                   id: adid, nome: rawName || `ID ${adid}`,
                   status: ada.status === 'PAUSED' ? 'pausado' : 'ativo',
+                  statusRevisao: googleAdStatusLabel(ada.status, ps.approvalStatus, ps.reviewStatus),
+                  statusMotivo: motivo,
                   grupoId: String(ag.id ?? ''), grupoNome: (ag.name ?? '').trim(),
                   campanhaId: String(camp.id ?? ''), campanhaNome: (camp.name ?? '').trim(),
                   cliques: cl, impressoes: imp, videoViews: vv, custo, conversoes: conv,

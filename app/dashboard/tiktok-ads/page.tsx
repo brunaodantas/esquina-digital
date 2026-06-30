@@ -105,6 +105,42 @@ function CopiavelNum({ compact, full = compact }: { compact: string; full?: stri
   )
 }
 
+// Cor do selo de status conforme o rótulo (verde=ok, amarelo=atenção, vermelho=problema)
+function statusCor(label: string): { fg: string; bg: string; bd: string } {
+  const l = label.toLowerCase()
+  if (/(reprovad|rejeitad|com problema|recusad)/.test(l)) return { fg: '#f87171', bg: '#ef444418', bd: '#ef444430' }
+  if (/(análise|analise|limitad|pausad|pendente|revis|não iniciad|nao iniciad)/.test(l)) return { fg: '#f59e0b', bg: '#f59e0b18', bd: '#f59e0b30' }
+  return { fg: '#4ade80', bg: '#00cc6618', bd: '#00cc6630' }
+}
+
+// Selo de status do anúncio; mostra o motivo no hover quando houver.
+function StatusPill({ label, motivo }: { label: string; motivo?: string }) {
+  const [hover, setHover] = useState(false)
+  const c = statusCor(label)
+  const temMotivo = !!(motivo && motivo.trim())
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-block', cursor: temMotivo ? 'help' : 'default' }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.bd}`, whiteSpace: 'nowrap' }}>
+        {label}{temMotivo ? ' ⓘ' : ''}
+      </span>
+      {hover && temMotivo && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
+          background: '#0f172a', border: '1px solid #334155', borderRadius: 5, padding: '5px 9px',
+          fontSize: 11, maxWidth: 280, whiteSpace: 'normal', zIndex: 200, pointerEvents: 'none',
+          color: '#e2e8f0', fontWeight: 400, lineHeight: '1.5', boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          {motivo}
+        </span>
+      )}
+    </span>
+  )
+}
+
 // ─── Period Dropdown ──────────────────────────────────────────────────────────
 function PeriodoDropdown({ preset, custom, t, onApply }: {
   preset: Preset; custom: { start: string; end: string }; t: typeof C['dark']
@@ -581,10 +617,10 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
 
         {nivel === 'anuncios' && (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={{ ...thS, minWidth: 200 }}>ANÚNCIO</th><th style={{ ...thS, minWidth: 160 }}>CONJUNTO</th><th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
+            <thead><tr><th style={{ ...thS, minWidth: 200 }}>ANÚNCIO</th><th style={{ ...thS, minWidth: 120 }}>STATUS</th><th style={{ ...thS, minWidth: 160 }}>CONJUNTO</th><th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
             <tbody>
               {sortedAnuncios.length === 0 ? (
-                <tr><td colSpan={12} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum anúncio encontrado</td></tr>
+                <tr><td colSpan={13} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum anúncio encontrado</td></tr>
               ) : sortedAnuncios.map(a => {
                 const share = totalSpend > 0 ? (a.spend / totalSpend) * 100 : 0
                 return (
@@ -593,6 +629,7 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
                       <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{a.nome}</div>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
                     </td>
+                    <td style={tdS}><StatusPill label={a.statusRevisao} motivo={a.statusMotivo} /></td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{a.adset}</td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{a.campanha}</td>
                     {metricCells(a)}
