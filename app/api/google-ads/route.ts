@@ -201,7 +201,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v10'
+const CACHE_V = 'v11'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -245,7 +245,7 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `google|v3|${start}|${end}`
+  const chave = `google|v4|${start}|${end}`
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -273,23 +273,6 @@ export async function GET(req: NextRequest) {
     const accounts = accountRows
       .map((r: any) => ({ id: String(r.customerClient?.id ?? ''), nome: (r.customerClient?.descriptiveName ?? '').trim() }))
       .filter((a: any) => a.id && a.nome)
-
-    // PROBE TEMPORÁRIO: inspeciona estrutura das linhas de anúncios por conta. Remover depois.
-    if (searchParams.get('probe') === 'ads') {
-      const alvo = searchParams.get('conta')
-      const q = `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, ad_group.id, campaign.id, campaign.name, metrics.impressions, metrics.cost_micros FROM ad_group_ad WHERE segments.date BETWEEN '${start}' AND '${end}' AND ad_group_ad.status != 'REMOVED' AND campaign.status != 'REMOVED' LIMIT 200`
-      const out: any[] = []
-      for (const acc of accounts) {
-        if (alvo && !acc.nome.includes(alvo)) continue
-        try {
-          const rows = await gaql(acc.id, q, token)
-          const comId = rows.filter((r: any) => r.adGroupAd?.ad?.id).length
-          const distintos = new Set(rows.map((r: any) => String(r.adGroupAd?.ad?.id ?? ''))).size
-          out.push({ conta: acc.nome, rows: rows.length, comAdId: comId, idsDistintos: distintos, sample: rows[0] ?? null })
-        } catch (e: any) { out.push({ conta: acc.nome, erro: String(e.message).slice(0, 160) }) }
-      }
-      return NextResponse.json({ probe: 'ads', start, end, contas: out })
-    }
 
     const results = (
       await Promise.all(
@@ -324,7 +307,9 @@ export async function GET(req: NextRequest) {
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND ad_group_ad.status != 'REMOVED'
                    AND campaign.status != 'REMOVED'
-                 LIMIT 200`,
+                   AND metrics.impressions > 0
+                 ORDER BY metrics.impressions DESC
+                 LIMIT 500`,
                 token),
               gaql(acc.id,
                 `SELECT segments.date, metrics.cost_micros, metrics.clicks, metrics.impressions
