@@ -116,6 +116,7 @@ function statusCor(label: string): { fg: string; bg: string; bd: string } {
 // Selo de status do anúncio; mostra o motivo no hover quando houver.
 function StatusPill({ label, motivo }: { label: string; motivo?: string }) {
   const [hover, setHover] = useState(false)
+  if (!label || !label.trim()) return <span style={{ color: '#888', fontSize: 12 }}>—</span>
   const c = statusCor(label)
   const temMotivo = !!(motivo && motivo.trim())
   return (

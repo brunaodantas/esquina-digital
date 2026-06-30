@@ -374,7 +374,7 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
       nome: String(m.ad_name ?? '').trim() || aid,
       adset: String(m.adgroup_name ?? '').trim(),
       campanha: String(m.campaign_name ?? '').trim(),
-      statusRevisao: 'Ativo', statusMotivo: '',
+      statusRevisao: '', statusMotivo: '', // preenchido por fetchTikTokAdStatuses (requer escopo Ads Management no token)
       spend, impressions: Number(m.impressions ?? 0), reach: Number(m.reach ?? 0), clicks: Number(m.clicks ?? 0),
       videoViews: aviews,
       ctr: Number(m.ctr ?? 0), cpc: Number(m.cpc ?? 0), cpm: Number(m.cpm ?? 0),
@@ -435,21 +435,6 @@ export async function GET(req: NextRequest) {
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
   const start = searchParams.get('start') ?? `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
-
-  // PROBE TEMPORÁRIO: confirma os campos/valores de status do /ad/get/ em produção. Remover depois.
-  if (searchParams.get('probe') === 'adstatus') {
-    try {
-      const id = searchParams.get('adv') ?? ADVERTISER_IDS[1]
-      const raw = await tiktokGet('/ad/get/', {
-        advertiser_id: id,
-        fields: JSON.stringify(['ad_id', 'ad_name', 'operation_status', 'secondary_status']),
-        page_size: '10',
-      })
-      return NextResponse.json({ probedAdvertiser: id, raw })
-    } catch (e: any) {
-      return NextResponse.json({ probeError: e?.message ?? String(e) })
-    }
-  }
 
   const fresh = searchParams.get('fresh') === '1'
   const chave = `tiktok|v2|${start}|${end}`
