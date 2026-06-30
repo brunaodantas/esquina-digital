@@ -645,11 +645,6 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     padding: '10px 12px', fontSize: 13, color: t.textSecondary,
     borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle',
   }
-  const statusBadge = (s: string) => (
-    <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600, background: s === 'ativo' ? '#00cc6618' : '#66666618', color: s === 'ativo' ? '#4ade80' : '#888', border: `1px solid ${s === 'ativo' ? '#00cc6630' : '#66666630'}` }}>
-      {s === 'ativo' ? 'Ativa' : 'Pausada'}
-    </span>
-  )
 
   const metricCols = (item: { custo: number; cliques: number; impressoes: number; videoViews: number; taxaVisualizacao: number; ctr: number; cpcMedio: number; cpm: number; cpv: number; conversoes: number; custoConversao: number }, share: number) => (
     <>
@@ -751,10 +746,10 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
         {nivel === 'campanhas' && (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr><th style={{ ...thS, minWidth: 220 }}>CAMPANHA</th>{metricHeaders}</tr>
+              <tr><th style={{ ...thS, minWidth: 220 }}>CAMPANHA</th><th style={{ ...thS, minWidth: 120 }}>STATUS</th>{metricHeaders}</tr>
             </thead>
             <tbody>
-              {sortedCamp.length === 0 ? emptyRow(12) : sortedCamp.map(c => {
+              {sortedCamp.length === 0 ? emptyRow(13) : sortedCamp.map(c => {
                 const share = totalCusto > 0 ? (c.custo / totalCusto) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
@@ -762,10 +757,10 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
                       <div style={{ fontWeight: 600, color: t.textPrimary }}>{c.nome}</div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 3 }}>
                         <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600, background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF2a' }}>{c.tipo}</span>
-                        {statusBadge(c.status)}
                       </div>
                       {share > 0 && <div style={{ marginTop: 5, height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
+                    <td style={tdS}><StatusPill label={c.status === 'ativo' ? 'Ativa' : 'Pausada'} /></td>
                     {metricCols(c, share)}
                   </tr>
                 )
@@ -779,17 +774,18 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
             <thead>
               <tr>
                 <th style={{ ...thS, minWidth: 200 }}>GRUPO DE ANÚNCIOS</th>
+                <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
                 <th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>
                 {metricHeaders}
               </tr>
             </thead>
             <tbody>
-              {sortedGrupos.length === 0 ? emptyRow(13) : sortedGrupos.map(g => (
+              {sortedGrupos.length === 0 ? emptyRow(14) : sortedGrupos.map(g => (
                 <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
                     <div style={{ fontWeight: 600, color: t.textPrimary }}>{g.nome}</div>
-                    <div style={{ marginTop: 3 }}>{statusBadge(g.status)}</div>
                   </td>
+                  <td style={tdS}><StatusPill label={g.status === 'ativo' ? 'Ativo' : 'Pausado'} /></td>
                   <td style={{ ...tdS, color: t.textMuted, fontSize: 12 }}>{g.campanhaNome}</td>
                   {metricCols(g, 0)}
                 </tr>

@@ -86,6 +86,26 @@ function extractReviewFeedback(fb: any): string {
   return Array.from(new Set(msgs.filter(Boolean))).join(' · ')
 }
 
+// Busca effective_status de campanhas/conjuntos (o /insights não traz status).
+// Retorna Map<id, effective_status>. Falha não quebra a tabela.
+async function fetchEffectiveStatuses(accountId: string, edge: 'campaigns' | 'adsets'): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  let url: string | null = `${API}/act_${accountId}/${edge}?fields=id,effective_status&limit=500&access_token=${encodeURIComponent(TOKEN)}`
+  let guard = 0
+  while (url && guard < 20) {
+    guard++
+    const res = await fetch(url, { next: { revalidate: 0 } })
+    const json: any = await res.json()
+    if (json.error) break
+    for (const a of json.data ?? []) {
+      const id = String(a.id ?? '')
+      if (id) map.set(id, a.effective_status ?? 'ACTIVE')
+    }
+    url = json.paging?.next ?? null
+  }
+  return map
+}
+
 // Busca status de revisão dos anúncios (o endpoint /insights não traz isso).
 // Retorna Map<ad_id, { effective_status, motivo }>. Falha não quebra a tabela.
 async function fetchAdStatuses(accountId: string): Promise<Map<string, { effective_status: string; motivo: string }>> {
@@ -125,6 +145,7 @@ export interface MetaCampaignData {
   id: string
   nome: string
   status: string
+  statusRevisao: string
   spend: number
   impressions: number
   reach: number
@@ -145,6 +166,7 @@ export interface MetaAdSetData {
   nome: string
   campanha: string
   status: string
+  statusRevisao: string
   spend: number
   impressions: number
   reach: number
@@ -234,9 +256,9 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `meta|v3|${start}|${end}`
+  const chave = `meta|v4|${start}|${end}`
 
-  const cacheKey = `metav5|${start}|${end}`
+  const cacheKey = `metav6|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
@@ -336,8 +358,10 @@ export async function GET(req: NextRequest) {
     await Promise.all(
       active.map(async (acc) => {
         try {
-          // status de revisão dos anúncios roda em paralelo (endpoint /ads, não /insights)
+          // status de revisão roda em paralelo (endpoints /ads /campaigns /adsets, não /insights)
           const adStatusPromise = fetchAdStatuses(acc.id).catch(() => new Map<string, { effective_status: string; motivo: string }>())
+          const campStatusPromise = fetchEffectiveStatuses(acc.id, 'campaigns').catch(() => new Map<string, string>())
+          const adsetStatusPromise = fetchEffectiveStatuses(acc.id, 'adsets').catch(() => new Map<string, string>())
           const [accRes, campRes, adsetRes, adRes, dailyRes, generoRes, idadeRes, dispositivoRes] = await Promise.all([
             fetch(`${API}/act_${acc.id}/insights?${accountParams}`, { next: { revalidate: 0 } }),
             fetch(`${API}/act_${acc.id}/insights?${campaignParams}`, { next: { revalidate: 0 } }),
@@ -371,12 +395,16 @@ export async function GET(req: NextRequest) {
             return 'ativo'
           }
 
+          const campStatusMap = await campStatusPromise
+          const adsetStatusMap = await adsetStatusPromise
+
           const campanhas: MetaCampaignData[] = (campData.data ?? [])
             .filter((c: any) => parseFloat(c.spend || '0') > 0)
             .map((c: any): MetaCampaignData => ({
               id: c.campaign_id ?? '',
               nome: c.campaign_name ?? '',
-              status: mapStatus(c.effective_status ?? 'ACTIVE'),
+              status: mapStatus(campStatusMap.get(String(c.campaign_id ?? '')) ?? 'ACTIVE'),
+              statusRevisao: metaStatusLabel(campStatusMap.get(String(c.campaign_id ?? '')) ?? 'ACTIVE'),
               spend: parseFloat(c.spend || '0'),
               impressions: parseInt(c.impressions || '0', 10),
               reach: parseInt(c.reach || '0', 10),
@@ -399,7 +427,8 @@ export async function GET(req: NextRequest) {
               id: c.adset_id ?? '',
               nome: c.adset_name ?? '',
               campanha: c.campaign_name ?? '',
-              status: mapStatus(c.effective_status ?? 'ACTIVE'),
+              status: mapStatus(adsetStatusMap.get(String(c.adset_id ?? '')) ?? 'ACTIVE'),
+              statusRevisao: metaStatusLabel(adsetStatusMap.get(String(c.adset_id ?? '')) ?? 'ACTIVE'),
               spend: parseFloat(c.spend || '0'),
               impressions: parseInt(c.impressions || '0', 10),
               reach: parseInt(c.reach || '0', 10),

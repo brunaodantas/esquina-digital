@@ -686,6 +686,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             <thead>
               <tr>
                 <th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>
+                <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
                 {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
                   const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
@@ -694,7 +695,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             </thead>
             <tbody>
               {sortedCampanhas.length === 0 ? (
-                <tr><td colSpan={13} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
+                <tr><td colSpan={14} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
               ) : sortedCampanhas.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 const obj = classifyObjetivo(c.nome)
@@ -702,17 +703,15 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: share > 0 ? 5 : 3 }}>{c.nome}</div>
                       <div style={{ display: 'flex', gap: 4, marginBottom: share > 0 ? 5 : 0 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: objColor + '22', color: objColor, fontWeight: 600 }}>
                           {obj === 'reconhecimento' ? 'Reconhecimento' : obj === 'engajamento' ? 'Engajamento' : 'Tráfego'}
                         </span>
-                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: c.status === 'ativo' ? '#22c55e22' : '#f59e0b22', color: c.status === 'ativo' ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>
-                          {c.status === 'ativo' ? 'Ativa' : 'Pausada'}
-                        </span>
                       </div>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
+                    <td style={tdS}><StatusPill label={c.statusRevisao} /></td>
                     <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? <CopiavelNum compact={fmtNum(c.reach)} full={fmtNumFull(c.reach)} /> : '—'}</td>
@@ -737,6 +736,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             <thead>
               <tr>
                 <th style={{ ...thS, minWidth: 200 }}>CONJUNTO DE ANÚNCIOS</th>
+                <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
                 <th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>
                 {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
                   const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
@@ -746,20 +746,16 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             </thead>
             <tbody>
               {sortedAdsets.length === 0 ? (
-                <tr><td colSpan={14} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
+                <tr><td colSpan={15} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
               ) : sortedAdsets.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
-                      <div style={{ marginBottom: share > 0 ? 5 : 0 }}>
-                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: c.status === 'ativo' ? '#22c55e22' : '#f59e0b22', color: c.status === 'ativo' ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>
-                          {c.status === 'ativo' ? 'Ativo' : 'Pausado'}
-                        </span>
-                      </div>
+                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: share > 0 ? 5 : 0 }}>{c.nome}</div>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
+                    <td style={tdS}><StatusPill label={c.statusRevisao} /></td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{c.campanha}</td>
                     <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
