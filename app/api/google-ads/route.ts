@@ -274,17 +274,19 @@ export async function GET(req: NextRequest) {
       .map((r: any) => ({ id: String(r.customerClient?.id ?? ''), nome: (r.customerClient?.descriptiveName ?? '').trim() }))
       .filter((a: any) => a.id && a.nome)
 
-    // PROBE TEMPORÁRIO: compara a query de anúncios com/sem policy_summary por conta. Remover depois.
+    // PROBE TEMPORÁRIO: inspeciona estrutura das linhas de anúncios por conta. Remover depois.
     if (searchParams.get('probe') === 'ads') {
+      const alvo = searchParams.get('conta')
+      const q = `SELECT ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, ad_group.id, campaign.id, campaign.name, metrics.impressions, metrics.cost_micros FROM ad_group_ad WHERE segments.date BETWEEN '${start}' AND '${end}' AND ad_group_ad.status != 'REMOVED' AND campaign.status != 'REMOVED' LIMIT 200`
       const out: any[] = []
       for (const acc of accounts) {
-        const base = `WHERE segments.date BETWEEN '${start}' AND '${end}' AND ad_group_ad.status != 'REMOVED' AND campaign.status != 'REMOVED' LIMIT 200`
-        const comPolicy = `SELECT ad_group_ad.ad.id, ad_group_ad.status, ad_group_ad.policy_summary.approval_status, ad_group_ad.policy_summary.review_status, ad_group_ad.policy_summary.policy_topic_entries, campaign.id, metrics.impressions FROM ad_group_ad ${base}`
-        const semPolicy = `SELECT ad_group_ad.ad.id, ad_group_ad.status, campaign.id, metrics.impressions FROM ad_group_ad ${base}`
-        let r1: any = 0, r2: any = 0
-        try { r1 = (await gaql(acc.id, comPolicy, token)).length } catch (e: any) { r1 = 'ERRO: ' + String(e.message).slice(0, 120) }
-        try { r2 = (await gaql(acc.id, semPolicy, token)).length } catch (e: any) { r2 = 'ERRO: ' + String(e.message).slice(0, 120) }
-        out.push({ conta: acc.nome, comPolicy: r1, semPolicy: r2 })
+        if (alvo && !acc.nome.includes(alvo)) continue
+        try {
+          const rows = await gaql(acc.id, q, token)
+          const comId = rows.filter((r: any) => r.adGroupAd?.ad?.id).length
+          const distintos = new Set(rows.map((r: any) => String(r.adGroupAd?.ad?.id ?? ''))).size
+          out.push({ conta: acc.nome, rows: rows.length, comAdId: comId, idsDistintos: distintos, sample: rows[0] ?? null })
+        } catch (e: any) { out.push({ conta: acc.nome, erro: String(e.message).slice(0, 160) }) }
       }
       return NextResponse.json({ probe: 'ads', start, end, contas: out })
     }
