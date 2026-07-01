@@ -85,6 +85,7 @@ function fmtNum(n: number) {
 function fmtNumFull(n: number) { return n.toLocaleString('pt-BR') }
 function fmtBRL(n: number) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtPct(n: number) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
+function fmtOrcamento(v: number, tipo: string) { return v > 0 ? fmtBRL(v) + (tipo === 'diario' ? '/dia' : tipo === 'total' ? ' total' : '') : '—' }
 
 function CopiavelNum({ compact, full = compact }: { compact: string; full?: string }) {
   const [tip, setTip] = useState<'hover' | 'copied' | null>(null)
@@ -746,10 +747,10 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
         {nivel === 'campanhas' && (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr><th style={{ ...thS, minWidth: 220 }}>CAMPANHA</th><th style={{ ...thS, minWidth: 120 }}>STATUS</th>{metricHeaders}</tr>
+              <tr><th style={{ ...thS, minWidth: 220 }}>CAMPANHA</th><th style={{ ...thS, minWidth: 120 }}>STATUS</th><th style={{ ...thS, textAlign: 'right', minWidth: 100 }}>ORÇAMENTO</th>{metricHeaders}</tr>
             </thead>
             <tbody>
-              {sortedCamp.length === 0 ? emptyRow(13) : sortedCamp.map(c => {
+              {sortedCamp.length === 0 ? emptyRow(14) : sortedCamp.map(c => {
                 const share = totalCusto > 0 ? (c.custo / totalCusto) * 100 : 0
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
@@ -761,6 +762,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
                       {share > 0 && <div style={{ marginTop: 5, height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
                     <td style={tdS}><StatusPill label={c.status === 'ativo' ? 'Ativa' : 'Pausada'} /></td>
+                    <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
                     {metricCols(c, share)}
                   </tr>
                 )

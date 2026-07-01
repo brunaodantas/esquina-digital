@@ -86,11 +86,13 @@ function extractReviewFeedback(fb: any): string {
   return Array.from(new Set(msgs.filter(Boolean))).join(' · ')
 }
 
-// Busca effective_status de campanhas/conjuntos (o /insights não traz status).
-// Retorna Map<id, effective_status>. Falha não quebra a tabela.
-async function fetchEffectiveStatuses(accountId: string, edge: 'campaigns' | 'adsets'): Promise<Map<string, string>> {
-  const map = new Map<string, string>()
-  let url: string | null = `${API}/act_${accountId}/${edge}?fields=id,effective_status&limit=500&access_token=${encodeURIComponent(TOKEN)}`
+// Busca effective_status + orçamento de campanhas/conjuntos (o /insights não traz nenhum dos dois).
+// Retorna Map<id, { status, orcamento, orcamentoTipo }>. Falha não quebra a tabela.
+// daily_budget/lifetime_budget vêm em centavos (menor unidade da moeda).
+interface EntityMeta { status: string; orcamento: number; orcamentoTipo: 'diario' | 'total' | '' }
+async function fetchEntityMeta(accountId: string, edge: 'campaigns' | 'adsets'): Promise<Map<string, EntityMeta>> {
+  const map = new Map<string, EntityMeta>()
+  let url: string | null = `${API}/act_${accountId}/${edge}?fields=id,effective_status,daily_budget,lifetime_budget&limit=500&access_token=${encodeURIComponent(TOKEN)}`
   let guard = 0
   while (url && guard < 20) {
     guard++
@@ -99,7 +101,12 @@ async function fetchEffectiveStatuses(accountId: string, edge: 'campaigns' | 'ad
     if (json.error) break
     for (const a of json.data ?? []) {
       const id = String(a.id ?? '')
-      if (id) map.set(id, a.effective_status ?? 'ACTIVE')
+      if (!id) continue
+      const daily = parseInt(a.daily_budget ?? '0', 10)
+      const life = parseInt(a.lifetime_budget ?? '0', 10)
+      const orcamento = daily > 0 ? daily / 100 : life > 0 ? life / 100 : 0
+      const orcamentoTipo: 'diario' | 'total' | '' = daily > 0 ? 'diario' : life > 0 ? 'total' : ''
+      map.set(id, { status: a.effective_status ?? 'ACTIVE', orcamento, orcamentoTipo })
     }
     url = json.paging?.next ?? null
   }
@@ -146,6 +153,8 @@ export interface MetaCampaignData {
   nome: string
   status: string
   statusRevisao: string
+  orcamento: number
+  orcamentoTipo: 'diario' | 'total' | ''
   spend: number
   impressions: number
   reach: number
@@ -167,6 +176,8 @@ export interface MetaAdSetData {
   campanha: string
   status: string
   statusRevisao: string
+  orcamento: number
+  orcamentoTipo: 'diario' | 'total' | ''
   spend: number
   impressions: number
   reach: number
@@ -256,9 +267,9 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `meta|v4|${start}|${end}`
+  const chave = `meta|v5|${start}|${end}`
 
-  const cacheKey = `metav6|${start}|${end}`
+  const cacheKey = `metav7|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
@@ -360,8 +371,8 @@ export async function GET(req: NextRequest) {
         try {
           // status de revisão roda em paralelo (endpoints /ads /campaigns /adsets, não /insights)
           const adStatusPromise = fetchAdStatuses(acc.id).catch(() => new Map<string, { effective_status: string; motivo: string }>())
-          const campStatusPromise = fetchEffectiveStatuses(acc.id, 'campaigns').catch(() => new Map<string, string>())
-          const adsetStatusPromise = fetchEffectiveStatuses(acc.id, 'adsets').catch(() => new Map<string, string>())
+          const campStatusPromise = fetchEntityMeta(acc.id, 'campaigns').catch(() => new Map<string, EntityMeta>())
+          const adsetStatusPromise = fetchEntityMeta(acc.id, 'adsets').catch(() => new Map<string, EntityMeta>())
           const [accRes, campRes, adsetRes, adRes, dailyRes, generoRes, idadeRes, dispositivoRes] = await Promise.all([
             fetch(`${API}/act_${acc.id}/insights?${accountParams}`, { next: { revalidate: 0 } }),
             fetch(`${API}/act_${acc.id}/insights?${campaignParams}`, { next: { revalidate: 0 } }),
@@ -403,8 +414,10 @@ export async function GET(req: NextRequest) {
             .map((c: any): MetaCampaignData => ({
               id: c.campaign_id ?? '',
               nome: c.campaign_name ?? '',
-              status: mapStatus(campStatusMap.get(String(c.campaign_id ?? '')) ?? 'ACTIVE'),
-              statusRevisao: metaStatusLabel(campStatusMap.get(String(c.campaign_id ?? '')) ?? 'ACTIVE'),
+              status: mapStatus(campStatusMap.get(String(c.campaign_id ?? ''))?.status ?? 'ACTIVE'),
+              statusRevisao: metaStatusLabel(campStatusMap.get(String(c.campaign_id ?? ''))?.status ?? 'ACTIVE'),
+              orcamento: campStatusMap.get(String(c.campaign_id ?? ''))?.orcamento ?? 0,
+              orcamentoTipo: campStatusMap.get(String(c.campaign_id ?? ''))?.orcamentoTipo ?? '',
               spend: parseFloat(c.spend || '0'),
               impressions: parseInt(c.impressions || '0', 10),
               reach: parseInt(c.reach || '0', 10),
@@ -427,8 +440,10 @@ export async function GET(req: NextRequest) {
               id: c.adset_id ?? '',
               nome: c.adset_name ?? '',
               campanha: c.campaign_name ?? '',
-              status: mapStatus(adsetStatusMap.get(String(c.adset_id ?? '')) ?? 'ACTIVE'),
-              statusRevisao: metaStatusLabel(adsetStatusMap.get(String(c.adset_id ?? '')) ?? 'ACTIVE'),
+              status: mapStatus(adsetStatusMap.get(String(c.adset_id ?? ''))?.status ?? 'ACTIVE'),
+              statusRevisao: metaStatusLabel(adsetStatusMap.get(String(c.adset_id ?? ''))?.status ?? 'ACTIVE'),
+              orcamento: adsetStatusMap.get(String(c.adset_id ?? ''))?.orcamento ?? 0,
+              orcamentoTipo: adsetStatusMap.get(String(c.adset_id ?? ''))?.orcamentoTipo ?? '',
               spend: parseFloat(c.spend || '0'),
               impressions: parseInt(c.impressions || '0', 10),
               reach: parseInt(c.reach || '0', 10),

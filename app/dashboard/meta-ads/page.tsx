@@ -110,6 +110,7 @@ function fmtNum(n: number) {
 function fmtNumFull(n: number) { return n.toLocaleString('pt-BR') }
 function fmtBRL(n: number) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtPct(n: number) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
+function fmtOrcamento(v: number, tipo: string) { return v > 0 ? fmtBRL(v) + (tipo === 'diario' ? '/dia' : tipo === 'total' ? ' total' : '') : '—' }
 
 function CopiavelNum({ compact, full = compact }: { compact: string; full?: string }) {
   const [tip, setTip] = useState<'hover' | 'copied' | null>(null)
@@ -687,6 +688,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
               <tr>
                 <th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>
                 <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
+                <th style={{ ...thS, textAlign: 'right', minWidth: 100 }}>ORÇAMENTO</th>
                 {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
                   const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
@@ -695,7 +697,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             </thead>
             <tbody>
               {sortedCampanhas.length === 0 ? (
-                <tr><td colSpan={14} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
+                <tr><td colSpan={15} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
               ) : sortedCampanhas.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 const obj = classifyObjetivo(c.nome)
@@ -712,6 +714,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
                     <td style={tdS}><StatusPill label={c.statusRevisao} /></td>
+                    <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
                     <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? <CopiavelNum compact={fmtNum(c.reach)} full={fmtNumFull(c.reach)} /> : '—'}</td>
@@ -737,6 +740,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
               <tr>
                 <th style={{ ...thS, minWidth: 200 }}>CONJUNTO DE ANÚNCIOS</th>
                 <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
+                <th style={{ ...thS, textAlign: 'right', minWidth: 100 }}>ORÇAMENTO</th>
                 <th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>
                 {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
                   const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
@@ -746,7 +750,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
             </thead>
             <tbody>
               {sortedAdsets.length === 0 ? (
-                <tr><td colSpan={15} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
+                <tr><td colSpan={16} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
               ) : sortedAdsets.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
@@ -756,6 +760,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
                     </td>
                     <td style={tdS}><StatusPill label={c.statusRevisao} /></td>
+                    <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{c.campanha}</td>
                     <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>

@@ -88,6 +88,7 @@ function fmtNum(n: number) {
 function fmtNumFull(n: number) { return n.toLocaleString('pt-BR') }
 function fmtBRL(n: number) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtPct(n: number) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
+function fmtOrcamento(v: number, tipo: string) { return v > 0 ? fmtBRL(v) + (tipo === 'diario' ? '/dia' : tipo === 'total' ? ' total' : '') : '—' }
 
 function CopiavelNum({ compact, full = compact }: { compact: string; full?: string }) {
   const [tip, setTip] = useState<'hover' | 'copied' | null>(null)
@@ -573,10 +574,10 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
       <div style={{ overflowX: 'auto' }}>
         {nivel === 'campanhas' && (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
+            <thead><tr><th style={{ ...thS, minWidth: 240 }}>CAMPANHA</th><th style={{ ...thS, textAlign: 'right', minWidth: 100 }}>ORÇAMENTO</th>{metricHeaders}</tr></thead>
             <tbody>
               {sortedCamp.length === 0 ? (
-                <tr><td colSpan={10} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
+                <tr><td colSpan={11} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
               ) : sortedCamp.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
@@ -585,6 +586,7 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
                       <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
                     </td>
+                    <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
                     {metricCells(c)}
                   </tr>
                 )
@@ -595,10 +597,10 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
 
         {nivel === 'conjuntos' && (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={{ ...thS, minWidth: 200 }}>CONJUNTO DE ANÚNCIOS</th><th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
+            <thead><tr><th style={{ ...thS, minWidth: 200 }}>CONJUNTO DE ANÚNCIOS</th><th style={{ ...thS, textAlign: 'right', minWidth: 100 }}>ORÇAMENTO</th><th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>{metricHeaders}</tr></thead>
             <tbody>
               {sortedGrupos.length === 0 ? (
-                <tr><td colSpan={11} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
+                <tr><td colSpan={12} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
               ) : sortedGrupos.map(g => {
                 const share = totalSpend > 0 ? (g.spend / totalSpend) * 100 : 0
                 return (
@@ -607,6 +609,7 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
                       <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{g.nome}</div>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
                     </td>
+                    <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(g.orcamento, g.orcamentoTipo)}</td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{g.campanha}</td>
                     {metricCells(g)}
                   </tr>

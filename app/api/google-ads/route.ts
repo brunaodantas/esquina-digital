@@ -88,6 +88,8 @@ export interface CampaignData {
   tipo: string
   tipoRaw: string
   status: 'ativo' | 'pausado'
+  orcamento: number
+  orcamentoTipo: 'diario' | 'total' | ''
   cliques: number
   impressoes: number
   videoViews: number
@@ -201,7 +203,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v11'
+const CACHE_V = 'v12'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -245,7 +247,7 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `google|v4|${start}|${end}`
+  const chave = `google|v5|${start}|${end}`
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -281,6 +283,7 @@ export async function GET(req: NextRequest) {
             const [campRows, agRows, adRows, dailyRows, geoRows, genderRows, ageRows, deviceRows, vvRows, genderViewsRows, ageViewsRows, deviceViewsRows] = await Promise.all([
               gaql(acc.id,
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
+                   campaign_budget.amount_micros,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
@@ -395,10 +398,13 @@ export async function GET(req: NextRequest) {
               const vv = Number(m.videoViews ?? 0)
               if (!ex) {
                 const tipoRaw = (c.advertisingChannelType ?? 'UNKNOWN') as string
+                const orcMicros = Number(row.campaignBudget?.amountMicros ?? 0)
                 campMap.set(cid, {
                   id: cid, nome: (c.name ?? '').trim(),
                   tipo: TIPO_MAP[tipoRaw] ?? tipoRaw, tipoRaw,
                   status: c.status === 'PAUSED' ? 'pausado' : 'ativo',
+                  orcamento: orcMicros > 0 ? orcMicros / 1_000_000 : 0,
+                  orcamentoTipo: orcMicros > 0 ? 'diario' : '',
                   cliques: cl, impressoes: imp, videoViews: vv, custo, conversoes: conv,
                   ...buildMetrics(cl, imp, custo, conv),
                 })
