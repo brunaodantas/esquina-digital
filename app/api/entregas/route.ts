@@ -194,8 +194,10 @@ function parseRows(rows: string[][], periodoStart: Date, periodoFim: Date, hoje:
     // Campanha ativa no período: sobrepõe com [periodoStart, periodoFim]
     if (inicio > periodoFim || termino < periodoStart) continue
 
+    // Só vira "encerrada" (e fica apagada no painel) no dia SEGUINTE ao término;
+    // no próprio dia do término ainda aparece como ativa/normal.
     const status: 'ativa' | 'encerrada' | 'futura' =
-      hoje >= termino ? 'encerrada' : hoje < inicio ? 'futura' : 'ativa'
+      hoje > termino ? 'encerrada' : hoje < inicio ? 'futura' : 'ativa'
 
     const meta = iMeta >= 0 ? parseNum(row[iMeta]) : 0
     let entregue = iEntregue >= 0 ? parseNum(row[iEntregue]) : 0
@@ -257,7 +259,7 @@ export async function GET(req: NextRequest) {
     : new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `entregas|v1|${periodoStart.toISOString().slice(0, 10)}|${periodoFim.toISOString().slice(0, 10)}`
+  const chave = `entregas|v2|${periodoStart.toISOString().slice(0, 10)}|${periodoFim.toISOString().slice(0, 10)}`
   if (!fresh && searchParams.get('debug') !== 'tabs') {
     const cacheado = await readCache(chave, 3_600_000)
     if (cacheado) return NextResponse.json(cacheado)
