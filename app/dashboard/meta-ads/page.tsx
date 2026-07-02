@@ -240,7 +240,7 @@ type MetaBarMetric = 'spend' | 'impressions' | 'clicks' | 'reach' | 'thruplays'
 type MetaLineMetric = 'cpm' | 'ctr' | 'cpv' | 'cpc' | 'frequency'
 
 const META_BAR_OPTIONS: { key: MetaBarMetric; label: string; color: string }[] = [
-  { key: 'spend',      label: 'Investimento', color: '#1A3CFF' },
+  { key: 'spend',      label: 'Gasto', color: '#1A3CFF' },
   { key: 'impressions',label: 'Impressões',   color: '#c77dff' },
   { key: 'clicks',     label: 'Cliques',      color: '#22c55e' },
   { key: 'reach',      label: 'Alcance',      color: '#56cfe1' },
@@ -447,7 +447,7 @@ const AUD_METRICAS_META = [
   { key: 'reach', label: 'Alcance', money: false },
   { key: 'clicks', label: 'Cliques', money: false },
   { key: 'thruplays', label: 'ThruPlays', money: false },
-  { key: 'spend', label: 'Investimento', money: true },
+  { key: 'spend', label: 'Gasto', money: true },
 ] as const
 type AudMetricaMeta = typeof AUD_METRICAS_META[number]['key']
 
@@ -500,7 +500,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
   }
 
   function exportCSV() {
-    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Alcance', 'Cliques', 'ThruPlays', 'Investimento', 'Percentual %']]
+    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Alcance', 'Cliques', 'ThruPlays', 'Gasto', 'Percentual %']]
     const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressions, i.reach, i.clicks, i.thruplays, i.spend.toFixed(2), i.pct.toFixed(1)]))
     add('Gênero', genero); add('Idade', idade); add('Dispositivos', dispositivos)
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -592,13 +592,13 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   function exportCSV() {
     let headers: string[]; let rows: (string | number)[][]
     if (nivel === 'campanhas') {
-      headers = ['Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'CPE', 'Visualizações', 'Taxa Vis.%', 'CPV', 'Frequência']
+      headers = ['Campanha', 'Status', 'Gasto', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'CPE', 'Visualizações', 'Taxa Vis.%', 'CPV', 'Frequência']
       rows = sortedCampanhas.map(c => [c.nome, c.status, c.spend, c.impressions, c.reach, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.cpe.toFixed(4), c.thruplays, c.taxaVisualizacao.toFixed(2), c.cpv.toFixed(4), c.frequency.toFixed(4)])
     } else if (nivel === 'conjuntos') {
-      headers = ['Conjunto', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'CPE', 'Visualizações', 'Taxa Vis.%', 'CPV', 'Frequência']
+      headers = ['Conjunto', 'Campanha', 'Status', 'Gasto', 'Impressões', 'Alcance', 'Cliques', 'CTR%', 'CPM', 'CPC', 'CPE', 'Visualizações', 'Taxa Vis.%', 'CPV', 'Frequência']
       rows = sortedAdsets.map(c => [c.nome, c.campanha, c.status, c.spend, c.impressions, c.reach, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2), c.cpe.toFixed(4), c.thruplays, c.taxaVisualizacao.toFixed(2), c.cpv.toFixed(4), c.frequency.toFixed(4)])
     } else {
-      headers = ['Anúncio', 'Conjunto', 'Campanha', 'Status', 'Investimento', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
+      headers = ['Anúncio', 'Conjunto', 'Campanha', 'Status', 'Gasto', 'Impressões', 'Cliques', 'CTR%', 'CPM', 'CPC']
       rows = sortedAds.map(c => [c.nome, c.adset, c.campanha, c.status, c.spend, c.impressions, c.clicks, c.ctr.toFixed(4), c.cpm.toFixed(2), c.cpc.toFixed(2)])
     }
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -690,7 +690,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
                 <th style={{ ...thS, textAlign: 'right', minWidth: 100 }}>ORÇAMENTO</th>
                 {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
-                  const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
+                  const labels = ['GASTO','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                 })}
               </tr>
@@ -743,7 +743,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 <th style={{ ...thS, textAlign: 'right', minWidth: 100 }}>ORÇAMENTO</th>
                 <th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>
                 {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
-                  const labels = ['INVEST.','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
+                  const labels = ['GASTO','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                 })}
               </tr>
@@ -789,7 +789,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 <th style={{ ...thS, minWidth: 120 }}>STATUS</th>
                 <th style={{ ...thS, minWidth: 160 }}>CONJUNTO</th>
                 {(['spend','impressions','clicks','ctr','cpm','cpc'] as const).map((col, i) => {
-                  const labels = ['INVEST.','IMPR.','CLIQUES','CTR','CPM','CPC']
+                  const labels = ['GASTO','IMPR.','CLIQUES','CTR','CPM','CPC']
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                 })}
               </tr>
@@ -1010,7 +1010,7 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
         <>
           {/* KPI tiles with colored top borders */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 20 }}>
-            <KpiTile label="Investimento" value={fmtBRL(totalSpend)} color={TILE_COLORS[0]} t={t} delta={pDelta(totalSpend, prevSpend)} />
+            <KpiTile label="Gasto" value={fmtBRL(totalSpend)} color={TILE_COLORS[0]} t={t} delta={pDelta(totalSpend, prevSpend)} />
             <KpiTile label="Impressões" value={fmtNum(totalImpressions)} color={TILE_COLORS[1]} t={t} delta={pDelta(totalImpressions, prevImpr)} />
             <KpiTile
               label="Alcance"

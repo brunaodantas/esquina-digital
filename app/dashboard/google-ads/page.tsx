@@ -231,7 +231,7 @@ type BarMetric = 'custo' | 'cliques' | 'impressoes'
 type LineMetric = 'cpcMedio' | 'ctr' | 'cliques' | 'impressoes'
 
 const BAR_OPTIONS: { key: BarMetric; label: string; color: string }[] = [
-  { key: 'custo',      label: 'Investimento', color: '#1A3CFF' },
+  { key: 'custo',      label: 'Gasto', color: '#1A3CFF' },
   { key: 'cliques',    label: 'Cliques',      color: '#22c55e' },
   { key: 'impressoes', label: 'Impressões',   color: '#c77dff' },
 ]
@@ -397,7 +397,7 @@ function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: num
               { label: 'Impressões', v: fmtNum(acc.impressoes) },
               { label: 'CTR', v: fmtPct(acc.ctr) },
               { label: 'CPC Médio', v: acc.cpcMedio > 0 ? fmtBRL(acc.cpcMedio) : '—' },
-              { label: 'Custo', v: fmtBRL(acc.custo), h: '#60a5fa' },
+              { label: 'Gasto', v: fmtBRL(acc.custo), h: '#60a5fa' },
               { label: 'Conversões', v: acc.conversoes > 0 ? fmtNum(acc.conversoes) : '—', h: acc.conversoes > 0 ? '#4ade80' : undefined },
               { label: 'Custo/Conv.', v: acc.custoConversao > 0 ? fmtBRL(acc.custoConversao) : '—' },
             ].map(m => (
@@ -419,7 +419,7 @@ const AUD_METRICAS_GOOGLE = [
   { key: 'videoViews', label: 'Visualizações', money: false },
   { key: 'cliques', label: 'Cliques', money: false },
   { key: 'conversoes', label: 'Conversões', money: false },
-  { key: 'custo', label: 'Custo', money: true },
+  { key: 'custo', label: 'Gasto', money: true },
 ] as const
 type AudMetricaGoogle = typeof AUD_METRICAS_GOOGLE[number]['key']
 
@@ -478,7 +478,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
   })
 
   function exportCSV() {
-    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Visualizações', 'Cliques', 'Conversões', 'Custo', 'Percentual %']]
+    const rows: (string | number)[][] = [['Seção', 'Categoria', 'Impressões', 'Visualizações', 'Cliques', 'Conversões', 'Gasto', 'Percentual %']]
     const add = (sec: string, items: ReturnType<typeof aggregate>) => items.forEach(i => rows.push([sec, i.label, i.impressoes, i.videoViews, i.cliques, i.conversoes.toFixed(2), i.custo.toFixed(2), i.pct.toFixed(1)]))
     add('Gênero', genero); add('Idade', idade); add('Dispositivos', dispositivos)
     const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -619,13 +619,13 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     const metricKeys = ['custo','cliques','impressoes','ctr','cpcMedio','cpm','cpv','conversoes','custoConversao']
     let headers: string[]; let rows: (string | number)[][]
     if (nivel === 'campanhas') {
-      headers = ['Campanha','Tipo','Status','Custo','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      headers = ['Campanha','Tipo','Status','Gasto','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
       rows = sortedCamp.map(c => [c.nome, c.tipo, c.status, c.custo, c.cliques, c.impressoes, c.videoViews, c.taxaVisualizacao.toFixed(2), c.ctr.toFixed(4), c.cpcMedio.toFixed(2), c.cpm.toFixed(2), c.cpv.toFixed(4), c.conversoes, c.custoConversao.toFixed(2)])
     } else if (nivel === 'grupos') {
-      headers = ['Grupo','Campanha','Status','Custo','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      headers = ['Grupo','Campanha','Status','Gasto','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
       rows = sortedGrupos.map(g => [g.nome, g.campanhaNome, g.status, g.custo, g.cliques, g.impressoes, g.videoViews, g.taxaVisualizacao.toFixed(2), g.ctr.toFixed(4), g.cpcMedio.toFixed(2), g.cpm.toFixed(2), g.cpv.toFixed(4), g.conversoes, g.custoConversao.toFixed(2)])
     } else {
-      headers = ['Anúncio','Grupo','Campanha','Status','Custo','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
+      headers = ['Anúncio','Grupo','Campanha','Status','Gasto','Cliques','Impressões','Visualizações','Taxa Vis.%','CTR%','CPC Méd.','CPM','CPV','Conv.','Custo/Conv.']
       rows = sortedAnuncios.map(a => [a.nome, a.grupoNome, a.campanhaNome, a.status, a.custo, a.cliques, a.impressoes, a.videoViews, a.taxaVisualizacao.toFixed(2), a.ctr.toFixed(4), a.cpcMedio.toFixed(2), a.cpm.toFixed(2), a.cpv.toFixed(4), a.conversoes, a.custoConversao.toFixed(2)])
     }
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -664,7 +664,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   )
 
   const METRIC_SORT_COLS: { col: string; label: string }[] = [
-    { col: 'custo', label: 'INVEST.' },
+    { col: 'custo', label: 'GASTO' },
     { col: 'cliques', label: 'CLIQUES' },
     { col: 'impressoes', label: 'IMPRESSÕES' },
     { col: 'videoViews', label: 'VISUALIZAÇÕES' },
@@ -1002,7 +1002,7 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
             <KpiTile label="Impressões" value={fmtNum(totalImpressoes)} t={t} delta={pDelta(totalImpressoes, prevImpressoes)} />
             <KpiTile label="CTR Médio" value={fmtPct(ctrMedio)} t={t} delta={pDelta(ctrMedio, prevCtr)} />
             <KpiTile label="CPC Médio" value={cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'} t={t} delta={pDelta(cpcMedio, prevCpc)} />
-            <KpiTile label="Investimento" value={fmtBRL(totalCusto)} t={t} delta={pDelta(totalCusto, prevCusto)} />
+            <KpiTile label="Gasto" value={fmtBRL(totalCusto)} t={t} delta={pDelta(totalCusto, prevCusto)} />
             <KpiTile label="Conversões" value={totalConversoes > 0 ? fmtNum(totalConversoes) : '—'} t={t} delta={pDelta(totalConversoes, prevConversoes)} />
             <KpiTile label="Custo/Conv." value={custoConversao > 0 ? fmtBRL(custoConversao) : '—'} t={t} delta={pDelta(custoConversao, prevCustoConv)} />
           </div>
