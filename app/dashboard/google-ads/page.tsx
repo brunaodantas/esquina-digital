@@ -998,11 +998,11 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
         <>
           {/* KPI tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 20 }}>
+            <KpiTile label="Gasto" value={fmtBRL(totalCusto)} t={t} delta={pDelta(totalCusto, prevCusto)} />
             <KpiTile label="Cliques" value={fmtNum(totalCliques)} t={t} delta={pDelta(totalCliques, prevCliques)} />
             <KpiTile label="Impressões" value={fmtNum(totalImpressoes)} t={t} delta={pDelta(totalImpressoes, prevImpressoes)} />
             <KpiTile label="CTR Médio" value={fmtPct(ctrMedio)} t={t} delta={pDelta(ctrMedio, prevCtr)} />
             <KpiTile label="CPC Médio" value={cpcMedio > 0 ? fmtBRL(cpcMedio) : '—'} t={t} delta={pDelta(cpcMedio, prevCpc)} />
-            <KpiTile label="Gasto" value={fmtBRL(totalCusto)} t={t} delta={pDelta(totalCusto, prevCusto)} />
             <KpiTile label="Conversões" value={totalConversoes > 0 ? fmtNum(totalConversoes) : '—'} t={t} delta={pDelta(totalConversoes, prevConversoes)} />
             <KpiTile label="Custo/Conv." value={custoConversao > 0 ? fmtBRL(custoConversao) : '—'} t={t} delta={pDelta(custoConversao, prevCustoConv)} />
           </div>
