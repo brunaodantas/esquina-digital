@@ -5,16 +5,24 @@ import { signInWithPopup, onAuthStateChanged, User } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
+import { PULSE_HOST } from '@/lib/domains'
+import { CLIENTES } from '@/clientes'
 
 type Screen = 'loading' | 'login' | 'checking' | 'pending' | 'auto-aprovado'
 
 // Depois do login, volta pra rota que a pessoa tentou acessar (ex.: /celina),
 // em vez de sempre mandar pro /dashboard — importante porque no domínio Pulse
 // o /dashboard é bloqueado (ver middleware.ts) e a rota original pode ser outra.
+// Se a pessoa logou direto pela raiz do domínio Pulse (sem vir de um link de
+// cliente específico), cai no primeiro cliente configurado em vez do /dashboard.
 function getRedirectTarget(): string {
   if (typeof window === 'undefined') return '/dashboard'
   const redirect = new URLSearchParams(window.location.search).get('redirect')
   if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) return redirect
+  if (window.location.hostname === PULSE_HOST) {
+    const primeiroCliente = Object.keys(CLIENTES)[0]
+    return primeiroCliente ? `/${primeiroCliente}` : '/'
+  }
   return '/dashboard'
 }
 
