@@ -75,11 +75,11 @@ export default function ClienteLayout({ children }: { children: React.ReactNode 
         background: '#0d0d0d',
         borderBottom: '1px solid #2a2a2a',
       }}>
-        <img src="/logo-pulse.svg" alt="Pulse" style={{ height: 16, width: 'auto', marginRight: 4 }} />
+        <img src="/logo-pulse.svg" alt="Pulse" style={{ height: 26, width: 'auto', marginRight: 6 }} />
         <span style={{ fontSize: 13, color: '#666', marginRight: 4 }}>·</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginRight: 8 }}>{cliente.nome}</span>
         {cliente.abas.map(aba => {
-          const href = `/${slug}/${aba}`
+          const href = aba === 'midia' ? `/${slug}` : `/${slug}/${aba}`
           const active = pathname === href
           return (
             <Link key={aba} href={href} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, textDecoration: 'none', transition: 'all 0.15s', background: active ? '#1A3CFF' : '#252525', color: active ? '#fff' : '#999', outline: !active ? '1px solid #333' : 'none', display: 'flex', alignItems: 'center' }}>

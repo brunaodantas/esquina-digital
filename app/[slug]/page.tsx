@@ -1,20 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useParams } from 'next/navigation'
+import MetaAdsPage from '@/app/dashboard/meta-ads/page'
 import { getCliente } from '@/clientes'
 
-export default function ClienteIndexPage() {
-  const router = useRouter()
+export default function ClienteMidiaPage() {
   const params = useParams<{ slug: string }>()
-  const slug = params?.slug ?? ''
-  const cliente = getCliente(slug)
-
-  useEffect(() => {
-    if (cliente && cliente.abas.length > 0) {
-      router.replace(`/${slug}/${cliente.abas[0]}`)
-    }
-  }, [cliente, router, slug])
-
-  return null
+  const cliente = getCliente(params?.slug ?? '')
+  if (!cliente) return null
+  return <MetaAdsPage theme="dark" contaIds={cliente.metaAccountIds} />
 }
