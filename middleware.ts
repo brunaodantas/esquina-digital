@@ -40,7 +40,9 @@ export function middleware(request: NextRequest) {
   if (pathname.startsWith('/dashboard') || isClientSlugPath(pathname)) {
     const session = request.cookies.get('__session')?.value
     if (!session) {
-      return NextResponse.redirect(new URL('/', request.url))
+      const loginUrl = new URL('/', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(loginUrl)
     }
   }
 
