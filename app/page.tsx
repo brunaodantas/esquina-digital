@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 
-type Screen = 'loading' | 'login' | 'checking' | 'pending'
+type Screen = 'loading' | 'login' | 'checking' | 'pending' | 'auto-aprovado'
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>('loading')
@@ -56,14 +56,22 @@ export default function Home() {
       setUser(u)
       setScreen('pending')
     } else {
+      const autoAprovado = (u.email ?? '').toLowerCase().endsWith('@esquina.online')
       await setDoc(ref, {
         uid: u.uid,
         email: u.email,
         name: u.displayName,
         photo: u.photoURL,
-        status: 'pendente',
+        status: autoAprovado ? 'aprovado' : 'pendente',
         createdAt: new Date().toISOString(),
       })
+      if (autoAprovado) {
+        document.cookie = '__session=1; path=/; max-age=86400; SameSite=Strict'
+        setUser(u)
+        setScreen('auto-aprovado')
+        setTimeout(() => router.push('/dashboard'), 1200)
+        return
+      }
       await fetch('/api/notify-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -108,6 +116,20 @@ export default function Home() {
     )
   }
 
+  if (screen === 'auto-aprovado') {
+    return (
+      <div style={styles.center}>
+        <div style={styles.card}>
+          <img src="/logo.webp" alt="Esquina" style={{ height: 40, width: 'auto' }} />
+          <h2 style={styles.title}>Acesso liberado</h2>
+          <p style={styles.muted}>
+            E-mail @esquina.online reconhecido — entrando no dashboard...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (screen === 'pending') {
     return (
       <div style={styles.center}>
@@ -127,7 +149,6 @@ export default function Home() {
     <div style={styles.center}>
       <div style={styles.card}>
         <img src="/logo.webp" alt="Esquina" style={{ height: 48, width: 'auto' }} />
-        <h1 style={styles.title}>Esquina Digital</h1>
         <p style={styles.muted}>Faça login para continuar</p>
         {error && <p style={styles.error}>{error}</p>}
         <button onClick={handleLogin} style={styles.googleBtn}>

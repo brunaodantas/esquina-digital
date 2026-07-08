@@ -10,5 +10,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/((?!api|_next|favicon.ico|logo.webp|logo-esquina-wordmark.png|logo-esquina.png|logo-pulse.svg|$).*)'],
 }
