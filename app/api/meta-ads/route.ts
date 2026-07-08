@@ -269,26 +269,13 @@ export async function GET(req: NextRequest) {
   const fresh = searchParams.get('fresh') === '1'
   const chave = `meta|v5|${start}|${end}`
 
-  // Filtro opcional por conta (usado pelos dashboards de cliente) — aplicado só na resposta,
-  // nunca na chave de cache: o cache sempre guarda o conjunto completo de contas para que
-  // o filtro de um cliente nunca vaze (nem sirva de) cache para outro.
-  const contaIdsParam = searchParams.get('contaIds')
-  const contaIdsFilter = contaIdsParam
-    ? new Set(contaIdsParam.split(',').map(s => s.trim()).filter(Boolean))
-    : null
-  function scoped(payload: { nomes: string[]; data: MetaAccountData[] }) {
-    if (!contaIdsFilter) return payload
-    const data = payload.data.filter(a => contaIdsFilter.has(a.id))
-    return { nomes: data.map(a => a.nome).sort(), data }
-  }
-
   const cacheKey = `metav7|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
-    return NextResponse.json(scoped({ nomes: _cache.nomes, data: _cache.data }))
+    return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
   if (!fresh) {
     const cacheado = await readCache(chave, 3_600_000)
-    if (cacheado) return NextResponse.json(scoped(cacheado))
+    if (cacheado) return NextResponse.json(cacheado)
   }
 
   const timeRange = JSON.stringify({ since: start, until: end })
@@ -560,5 +547,5 @@ export async function GET(req: NextRequest) {
   _cache = { key: cacheKey, ts: Date.now(), data: results, nomes }
   const out = { nomes, data: results }
   await writeCache(chave, out)
-  return NextResponse.json(scoped(out))
+  return NextResponse.json(out)
 }

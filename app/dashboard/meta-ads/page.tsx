@@ -825,7 +825,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
 }
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
-export default function MetaAdsPage({ theme = 'dark', contaIds }: { theme?: Theme; contaIds?: string[] }) {
+export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
   const [data, setData] = useState<MetaAccountData[] | null>(null)
   const [nomes, setNomes] = useState<string[]>([])
   const [error, setError] = useState('')
@@ -842,11 +842,10 @@ export default function MetaAdsPage({ theme = 'dark', contaIds }: { theme?: Them
   const t = C[theme]
   const periodoRef = useRef(getPeriodo('mes-atual'))
   const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const contaIdsQS = contaIds?.length ? `&contaIds=${contaIds.join(',')}` : ''
 
   function fetchData(p: { start: string; end: string }, fresh = false) {
     setLoading(true); setError('')
-    fetch(`/api/meta-ads?start=${p.start}&end=${p.end}${fresh ? '&fresh=1' : ''}${contaIdsQS}`)
+    fetch(`/api/meta-ads?start=${p.start}&end=${p.end}${fresh ? '&fresh=1' : ''}`)
       .then(r => r.json())
       .then(res => {
         if (res.error) { setError(res.error); setLoading(false); return }
@@ -878,7 +877,7 @@ export default function MetaAdsPage({ theme = 'dark', contaIds }: { theme?: Them
     if (comparar) { setComparar(false); setPrevData(null); return }
     const prev = getPrevPeriodo(periodoRef.current)
     setLoadingPrev(true); setComparar(true)
-    fetch(`/api/meta-ads?start=${prev.start}&end=${prev.end}${contaIdsQS}`)
+    fetch(`/api/meta-ads?start=${prev.start}&end=${prev.end}`)
       .then(r => r.json())
       .then(res => { if (!res.error) setPrevData(res.data ?? []); setLoadingPrev(false) })
       .catch(() => setLoadingPrev(false))
@@ -902,7 +901,7 @@ export default function MetaAdsPage({ theme = 'dark', contaIds }: { theme?: Them
       if (next <= now) next.setDate(next.getDate() + 1)
       return setTimeout(() => {
         const cur = periodoRef.current
-        fetch(`/api/meta-ads?start=${cur.start}&end=${cur.end}${contaIdsQS}`).then(r => r.json()).then(res => {
+        fetch(`/api/meta-ads?start=${cur.start}&end=${cur.end}`).then(r => r.json()).then(res => {
           if (!res.error) { setData(res.data ?? []); if ((res.nomes ?? []).length > 0) setNomes(res.nomes); setLastUpdated(new Date()) }
         }).catch(() => {})
         timer = scheduleNext()

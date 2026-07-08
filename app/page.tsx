@@ -5,26 +5,8 @@ import { signInWithPopup, onAuthStateChanged, User } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
-import { PULSE_HOST } from '@/lib/domains'
-import { CLIENTES } from '@/clientes'
 
 type Screen = 'loading' | 'login' | 'checking' | 'pending' | 'auto-aprovado'
-
-// Depois do login, volta pra rota que a pessoa tentou acessar (ex.: /celina),
-// em vez de sempre mandar pro /dashboard — importante porque no domínio Pulse
-// o /dashboard é bloqueado (ver middleware.ts) e a rota original pode ser outra.
-// Se a pessoa logou direto pela raiz do domínio Pulse (sem vir de um link de
-// cliente específico), cai no primeiro cliente configurado em vez do /dashboard.
-function getRedirectTarget(): string {
-  if (typeof window === 'undefined') return '/dashboard'
-  const redirect = new URLSearchParams(window.location.search).get('redirect')
-  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) return redirect
-  if (window.location.hostname === PULSE_HOST) {
-    const primeiroCliente = Object.keys(CLIENTES)[0]
-    return primeiroCliente ? `/${primeiroCliente}` : '/'
-  }
-  return '/dashboard'
-}
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>('loading')
@@ -69,7 +51,7 @@ export default function Home() {
     const snap = await getDoc(ref)
     if (snap.exists() && snap.data().status === 'aprovado') {
       document.cookie = '__session=1; path=/; max-age=86400; SameSite=Strict'
-      router.push(getRedirectTarget())
+      router.push('/dashboard')
     } else if (snap.exists() && snap.data().status === 'pendente') {
       setUser(u)
       setScreen('pending')
@@ -87,7 +69,7 @@ export default function Home() {
         document.cookie = '__session=1; path=/; max-age=86400; SameSite=Strict'
         setUser(u)
         setScreen('auto-aprovado')
-        setTimeout(() => router.push(getRedirectTarget()), 1200)
+        setTimeout(() => router.push('/dashboard'), 1200)
         return
       }
       await fetch('/api/notify-admin', {
