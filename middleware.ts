@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { DIGITAL_ESQUINA_HOST, PULSE_HOST, isLocalHost } from '@/lib/domains'
 
 // Separação por domínio: cada área só existe no seu próprio domínio de produção.
 // Um link não pode "vazar" de um domínio pro outro — digital-esquina tem dados
 // internos/sigilosos da agência, pulse-esquina tem dados de clientes específicos.
 // Em localhost (dev) as duas áreas ficam liberadas pra facilitar teste local.
-const DIGITAL_ESQUINA_HOST = 'digital-esquina.vercel.app'
-const PULSE_HOST = 'pulse-esquina.vercel.app'
-const LOCAL_HOSTS = ['localhost:3000', '127.0.0.1:3000']
 
 const PUBLIC_FILES = new Set([
   '/favicon.ico',
@@ -29,7 +27,7 @@ function isClientSlugPath(pathname: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const host = request.headers.get('host') ?? ''
-  const isLocal = LOCAL_HOSTS.includes(host)
+  const isLocal = isLocalHost(host)
 
   if (isClientSlugPath(pathname) && !isLocal && host !== PULSE_HOST) {
     return new NextResponse('Not found', { status: 404 })

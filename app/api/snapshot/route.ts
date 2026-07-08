@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
+import { DIGITAL_ESQUINA_HOST, isLocalHost } from '@/lib/domains'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -8,6 +9,10 @@ export const maxDuration = 60
 // Reusa as rotas que já existem (/api/meta-ads etc.) — não reimplementa coleta.
 // Protegido por secret: header "Authorization: Bearer <CRON_SECRET>" (Vercel Cron)
 // ou ?key=<SNAPSHOT_SECRET> (teste manual). /api/* não passa pelo middleware de auth.
+//
+// Roda só a partir do projeto digital-esquina: o mesmo vercel.json (com o cron)
+// existe nos dois projetos Vercel (digital-esquina e pulse-esquina, mesmo repo),
+// então sem essa checagem o snapshot rodaria em dobro — uma vez por domínio.
 
 type Snapshot = { dia: string; plataforma: string; conta_id: string; conta_nome: string; metricas: any; campanhas: any }
 
@@ -27,6 +32,11 @@ export async function GET(req: NextRequest) {
     (!!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) ||
     (!!process.env.SNAPSHOT_SECRET && key === process.env.SNAPSHOT_SECRET)
   if (!ok) return NextResponse.json({ error: 'não autorizado' }, { status: 401 })
+
+  const host = req.headers.get('host') ?? ''
+  if (host !== DIGITAL_ESQUINA_HOST && !isLocalHost(host)) {
+    return NextResponse.json({ ok: true, skipped: 'cron só roda a partir de digital-esquina.vercel.app' })
+  }
 
   const origin = url.origin
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)

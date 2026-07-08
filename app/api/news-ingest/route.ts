@@ -5,6 +5,7 @@ import { KeywordRule } from '@/clientes/types'
 import { fetchGoogleNewsRss } from '@/lib/news/rss'
 import { isRelevant } from '@/lib/news/relevance'
 import { normalizeUrl } from '@/lib/news/dedup'
+import { DIGITAL_ESQUINA_HOST, isLocalHost } from '@/lib/domains'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -12,6 +13,10 @@ export const maxDuration = 60
 // Ingestão diária de notícias/clipagem por cliente via Google News RSS.
 // Protegido por secret: header "Authorization: Bearer <CRON_SECRET>" (Vercel Cron)
 // ou ?key=<INGEST_SECRET> (teste manual). /api/* não passa pelo middleware de auth.
+//
+// Roda só a partir do projeto digital-esquina (mesma regra do /api/snapshot):
+// o mesmo vercel.json existe nos dois projetos Vercel (mesmo repo), então sem
+// essa checagem a ingestão rodaria em dobro — uma vez por domínio.
 
 type Categoria = 'noticias' | 'clipagem'
 
@@ -67,6 +72,11 @@ export async function GET(req: NextRequest) {
     (!!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) ||
     (!!process.env.INGEST_SECRET && key === process.env.INGEST_SECRET)
   if (!ok) return NextResponse.json({ error: 'não autorizado' }, { status: 401 })
+
+  const host = req.headers.get('host') ?? ''
+  if (host !== DIGITAL_ESQUINA_HOST && !isLocalHost(host)) {
+    return NextResponse.json({ ok: true, skipped: 'cron só roda a partir de digital-esquina.vercel.app' })
+  }
 
   try {
     getSupabase()
