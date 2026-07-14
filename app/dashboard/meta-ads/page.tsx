@@ -539,6 +539,35 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
 }
 
 // ─── Meta Data Table ───────────────────────────────────────────────────────────
+// Soma métricas de campanha/conjunto. Alcance e Frequência NUNCA são somados (deduplicados) — ficam "—" na linha de total.
+function sumMetaEntity<T extends { spend: number; impressions: number; clicks: number; engajamento: number; thruplays: number }>(rows: T[]) {
+  const spend = rows.reduce((s, r) => s + r.spend, 0)
+  const impressions = rows.reduce((s, r) => s + r.impressions, 0)
+  const clicks = rows.reduce((s, r) => s + r.clicks, 0)
+  const engajamento = rows.reduce((s, r) => s + r.engajamento, 0)
+  const thruplays = rows.reduce((s, r) => s + r.thruplays, 0)
+  return {
+    spend, impressions, clicks, thruplays,
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+    cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+    cpc: clicks > 0 ? spend / clicks : 0,
+    cpe: engajamento > 0 ? spend / engajamento : 0,
+    cpv: thruplays > 0 ? spend / thruplays : 0,
+    taxaVisualizacao: impressions > 0 ? (thruplays / impressions) * 100 : 0,
+  }
+}
+function sumMetaAds(rows: MetaAdData[]) {
+  const spend = rows.reduce((s, r) => s + r.spend, 0)
+  const impressions = rows.reduce((s, r) => s + r.impressions, 0)
+  const clicks = rows.reduce((s, r) => s + r.clicks, 0)
+  return {
+    spend, impressions, clicks,
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+    cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+    cpc: clicks > 0 ? spend / clicks : 0,
+  }
+}
+
 function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   campanhas: MetaCampaignData[]
   adsets: MetaAdSetData[]
@@ -588,6 +617,11 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   const sortedCampanhas = sortRows(filteredCampanhas)
   const sortedAdsets = sortRows(filteredAdsets)
   const sortedAds = sortRows(filteredAds)
+
+  const totCampanhas = sumMetaEntity(sortedCampanhas)
+  const totAdsets = sumMetaEntity(sortedAdsets)
+  const totAds = sumMetaAds(sortedAds)
+  const totalTdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textPrimary, fontWeight: 700, borderTop: `2px solid ${t.tableBorder}` }
 
   function exportCSV() {
     let headers: string[]; let rows: (string | number)[][]
@@ -730,6 +764,25 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                   </tr>
                 )
               })}
+              {sortedCampanhas.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  <td style={{ ...totalTdS, textAlign: 'right', color: '#60a5fa' }}><CopiavelNum compact={fmtBRL(totCampanhas.spend)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totCampanhas.impressions)} full={fmtNumFull(totCampanhas.impressions)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totCampanhas.clicks)} full={fmtNumFull(totCampanhas.clicks)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(totCampanhas.ctr)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(totCampanhas.cpm)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpc > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpc)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpe > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpe)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.thruplays > 0 ? <CopiavelNum compact={fmtNum(totCampanhas.thruplays)} full={fmtNumFull(totCampanhas.thruplays)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(totCampanhas.taxaVisualizacao)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpv > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpv)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -777,6 +830,26 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                   </tr>
                 )
               })}
+              {sortedAdsets.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={{ ...totalTdS, textAlign: 'right', color: '#60a5fa' }}><CopiavelNum compact={fmtBRL(totAdsets.spend)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totAdsets.impressions)} full={fmtNumFull(totAdsets.impressions)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totAdsets.clicks)} full={fmtNumFull(totAdsets.clicks)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(totAdsets.ctr)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(totAdsets.cpm)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpc > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpc)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpe > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpe)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.thruplays > 0 ? <CopiavelNum compact={fmtNum(totAdsets.thruplays)} full={fmtNumFull(totAdsets.thruplays)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(totAdsets.taxaVisualizacao)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpv > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpv)} /> : '—'}</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -816,6 +889,19 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                   </tr>
                 )
               })}
+              {sortedAds.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={{ ...totalTdS, textAlign: 'right', color: '#60a5fa' }}><CopiavelNum compact={fmtBRL(totAds.spend)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totAds.impressions)} full={fmtNumFull(totAds.impressions)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totAds.clicks)} full={fmtNumFull(totAds.clicks)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(totAds.ctr)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(totAds.cpm)} /></td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAds.cpc > 0 ? <CopiavelNum compact={fmtBRL(totAds.cpc)} /> : '—'}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}

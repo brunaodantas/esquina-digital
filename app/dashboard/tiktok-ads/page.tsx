@@ -475,6 +475,22 @@ function AudienciaSection({ filtrado, t }: { filtrado: TikTokAccountData[]; t: t
   )
 }
 
+// Soma métricas do TikTok (campanha/conjunto/anúncio compartilham os mesmos campos).
+// Alcance NUNCA é somado (deduplicado) — fica 0 de propósito pra cair no "—" já existente em metricCells.
+function sumTikTokEntity<T extends { spend: number; impressions: number; clicks: number; videoViews: number }>(rows: T[]) {
+  const spend = rows.reduce((s, r) => s + r.spend, 0)
+  const impressions = rows.reduce((s, r) => s + r.impressions, 0)
+  const clicks = rows.reduce((s, r) => s + r.clicks, 0)
+  const videoViews = rows.reduce((s, r) => s + r.videoViews, 0)
+  return {
+    spend, impressions, clicks, videoViews, reach: 0,
+    ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+    cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+    cpc: clicks > 0 ? spend / clicks : 0,
+    cpv: videoViews > 0 ? spend / videoViews : 0,
+  }
+}
+
 // ─── Data Table (3 níveis: Campanhas / Conjuntos / Anúncios) ──────────────────
 function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
   campanhas: TikTokCampaignData[]; grupos: TikTokAdSetData[]; anuncios: TikTokAdData[]; totalSpend: number; t: typeof C['dark']
@@ -506,6 +522,10 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
   const sortedGrupos = sortRows(filtGrupos)
   const sortedAnuncios = sortRows(filtAnuncios)
 
+  const totCamp = sumTikTokEntity(sortedCamp)
+  const totGrupos = sumTikTokEntity(sortedGrupos)
+  const totAnuncios = sumTikTokEntity(sortedAnuncios)
+
   function exportCSV() {
     let headers: string[]; let rows: (string | number)[][]
     if (nivel === 'campanhas') {
@@ -528,6 +548,7 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
 
   const thS: React.CSSProperties = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left', borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap' }
   const tdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textSecondary, borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle' }
+  const totalTdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textPrimary, fontWeight: 700, borderTop: `2px solid ${t.tableBorder}` }
 
   const metricHeaders = (
     <>
@@ -537,17 +558,17 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
       })}
     </>
   )
-  const metricCells = (item: { spend: number; impressions: number; reach: number; clicks: number; videoViews: number; ctr: number; cpm: number; cpc: number; cpv: number }) => (
+  const metricCells = (item: { spend: number; impressions: number; reach: number; clicks: number; videoViews: number; ctr: number; cpm: number; cpc: number; cpv: number }, cellStyle: React.CSSProperties = tdS) => (
     <>
-      <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.spend)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressions)} full={fmtNumFull(item.impressions)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.reach > 0 ? <CopiavelNum compact={fmtNum(item.reach)} full={fmtNumFull(item.reach)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.clicks)} full={fmtNumFull(item.clicks)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.videoViews > 0 ? <CopiavelNum compact={fmtNum(item.videoViews)} full={fmtNumFull(item.videoViews)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(item.cpm)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpc > 0 ? <CopiavelNum compact={fmtBRL(item.cpc)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpv > 0 ? <CopiavelNum compact={fmtBRL(item.cpv)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.spend)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressions)} full={fmtNumFull(item.impressions)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.reach > 0 ? <CopiavelNum compact={fmtNum(item.reach)} full={fmtNumFull(item.reach)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.clicks)} full={fmtNumFull(item.clicks)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.videoViews > 0 ? <CopiavelNum compact={fmtNum(item.videoViews)} full={fmtNumFull(item.videoViews)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(item.cpm)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.cpc > 0 ? <CopiavelNum compact={fmtBRL(item.cpc)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.cpv > 0 ? <CopiavelNum compact={fmtBRL(item.cpv)} /> : '—'}</td>
     </>
   )
 
@@ -591,6 +612,13 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
                   </tr>
                 )
               })}
+              {sortedCamp.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  {metricCells(totCamp, totalTdS)}
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -615,6 +643,14 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
                   </tr>
                 )
               })}
+              {sortedGrupos.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  <td style={totalTdS}>—</td>
+                  {metricCells(totGrupos, totalTdS)}
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -640,6 +676,15 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
                   </tr>
                 )
               })}
+              {sortedAnuncios.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={totalTdS}>—</td>
+                  {metricCells(totAnuncios, totalTdS)}
+                </tr>
+              )}
             </tbody>
           </table>
         )}

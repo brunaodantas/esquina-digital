@@ -552,6 +552,24 @@ function CidadesSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof C[
 }
 
 // ─── Data Table (3 níveis) ────────────────────────────────────────────────────
+// Soma métricas do Google (campanha/grupo/anúncio compartilham os mesmos campos). Taxas são recalculadas a partir dos totais, nunca somadas direto.
+function sumGoogleEntity<T extends { custo: number; cliques: number; impressoes: number; videoViews: number; conversoes: number }>(rows: T[]) {
+  const custo = rows.reduce((s, r) => s + r.custo, 0)
+  const cliques = rows.reduce((s, r) => s + r.cliques, 0)
+  const impressoes = rows.reduce((s, r) => s + r.impressoes, 0)
+  const videoViews = rows.reduce((s, r) => s + r.videoViews, 0)
+  const conversoes = rows.reduce((s, r) => s + r.conversoes, 0)
+  return {
+    custo, cliques, impressoes, videoViews, conversoes,
+    taxaVisualizacao: impressoes > 0 ? (videoViews / impressoes) * 100 : 0,
+    ctr: impressoes > 0 ? (cliques / impressoes) * 100 : 0,
+    cpcMedio: cliques > 0 ? custo / cliques : 0,
+    cpm: impressoes > 0 ? (custo / impressoes) * 1000 : 0,
+    cpv: videoViews > 0 ? custo / videoViews : 0,
+    custoConversao: conversoes > 0 ? custo / conversoes : 0,
+  }
+}
+
 function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   campanhas: CampaignData[]; grupos: AdGroupData[]; anuncios: AdData[]
   totalCusto: number; t: typeof C['dark']; multiNivel: boolean
@@ -615,6 +633,11 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   const sortedGrupos = sortRows(filtGrupos)
   const sortedAnuncios = sortRows(filtAnuncios)
 
+  const totCamp = sumGoogleEntity(sortedCamp)
+  const totGrupos = sumGoogleEntity(sortedGrupos)
+  const totAnuncios = sumGoogleEntity(sortedAnuncios)
+  const totalTdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textPrimary, fontWeight: 700, borderTop: `2px solid ${t.tableBorder}` }
+
   function exportCSV() {
     const metricKeys = ['custo','cliques','impressoes','ctr','cpcMedio','cpm','cpv','conversoes','custoConversao']
     let headers: string[]; let rows: (string | number)[][]
@@ -647,19 +670,19 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
     borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle',
   }
 
-  const metricCols = (item: { custo: number; cliques: number; impressoes: number; videoViews: number; taxaVisualizacao: number; ctr: number; cpcMedio: number; cpm: number; cpv: number; conversoes: number; custoConversao: number }, share: number) => (
+  const metricCols = (item: { custo: number; cliques: number; impressoes: number; videoViews: number; taxaVisualizacao: number; ctr: number; cpcMedio: number; cpm: number; cpv: number; conversoes: number; custoConversao: number }, share: number, cellStyle: React.CSSProperties = tdS) => (
     <>
-      <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.custo)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.cliques)} full={fmtNumFull(item.cliques)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressoes)} full={fmtNumFull(item.impressoes)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.videoViews > 0 ? <CopiavelNum compact={fmtNum(item.videoViews)} full={fmtNumFull(item.videoViews)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(item.taxaVisualizacao)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpcMedio > 0 ? <CopiavelNum compact={fmtBRL(item.cpcMedio)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpm > 0 ? <CopiavelNum compact={fmtBRL(item.cpm)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.cpv > 0 ? <CopiavelNum compact={fmtBRL(item.cpv)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right', color: item.conversoes > 0 ? '#4ade80' : t.textMuted }}>{item.conversoes > 0 ? <CopiavelNum compact={fmtNum(item.conversoes)} full={fmtNumFull(item.conversoes)} /> : '—'}</td>
-      <td style={{ ...tdS, textAlign: 'right' }}>{item.custoConversao > 0 ? <CopiavelNum compact={fmtBRL(item.custoConversao)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(item.custo)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.cliques)} full={fmtNumFull(item.cliques)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}><CopiavelNum compact={fmtNum(item.impressoes)} full={fmtNumFull(item.impressoes)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.videoViews > 0 ? <CopiavelNum compact={fmtNum(item.videoViews)} full={fmtNumFull(item.videoViews)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(item.taxaVisualizacao)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}><CopiavelNum compact={fmtPct(item.ctr)} /></td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.cpcMedio > 0 ? <CopiavelNum compact={fmtBRL(item.cpcMedio)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.cpm > 0 ? <CopiavelNum compact={fmtBRL(item.cpm)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.cpv > 0 ? <CopiavelNum compact={fmtBRL(item.cpv)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right', color: item.conversoes > 0 ? '#4ade80' : t.textMuted }}>{item.conversoes > 0 ? <CopiavelNum compact={fmtNum(item.conversoes)} full={fmtNumFull(item.conversoes)} /> : '—'}</td>
+      <td style={{ ...cellStyle, textAlign: 'right' }}>{item.custoConversao > 0 ? <CopiavelNum compact={fmtBRL(item.custoConversao)} /> : '—'}</td>
     </>
   )
 
@@ -767,6 +790,14 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
                   </tr>
                 )
               })}
+              {sortedCamp.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  {metricCols(totCamp, 0, totalTdS)}
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -792,6 +823,14 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
                   {metricCols(g, 0)}
                 </tr>
               ))}
+              {sortedGrupos.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={totalTdS}>—</td>
+                  {metricCols(totGrupos, 0, totalTdS)}
+                </tr>
+              )}
             </tbody>
           </table>
         )}
@@ -819,6 +858,15 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
                   {metricCols(a, 0)}
                 </tr>
               ))}
+              {sortedAnuncios.length > 0 && (
+                <tr>
+                  <td style={totalTdS}>TOTAL</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={totalTdS}>—</td>
+                  <td style={totalTdS}>—</td>
+                  {metricCols(totAnuncios, 0, totalTdS)}
+                </tr>
+              )}
             </tbody>
           </table>
         )}
