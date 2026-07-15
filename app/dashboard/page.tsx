@@ -12,6 +12,11 @@ import TikTokAdsPage from './tiktok-ads/page'
 
 type Tab = 'meta' | 'entregas' | 'google-ads' | 'tiktok'
 type Theme = 'dark' | 'light'
+
+const H = {
+  dark: { bg: '#07070f', border: 'rgba(255,255,255,0.07)', tabBg: '#111122', tabText: '#8888b8', tabBorder: 'rgba(255,255,255,0.1)', userText: '#52527a' },
+  light: { bg: '#ffffff', border: 'rgba(0,0,0,0.08)', tabBg: '#efeff8', tabText: '#4a4a72', tabBorder: 'rgba(0,0,0,0.1)', userText: '#8080a8' },
+}
 type PresetWA = 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'personalizado'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -1392,10 +1397,10 @@ export default function Dashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
 
-      {/* Faixa de marca com a logo Esquina centralizada */}
+      {/* Faixa de marca */}
       <div style={{
         display: 'flex', justifyContent: 'center', alignItems: 'center',
-        padding: '5px 0', flexShrink: 0, background: '#010066',
+        padding: '5px 0', flexShrink: 0, background: '#0f0f26',
       }}>
         <img src="/logo-esquina-wordmark.png" alt="Esquina" style={{ height: 22, width: 'auto', filter: 'brightness(0) invert(1)' }} />
       </div>
@@ -1404,28 +1409,28 @@ export default function Dashboard() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '0 20px', height: 52, flexShrink: 0,
-        background: '#0d0d0d',
-        borderBottom: '1px solid #2a2a2a',
+        background: H[theme].bg,
+        borderBottom: `1px solid ${H[theme].border}`,
       }}>
-        <button onClick={() => setActiveTab('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? '#1A3CFF' : '#252525', color: activeTab === 'meta' ? '#fff' : '#999', outline: activeTab !== 'meta' ? '1px solid #333' : 'none' }}>Meta Ads</button>
-        <button onClick={() => setActiveTab('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? '#1A3CFF' : '#252525', color: activeTab === 'google-ads' ? '#fff' : '#999', outline: activeTab !== 'google-ads' ? '1px solid #333' : 'none' }}>Google Ads</button>
-        <button onClick={() => setActiveTab('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#00994D' : '#252525', color: activeTab === 'tiktok' ? '#fff' : '#999', outline: activeTab !== 'tiktok' ? '1px solid #333' : 'none' }}>TikTok</button>
+        <button onClick={() => setActiveTab('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'meta' ? '#fff' : H[theme].tabText, outline: activeTab !== 'meta' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Meta Ads</button>
+        <button onClick={() => setActiveTab('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'google-ads' ? '#fff' : H[theme].tabText, outline: activeTab !== 'google-ads' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Google Ads</button>
+        <button onClick={() => setActiveTab('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#00994D' : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
         <button onClick={() => setShowRelatorio(true)} title="Gerar relatório para WhatsApp" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a4a2a', transition: 'all 0.15s', background: '#1a2e1a', color: '#4ade80', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>✉</span> Relatório WA
         </button>
         <button onClick={() => setShowRelatorioSemanal(true)} title="Gerar boletim semanal PDF" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a3a4a', transition: 'all 0.15s', background: '#1a2030', color: '#7ba3ff', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>📄</span> Boletim PDF
         </button>
-        <button onClick={() => setActiveTab('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : '#252525', color: activeTab === 'entregas' ? '#fff' : '#999', outline: activeTab !== 'entregas' ? '1px solid #333' : 'none' }}>Entregas</button>
+        <button onClick={() => setActiveTab('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'entregas' ? '#fff' : H[theme].tabText, outline: activeTab !== 'entregas' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Entregas</button>
 
         <div style={{ flex: 1 }} />
 
-        <button onClick={toggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'} style={{ width: 32, height: 32, borderRadius: 7, fontSize: 15, background: '#252525', border: '1px solid #333', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button onClick={toggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'} style={{ width: 32, height: 32, borderRadius: 7, fontSize: 15, background: H[theme].tabBg, border: `1px solid ${H[theme].tabBorder}`, color: H[theme].tabText, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {theme === 'dark' ? '☀' : '☽'}
         </button>
         <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1A3CFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>{initials}</div>
-        <span style={{ fontSize: 13, color: '#888' }}>{user?.displayName?.split(' ')[0]}</span>
-        <button onClick={handleLogout} style={{ height: 30, padding: '0 12px', borderRadius: 6, fontSize: 12, background: 'transparent', border: '1px solid #333', color: '#666', cursor: 'pointer' }}>Sair</button>
+        <span style={{ fontSize: 13, color: H[theme].userText }}>{user?.displayName?.split(' ')[0]}</span>
+        <button onClick={handleLogout} style={{ height: 30, padding: '0 12px', borderRadius: 6, fontSize: 12, background: 'transparent', border: `1px solid ${H[theme].tabBorder}`, color: H[theme].userText, cursor: 'pointer' }}>Sair</button>
       </div>
 
       {/* Conteúdo */}
