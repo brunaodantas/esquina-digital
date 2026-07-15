@@ -513,7 +513,7 @@ canvas{width:100%!important;height:100%!important;display:block}
 .diag-list li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:0.85rem;line-height:1.55}
 .diag-list li::before{content:'✓';color:#00994D;font-weight:800;flex-shrink:0;margin-top:1px}
 .concl-list{display:flex;flex-direction:column;gap:8px}
-.concl-item{background:#f8f8f8;border-radius:8px;padding:11px 14px;border-left:3px solid #1A3CFF;font-size:0.82rem;line-height:1.5;color:#333}
+.concl-item{background:#f0f4ff;border-radius:8px;padding:11px 14px;border:1px solid rgba(26,60,255,0.15);font-size:0.82rem;line-height:1.5;color:#333}
 
 /* ── Footer strip (inside last section) ── */
 .footer-strip{border-top:2px solid #1A3CFF;display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 40px;margin-top:auto}
@@ -1347,15 +1347,16 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('meta')
-  const [theme, setTheme] = useState<Theme>('dark')
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('esquina-theme') as Theme | null
+      return saved || 'dark'
+    }
+    return 'dark'
+  })
   const [showRelatorio, setShowRelatorio] = useState(false)
   const [showRelatorioSemanal, setShowRelatorioSemanal] = useState(false)
   const router = useRouter()
-
-  useEffect(() => {
-    const saved = localStorage.getItem('esquina-theme') as Theme | null
-    if (saved) setTheme(saved)
-  }, [])
 
   function toggleTheme() {
     setTheme(t => {
@@ -1388,22 +1389,14 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0d0d0d' }}>
-        <div style={{ width: 32, height: 32, border: '3px solid #333', borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: H[theme].bg }}>
+        <div style={{ width: 32, height: 32, border: `3px solid ${H[theme].tabBg}`, borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       </div>
     )
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-
-      {/* Faixa de marca */}
-      <div style={{
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        padding: '5px 0', flexShrink: 0, background: '#0f0f26',
-      }}>
-        <img src="/logo-esquina-wordmark.png" alt="Esquina" style={{ height: 22, width: 'auto', filter: 'brightness(0) invert(1)' }} />
-      </div>
 
       {/* Header sempre visível */}
       <div style={{
@@ -1412,18 +1405,27 @@ export default function Dashboard() {
         background: H[theme].bg,
         borderBottom: `1px solid ${H[theme].border}`,
       }}>
+        {/* Logo integrada ao header */}
+        <img src="/logo-esquina-wordmark.png" alt="Esquina" style={{ height: 18, width: 'auto', filter: theme === 'dark' ? 'brightness(0) invert(1)' : 'brightness(0)', opacity: 0.75, marginRight: 4, flexShrink: 0 }} />
+        <div style={{ width: 1, height: 20, background: H[theme].border, marginRight: 4, flexShrink: 0 }} />
+
+        {/* Abas de navegação */}
         <button onClick={() => setActiveTab('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'meta' ? '#fff' : H[theme].tabText, outline: activeTab !== 'meta' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Meta Ads</button>
         <button onClick={() => setActiveTab('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'google-ads' ? '#fff' : H[theme].tabText, outline: activeTab !== 'google-ads' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Google Ads</button>
-        <button onClick={() => setActiveTab('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#00994D' : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
-        <button onClick={() => setShowRelatorio(true)} title="Gerar relatório para WhatsApp" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a4a2a', transition: 'all 0.15s', background: '#1a2e1a', color: '#4ade80', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14 }}>✉</span> Relatório WA
-        </button>
-        <button onClick={() => setShowRelatorioSemanal(true)} title="Gerar boletim semanal PDF" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: '1px solid #2a3a4a', transition: 'all 0.15s', background: '#1a2030', color: '#7ba3ff', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14 }}>📄</span> Boletim PDF
-        </button>
+        <button onClick={() => setActiveTab('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
         <button onClick={() => setActiveTab('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'entregas' ? '#fff' : H[theme].tabText, outline: activeTab !== 'entregas' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Entregas</button>
 
         <div style={{ flex: 1 }} />
+
+        {/* Ações (separadas visualmente das abas) */}
+        <button onClick={() => setShowRelatorio(true)} title="Gerar relatório para WhatsApp" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${H[theme].tabBorder}`, transition: 'all 0.15s', background: H[theme].tabBg, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14 }}>✉</span> Relatório WA
+        </button>
+        <button onClick={() => setShowRelatorioSemanal(true)} title="Gerar boletim semanal PDF" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${H[theme].tabBorder}`, transition: 'all 0.15s', background: H[theme].tabBg, color: '#1A3CFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 14 }}>📄</span> Boletim PDF
+        </button>
+
+        <div style={{ width: 1, height: 20, background: H[theme].border, flexShrink: 0 }} />
 
         <button onClick={toggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'} style={{ width: 32, height: 32, borderRadius: 7, fontSize: 15, background: H[theme].tabBg, border: `1px solid ${H[theme].tabBorder}`, color: H[theme].tabText, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {theme === 'dark' ? '☀' : '☽'}
