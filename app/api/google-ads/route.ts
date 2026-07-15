@@ -32,9 +32,11 @@ async function getToken(): Promise<string> {
   return _token
 }
 
-// metrics.video_views (views reais do TrueView) só existe até a v21; v22+ removeu o campo.
-// Mantemos as queries principais na v24 e buscamos só as views na v21.
-const VIEWS_VERSION = 'v21'
+// metrics.video_views foi removido a partir da v22. Views é estimado a partir de
+// metrics.video_quartile_p25_rate (fração de impressões que chegou a 25% do vídeo) * impressões.
+function estimaViews(impressoes: number, quartileP25Rate?: number): number {
+  return Math.round(impressoes * (quartileP25Rate ?? 0))
+}
 
 async function gaql(customerId: string, query: string, token: string, version: string = ADS_VERSION): Promise<any[]> {
   const id = customerId.replace(/-/g, '')
@@ -203,7 +205,7 @@ export interface AccountData {
 
 let _cache: { key: string; ts: number; data: AccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v12'
+const CACHE_V = 'v13'
 
 const GENDER_LABELS: Record<string, string> = {
   MALE: 'Masculino', FEMALE: 'Feminino', UNDETERMINED: 'Não identificado',
@@ -247,7 +249,7 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `google|v5|${start}|${end}`
+  const chave = `google|v6|${start}|${end}`
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
@@ -280,11 +282,12 @@ export async function GET(req: NextRequest) {
       await Promise.all(
         accounts.map(async (acc: { id: string; nome: string }) => {
           try {
-            const [campRows, agRows, adRows, dailyRows, geoRows, genderRows, ageRows, deviceRows, vvRows, genderViewsRows, ageViewsRows, deviceViewsRows] = await Promise.all([
+            const [campRows, agRows, adRows, dailyRows, geoRows, genderRows, ageRows, deviceRows] = await Promise.all([
               gaql(acc.id,
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
                    campaign_budget.amount_micros,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
+                   metrics.video_quartile_p25_rate
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'`,
@@ -305,7 +308,8 @@ export async function GET(req: NextRequest) {
                    ad_group_ad.policy_summary.policy_topic_entries,
                    ad_group.id, ad_group.name,
                    campaign.id, campaign.name,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
+                   metrics.video_quartile_p25_rate
                  FROM ad_group_ad
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND ad_group_ad.status != 'REMOVED'
@@ -333,50 +337,28 @@ export async function GET(req: NextRequest) {
                 token).catch(() => []),
               gaql(acc.id,
                 `SELECT gender_view.resource_name, ad_group_criterion.gender.type,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
+                   metrics.video_quartile_p25_rate
                  FROM gender_view
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND metrics.impressions > 0`,
                 token).catch(() => []),
               gaql(acc.id,
                 `SELECT age_range_view.resource_name, ad_group_criterion.age_range.type,
-                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                   metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
+                   metrics.video_quartile_p25_rate
                  FROM age_range_view
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND metrics.impressions > 0`,
                 token).catch(() => []),
               gaql(acc.id,
-                `SELECT segments.device, metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions
+                `SELECT segments.device, metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
+                   metrics.video_quartile_p25_rate
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'
                    AND metrics.impressions > 0`,
                 token).catch(() => []),
-              // Views reais do TrueView (metrics.video_views) — só existe na v21 (removido na v22+)
-              gaql(acc.id,
-                `SELECT campaign.id, metrics.video_views
-                 FROM campaign
-                 WHERE segments.date BETWEEN '${start}' AND '${end}'
-                   AND campaign.advertising_channel_type = 'VIDEO'
-                   AND metrics.impressions > 0`,
-                token, VIEWS_VERSION).catch(() => []),
-              // Views por audiência (gênero/idade/dispositivo) — também só na v21
-              gaql(acc.id,
-                `SELECT ad_group_criterion.gender.type, metrics.video_views
-                 FROM gender_view
-                 WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`,
-                token, VIEWS_VERSION).catch(() => []),
-              gaql(acc.id,
-                `SELECT ad_group_criterion.age_range.type, metrics.video_views
-                 FROM age_range_view
-                 WHERE segments.date BETWEEN '${start}' AND '${end}' AND metrics.impressions > 0`,
-                token, VIEWS_VERSION).catch(() => []),
-              gaql(acc.id,
-                `SELECT segments.device, metrics.video_views
-                 FROM campaign
-                 WHERE segments.date BETWEEN '${start}' AND '${end}'
-                   AND campaign.status != 'REMOVED' AND metrics.impressions > 0`,
-                token, VIEWS_VERSION).catch(() => []),
             ])
 
             // ── Campaigns ──────────────────────────────────────────────
@@ -395,7 +377,7 @@ export async function GET(req: NextRequest) {
 
               const ex = campMap.get(cid)
               const custo = cm / 1_000_000
-              const vv = Number(m.videoViews ?? 0)
+              const vv = estimaViews(imp, Number(m.videoQuartileP25Rate ?? 0))
               if (!ex) {
                 const tipoRaw = (c.advertisingChannelType ?? 'UNKNOWN') as string
                 const orcMicros = Number(row.campaignBudget?.amountMicros ?? 0)
@@ -414,12 +396,7 @@ export async function GET(req: NextRequest) {
               }
             }
 
-            // Views reais do TrueView (query isolada na v21) + CPV = custo / views
-            for (const row of vvRows) {
-              const cid = String(row.campaign?.id ?? '')
-              const camp = campMap.get(cid)
-              if (camp) camp.videoViews += Number(row.metrics?.videoViews ?? 0)
-            }
+            // CPV = custo / views (views já acumuladas por campanha acima)
             for (const camp of campMap.values()) {
               if (camp.videoViews > 0) camp.cpv = camp.custo / camp.videoViews
               if (camp.impressoes > 0 && camp.videoViews > 0) camp.taxaVisualizacao = (camp.videoViews / camp.impressoes) * 100
@@ -464,7 +441,7 @@ export async function GET(req: NextRequest) {
               const imp = Number(m.impressions ?? 0)
               const custo = Number(m.costMicros ?? 0) / 1_000_000
               const conv = Number(m.conversions ?? 0)
-              const vv = Number(m.videoViews ?? 0)
+              const vv = estimaViews(imp, Number(m.videoQuartileP25Rate ?? 0))
               const ex = adMap.get(adid)
               const rawName = (ada.ad?.name ?? '').trim()
               if (!ex) {
@@ -507,8 +484,6 @@ export async function GET(req: NextRequest) {
                 cpcMedio: d.cliques > 0 ? d.custo / d.cliques : 0,
                 cpm: d.impressoes > 0 ? (d.custo / d.impressoes) * 1000 : 0,
               }))
-
-            // videoViews vem direto de metrics.video_views no nível de campanha/anúncio (não propagar — duplicaria)
 
             if (custoMicros === 0) return null
 
@@ -556,36 +531,27 @@ export async function GET(req: NextRequest) {
             }
 
             // ── Audiência (gênero, idade, dispositivo) ─────────────────
-            // mapa de views (v21) por rótulo, pra mesclar nas categorias
-            function viewsMap(rows: any[], typePath: (r: any) => string, labels: Record<string, string>): Map<string, number> {
-              const m = new Map<string, number>()
-              for (const row of rows) {
-                const raw = String(typePath(row) ?? ''); if (!raw) continue
-                const label = labels[raw] ?? raw
-                m.set(label, (m.get(label) ?? 0) + Number(row.metrics?.videoViews ?? 0))
-              }
-              return m
-            }
-            function parseAud(rows: any[], typePath: (r: any) => string, labels: Record<string, string>, views: Map<string, number>): AudienceItem[] {
+            function parseAud(rows: any[], typePath: (r: any) => string, labels: Record<string, string>): AudienceItem[] {
               const m = new Map<string, AudienceItem>()
               for (const row of rows) {
                 const raw = String(typePath(row) ?? '')
                 if (!raw) continue
                 const label = labels[raw] ?? raw
                 const ex = m.get(label) ?? { label, impressoes: 0, cliques: 0, custo: 0, conversoes: 0, videoViews: 0 }
-                ex.impressoes += Number(row.metrics?.impressions ?? 0)
+                const imp = Number(row.metrics?.impressions ?? 0)
+                ex.impressoes += imp
                 ex.cliques += Number(row.metrics?.clicks ?? 0)
                 ex.custo += Number(row.metrics?.costMicros ?? 0) / 1_000_000
                 ex.conversoes += Number(row.metrics?.conversions ?? 0)
+                ex.videoViews += estimaViews(imp, Number(row.metrics?.videoQuartileP25Rate ?? 0))
                 m.set(label, ex)
               }
-              for (const it of m.values()) it.videoViews = views.get(it.label) ?? 0
               return Array.from(m.values()).filter(i => i.impressoes > 0).sort((a, b) => b.impressoes - a.impressoes)
             }
             const audiencia: AudienceData = {
-              genero: parseAud(genderRows, r => r.adGroupCriterion?.gender?.type, GENDER_LABELS, viewsMap(genderViewsRows, r => r.adGroupCriterion?.gender?.type, GENDER_LABELS)),
-              idade: parseAud(ageRows, r => r.adGroupCriterion?.ageRange?.type, AGE_LABELS, viewsMap(ageViewsRows, r => r.adGroupCriterion?.ageRange?.type, AGE_LABELS)),
-              dispositivos: parseAud(deviceRows, r => r.segments?.device, DEVICE_LABELS, viewsMap(deviceViewsRows, r => r.segments?.device, DEVICE_LABELS)),
+              genero: parseAud(genderRows, r => r.adGroupCriterion?.gender?.type, GENDER_LABELS),
+              idade: parseAud(ageRows, r => r.adGroupCriterion?.ageRange?.type, AGE_LABELS),
+              dispositivos: parseAud(deviceRows, r => r.segments?.device, DEVICE_LABELS),
             }
 
             const custo = custoMicros / 1_000_000
