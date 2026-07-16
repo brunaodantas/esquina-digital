@@ -57,7 +57,11 @@ async function discoverAllAccounts(): Promise<{ accounts: MetaAccountRef[]; toke
   const tokenFor = new Map<string, string>()
   const accounts: MetaAccountRef[] = []
   for (const token of [TOKEN, TOKEN2].filter(Boolean)) {
-    const found = await discoverAccounts(token)
+    // Um token inválido não pode derrubar as contas do(s) outro(s) token(s).
+    const found = await discoverAccounts(token).catch(e => {
+      console.error('Meta discoverAccounts falhou para um dos tokens:', e)
+      return []
+    })
     for (const acc of found) {
       if (tokenFor.has(acc.id)) continue
       tokenFor.set(acc.id, token)
