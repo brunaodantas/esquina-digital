@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { readCache, writeCache } from '@/lib/cache'
 
 const TOKEN = process.env.META_ACCESS_TOKEN ?? ''
+// Token de um usuário de sistema diferente (ex.: contas de cliente compartilhadas com
+// outro negócio, como o Kalil/PDT compartilhado só com o "Esquina API" da Algoritmica).
+const TOKEN2 = process.env.META_ACCESS_TOKEN_2 ?? ''
 const API = 'https://graph.facebook.com/v21.0'
 
 interface MetaAccountRef { id: string; nome: string; moeda: string }
@@ -29,10 +32,10 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number
   return results
 }
 
-// Descobre todas as contas de anúncio acessíveis pelo token (segue paginação)
-async function discoverAccounts(): Promise<MetaAccountRef[]> {
+// Descobre todas as contas de anúncio acessíveis por um token (segue paginação)
+async function discoverAccounts(token: string): Promise<MetaAccountRef[]> {
   const out: MetaAccountRef[] = []
-  let url: string | null = `${API}/me/adaccounts?fields=account_id,name,currency&limit=200&access_token=${encodeURIComponent(TOKEN)}`
+  let url: string | null = `${API}/me/adaccounts?fields=account_id,name,currency&limit=200&access_token=${encodeURIComponent(token)}`
   let guard = 0
   while (url && guard < 25) {
     guard++
@@ -47,6 +50,21 @@ async function discoverAccounts(): Promise<MetaAccountRef[]> {
     url = json.paging?.next ?? null
   }
   return out
+}
+
+// Descobre contas em todos os tokens configurados; primeira ocorrência de cada conta vence.
+async function discoverAllAccounts(): Promise<{ accounts: MetaAccountRef[]; tokenFor: Map<string, string> }> {
+  const tokenFor = new Map<string, string>()
+  const accounts: MetaAccountRef[] = []
+  for (const token of [TOKEN, TOKEN2].filter(Boolean)) {
+    const found = await discoverAccounts(token)
+    for (const acc of found) {
+      if (tokenFor.has(acc.id)) continue
+      tokenFor.set(acc.id, token)
+      accounts.push(acc)
+    }
+  }
+  return { accounts, tokenFor }
 }
 
 function parseThruplays(actions: any[]): number {
@@ -90,9 +108,9 @@ function extractReviewFeedback(fb: any): string {
 // Retorna Map<id, { status, orcamento, orcamentoTipo }>. Falha não quebra a tabela.
 // daily_budget/lifetime_budget vêm em centavos (menor unidade da moeda).
 interface EntityMeta { status: string; orcamento: number; orcamentoTipo: 'diario' | 'total' | '' }
-async function fetchEntityMeta(accountId: string, edge: 'campaigns' | 'adsets'): Promise<Map<string, EntityMeta>> {
+async function fetchEntityMeta(accountId: string, edge: 'campaigns' | 'adsets', token: string): Promise<Map<string, EntityMeta>> {
   const map = new Map<string, EntityMeta>()
-  let url: string | null = `${API}/act_${accountId}/${edge}?fields=id,effective_status,daily_budget,lifetime_budget&limit=500&access_token=${encodeURIComponent(TOKEN)}`
+  let url: string | null = `${API}/act_${accountId}/${edge}?fields=id,effective_status,daily_budget,lifetime_budget&limit=500&access_token=${encodeURIComponent(token)}`
   let guard = 0
   while (url && guard < 20) {
     guard++
@@ -115,9 +133,9 @@ async function fetchEntityMeta(accountId: string, edge: 'campaigns' | 'adsets'):
 
 // Busca status de revisão dos anúncios (o endpoint /insights não traz isso).
 // Retorna Map<ad_id, { effective_status, motivo }>. Falha não quebra a tabela.
-async function fetchAdStatuses(accountId: string): Promise<Map<string, { effective_status: string; motivo: string }>> {
+async function fetchAdStatuses(accountId: string, token: string): Promise<Map<string, { effective_status: string; motivo: string }>> {
   const map = new Map<string, { effective_status: string; motivo: string }>()
-  let url: string | null = `${API}/act_${accountId}/ads?fields=id,effective_status,ad_review_feedback&limit=500&access_token=${encodeURIComponent(TOKEN)}`
+  let url: string | null = `${API}/act_${accountId}/ads?fields=id,effective_status,ad_review_feedback&limit=500&access_token=${encodeURIComponent(token)}`
   let guard = 0
   while (url && guard < 20) {
     guard++
@@ -250,7 +268,7 @@ let _cache: { key: string; ts: number; data: MetaAccountData[]; nomes: string[] 
 const CACHE_TTL = 30 * 60 * 1000
 
 export async function GET(req: NextRequest) {
-  if (!TOKEN) {
+  if (!TOKEN && !TOKEN2) {
     return NextResponse.json(
       { error: 'Variável META_ACCESS_TOKEN não configurada.' },
       { status: 500 }
@@ -267,9 +285,9 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `meta|v5|${start}|${end}`
+  const chave = `meta|v6|${start}|${end}`
 
-  const cacheKey = `metav7|${start}|${end}`
+  const cacheKey = `metav8|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
@@ -282,49 +300,17 @@ export async function GET(req: NextRequest) {
 
   const COMMON_METRICS = 'spend,impressions,reach,clicks,ctr,cpm,cpc,frequency,video_thruplay_watched_actions,inline_post_engagement'
 
-  const accountParams = new URLSearchParams({
-    fields: COMMON_METRICS,
-    level: 'account',
-    time_range: timeRange,
-    access_token: TOKEN,
-  })
-
-  const campaignParams = new URLSearchParams({
-    fields: `campaign_id,campaign_name,${COMMON_METRICS}`,
-    level: 'campaign',
-    time_range: timeRange,
-    access_token: TOKEN,
-    limit: '200',
-  })
-
-  const adsetParams = new URLSearchParams({
-    fields: `adset_id,adset_name,campaign_name,${COMMON_METRICS}`,
-    level: 'adset',
-    time_range: timeRange,
-    access_token: TOKEN,
-    limit: '500',
-  })
-
-  const adParams = new URLSearchParams({
-    fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpm,cpc',
-    level: 'ad',
-    time_range: timeRange,
-    access_token: TOKEN,
-    limit: '500',
-  })
-
-  const dailyParams = new URLSearchParams({
-    fields: 'spend,impressions,reach,clicks,cpm,frequency,video_thruplay_watched_actions',
-    level: 'account',
-    time_range: timeRange,
-    time_increment: '1',
-    access_token: TOKEN,
-  })
+  // access_token é acrescentado por conta (cada conta pode vir de um token diferente)
+  const accountParamsBase = { fields: COMMON_METRICS, level: 'account', time_range: timeRange }
+  const campaignParamsBase = { fields: `campaign_id,campaign_name,${COMMON_METRICS}`, level: 'campaign', time_range: timeRange, limit: '200' }
+  const adsetParamsBase = { fields: `adset_id,adset_name,campaign_name,${COMMON_METRICS}`, level: 'adset', time_range: timeRange, limit: '500' }
+  const adParamsBase = { fields: 'ad_id,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpm,cpc', level: 'ad', time_range: timeRange, limit: '500' }
+  const dailyParamsBase = { fields: 'spend,impressions,reach,clicks,cpm,frequency,video_thruplay_watched_actions', level: 'account', time_range: timeRange, time_increment: '1' }
 
   const BREAKDOWN_FIELDS = 'impressions,reach,clicks,spend,video_thruplay_watched_actions'
-  const generoParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'gender', time_range: timeRange, access_token: TOKEN })
-  const idadeParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'age', time_range: timeRange, access_token: TOKEN })
-  const dispositivoParams = new URLSearchParams({ fields: BREAKDOWN_FIELDS, breakdowns: 'device_platform', time_range: timeRange, access_token: TOKEN })
+  const generoParamsBase = { fields: BREAKDOWN_FIELDS, breakdowns: 'gender', time_range: timeRange }
+  const idadeParamsBase = { fields: BREAKDOWN_FIELDS, breakdowns: 'age', time_range: timeRange }
+  const dispositivoParamsBase = { fields: BREAKDOWN_FIELDS, breakdowns: 'device_platform', time_range: timeRange }
 
   const GENERO_LABEL: Record<string, string> = { male: 'Masculino', female: 'Feminino', unknown: 'Desconhecido' }
   const DEVICE_LABEL: Record<string, string> = { mobile: 'Mobile', desktop: 'Desktop', connected_tv: 'Smart TV', unknown: 'Outros' }
@@ -344,10 +330,13 @@ export async function GET(req: NextRequest) {
     return items.sort((a, b) => b.impressions - a.impressions)
   }
 
-  // Descobre as contas acessíveis pelo token (lista dinâmica, não mais hardcoded)
+  // Descobre as contas acessíveis pelos tokens configurados (lista dinâmica, não mais hardcoded)
   let discovered: MetaAccountRef[]
+  let tokenFor: Map<string, string>
   try {
-    discovered = await discoverAccounts()
+    const r = await discoverAllAccounts()
+    discovered = r.accounts
+    tokenFor = r.tokenFor
   } catch (e: any) {
     console.error('Meta discover error:', e)
     return NextResponse.json({ error: e.message ?? 'Erro ao listar contas Meta' }, { status: 500 })
@@ -356,7 +345,8 @@ export async function GET(req: NextRequest) {
   // Fase A (leve): mantém só contas com gasto > 0 no período — some inativa/encerrada
   const active = (await mapLimit(discovered, 8, async (acc): Promise<MetaAccountRef | null> => {
     try {
-      const params = new URLSearchParams({ fields: 'spend', level: 'account', time_range: timeRange, access_token: TOKEN })
+      const token = tokenFor.get(acc.id) ?? TOKEN
+      const params = new URLSearchParams({ fields: 'spend', level: 'account', time_range: timeRange, access_token: token })
       const r = await fetch(`${API}/act_${acc.id}/insights?${params}`, { next: { revalidate: 0 } })
       const j = await r.json()
       if (j.error) return null
@@ -369,10 +359,20 @@ export async function GET(req: NextRequest) {
     await Promise.all(
       active.map(async (acc) => {
         try {
+          const token = tokenFor.get(acc.id) ?? TOKEN
+          const accountParams = new URLSearchParams({ ...accountParamsBase, access_token: token })
+          const campaignParams = new URLSearchParams({ ...campaignParamsBase, access_token: token })
+          const adsetParams = new URLSearchParams({ ...adsetParamsBase, access_token: token })
+          const adParams = new URLSearchParams({ ...adParamsBase, access_token: token })
+          const dailyParams = new URLSearchParams({ ...dailyParamsBase, access_token: token })
+          const generoParams = new URLSearchParams({ ...generoParamsBase, access_token: token })
+          const idadeParams = new URLSearchParams({ ...idadeParamsBase, access_token: token })
+          const dispositivoParams = new URLSearchParams({ ...dispositivoParamsBase, access_token: token })
+
           // status de revisão roda em paralelo (endpoints /ads /campaigns /adsets, não /insights)
-          const adStatusPromise = fetchAdStatuses(acc.id).catch(() => new Map<string, { effective_status: string; motivo: string }>())
-          const campStatusPromise = fetchEntityMeta(acc.id, 'campaigns').catch(() => new Map<string, EntityMeta>())
-          const adsetStatusPromise = fetchEntityMeta(acc.id, 'adsets').catch(() => new Map<string, EntityMeta>())
+          const adStatusPromise = fetchAdStatuses(acc.id, token).catch(() => new Map<string, { effective_status: string; motivo: string }>())
+          const campStatusPromise = fetchEntityMeta(acc.id, 'campaigns', token).catch(() => new Map<string, EntityMeta>())
+          const adsetStatusPromise = fetchEntityMeta(acc.id, 'adsets', token).catch(() => new Map<string, EntityMeta>())
           const [accRes, campRes, adsetRes, adRes, dailyRes, generoRes, idadeRes, dispositivoRes] = await Promise.all([
             fetch(`${API}/act_${acc.id}/insights?${accountParams}`, { next: { revalidate: 0 } }),
             fetch(`${API}/act_${acc.id}/insights?${campaignParams}`, { next: { revalidate: 0 } }),
