@@ -32,11 +32,9 @@ async function getToken(): Promise<string> {
   return _token
 }
 
-// metrics.video_views foi removido a partir da v22. Views é estimado a partir de
-// metrics.video_quartile_p25_rate (fração de impressões que chegou a 25% do vídeo) * impressões.
-function estimaViews(impressoes: number, quartileP25Rate?: number): number {
-  return Math.round(impressoes * (quartileP25Rate ?? 0))
-}
+// metrics.video_views foi removido a partir da v22 na versão padrão (ADS_VERSION).
+// As queries que precisam desse campo passam version: VIDEO_VIEWS_ADS_VERSION explicitamente.
+const VIDEO_VIEWS_ADS_VERSION = 'v21'
 
 async function gaql(customerId: string, query: string, token: string, version: string = ADS_VERSION): Promise<any[]> {
   const id = customerId.replace(/-/g, '')
@@ -287,11 +285,11 @@ export async function GET(req: NextRequest) {
                 `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status,
                    campaign_budget.amount_micros,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
-                   metrics.video_quartile_p25_rate
+                   metrics.video_views
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'`,
-                token),
+                token, VIDEO_VIEWS_ADS_VERSION),
               gaql(acc.id,
                 `SELECT ad_group.id, ad_group.name, ad_group.status,
                    campaign.id, campaign.name,
@@ -309,7 +307,7 @@ export async function GET(req: NextRequest) {
                    ad_group.id, ad_group.name,
                    campaign.id, campaign.name,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
-                   metrics.video_quartile_p25_rate
+                   metrics.video_views
                  FROM ad_group_ad
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND ad_group_ad.status != 'REMOVED'
@@ -317,7 +315,7 @@ export async function GET(req: NextRequest) {
                    AND metrics.impressions > 0
                  ORDER BY metrics.impressions DESC
                  LIMIT 500`,
-                token),
+                token, VIDEO_VIEWS_ADS_VERSION),
               gaql(acc.id,
                 `SELECT segments.date, metrics.cost_micros, metrics.clicks, metrics.impressions
                  FROM campaign
@@ -338,27 +336,27 @@ export async function GET(req: NextRequest) {
               gaql(acc.id,
                 `SELECT gender_view.resource_name, ad_group_criterion.gender.type,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
-                   metrics.video_quartile_p25_rate
+                   metrics.video_views
                  FROM gender_view
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND metrics.impressions > 0`,
-                token).catch(() => []),
+                token, VIDEO_VIEWS_ADS_VERSION).catch(() => []),
               gaql(acc.id,
                 `SELECT age_range_view.resource_name, ad_group_criterion.age_range.type,
                    metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
-                   metrics.video_quartile_p25_rate
+                   metrics.video_views
                  FROM age_range_view
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND metrics.impressions > 0`,
-                token).catch(() => []),
+                token, VIDEO_VIEWS_ADS_VERSION).catch(() => []),
               gaql(acc.id,
                 `SELECT segments.device, metrics.clicks, metrics.impressions, metrics.cost_micros, metrics.conversions,
-                   metrics.video_quartile_p25_rate
+                   metrics.video_views
                  FROM campaign
                  WHERE segments.date BETWEEN '${start}' AND '${end}'
                    AND campaign.status != 'REMOVED'
                    AND metrics.impressions > 0`,
-                token).catch(() => []),
+                token, VIDEO_VIEWS_ADS_VERSION).catch(() => []),
             ])
 
             // ── Campaigns ──────────────────────────────────────────────
@@ -377,7 +375,7 @@ export async function GET(req: NextRequest) {
 
               const ex = campMap.get(cid)
               const custo = cm / 1_000_000
-              const vv = estimaViews(imp, Number(m.videoQuartileP25Rate ?? 0))
+              const vv = Number(m.videoViews ?? 0)
               if (!ex) {
                 const tipoRaw = (c.advertisingChannelType ?? 'UNKNOWN') as string
                 const orcMicros = Number(row.campaignBudget?.amountMicros ?? 0)
@@ -441,7 +439,7 @@ export async function GET(req: NextRequest) {
               const imp = Number(m.impressions ?? 0)
               const custo = Number(m.costMicros ?? 0) / 1_000_000
               const conv = Number(m.conversions ?? 0)
-              const vv = estimaViews(imp, Number(m.videoQuartileP25Rate ?? 0))
+              const vv = Number(m.videoViews ?? 0)
               const ex = adMap.get(adid)
               const rawName = (ada.ad?.name ?? '').trim()
               if (!ex) {
@@ -543,7 +541,7 @@ export async function GET(req: NextRequest) {
                 ex.cliques += Number(row.metrics?.clicks ?? 0)
                 ex.custo += Number(row.metrics?.costMicros ?? 0) / 1_000_000
                 ex.conversoes += Number(row.metrics?.conversions ?? 0)
-                ex.videoViews += estimaViews(imp, Number(row.metrics?.videoQuartileP25Rate ?? 0))
+                ex.videoViews += Number(row.metrics?.videoViews ?? 0)
                 m.set(label, ex)
               }
               return Array.from(m.values()).filter(i => i.impressoes > 0).sort((a, b) => b.impressoes - a.impressoes)

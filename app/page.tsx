@@ -49,37 +49,52 @@ export default function Home() {
     setScreen('checking')
     const ref = doc(db, 'users', u.uid)
     const snap = await getDoc(ref)
+    const autoAprovado = (u.email ?? '').toLowerCase().endsWith('@esquina.online')
+
     if (snap.exists() && snap.data().status === 'aprovado') {
       document.cookie = '__session=1; path=/; max-age=86400; SameSite=Strict'
       router.push('/dashboard')
-    } else if (snap.exists() && snap.data().status === 'pendente') {
-      setUser(u)
-      setScreen('pending')
-    } else {
-      const autoAprovado = (u.email ?? '').toLowerCase().endsWith('@esquina.online')
-      await setDoc(ref, {
-        uid: u.uid,
-        email: u.email,
-        name: u.displayName,
-        photo: u.photoURL,
-        status: autoAprovado ? 'aprovado' : 'pendente',
-        createdAt: new Date().toISOString(),
-      })
+      return
+    }
+
+    if (snap.exists() && snap.data().status === 'pendente') {
+      // Usuário ficou pendente antes de existir a auto-aprovação por domínio —
+      // promove agora se o e-mail for @esquina.online, em vez de deixar preso pra sempre.
       if (autoAprovado) {
+        await setDoc(ref, { status: 'aprovado' }, { merge: true })
         document.cookie = '__session=1; path=/; max-age=86400; SameSite=Strict'
         setUser(u)
         setScreen('auto-aprovado')
         setTimeout(() => router.push('/dashboard'), 1200)
         return
       }
-      await fetch('/api/notify-admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: u.email, name: u.displayName }),
-      })
       setUser(u)
       setScreen('pending')
+      return
     }
+
+    await setDoc(ref, {
+      uid: u.uid,
+      email: u.email,
+      name: u.displayName,
+      photo: u.photoURL,
+      status: autoAprovado ? 'aprovado' : 'pendente',
+      createdAt: new Date().toISOString(),
+    })
+    if (autoAprovado) {
+      document.cookie = '__session=1; path=/; max-age=86400; SameSite=Strict'
+      setUser(u)
+      setScreen('auto-aprovado')
+      setTimeout(() => router.push('/dashboard'), 1200)
+      return
+    }
+    await fetch('/api/notify-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: u.email, name: u.displayName }),
+    })
+    setUser(u)
+    setScreen('pending')
   }
 
   async function handleLogin() {
