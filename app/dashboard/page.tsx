@@ -77,22 +77,26 @@ function fmtBRLn(v: number) { return v.toLocaleString('pt-BR', { style: 'currenc
 function fmtPctn(v: number) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%' }
 function fmtF(v: number) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
-function comentarioMeta(impressions: number, clicks: number, reach: number, ctr: number, freq: number, spend: number, thruplays: number, incluirValores: boolean): string {
-  const linhas: string[] = []
-  if (ctr >= 1.5) linhas.push(`CTR de ${fmtPctn(ctr)} acima da média para campanhas de alcance.`)
-  else if (ctr >= 0.7) linhas.push(`CTR de ${fmtPctn(ctr)} dentro da média para campanhas de alcance.`)
-  else linhas.push(`CTR de ${fmtPctn(ctr)} abaixo da média — vale revisar criativos e segmentação.`)
-  if (freq < 1.3) linhas.push(`Frequência de ${fmtF(freq)} indica baixa saturação da audiência.`)
-  else if (freq <= 2.5) linhas.push(`Frequência de ${fmtF(freq)} está no nível ideal, sem sinais de saturação.`)
-  else linhas.push(`Frequência de ${fmtF(freq)} está elevada — atenção à possível saturação de audiência.`)
-  return linhas.join('\n')
+// Objetivos "de tráfego" — únicos onde CTR/cliques fazem sentido como leitura de
+// desempenho. Reconhecimento, engajamento, visualização de vídeo etc. não têm
+// clique como objetivo, então CTR ali não diagnostica nada (ver feedback do Bruno).
+const META_TRAFFIC_OBJECTIVES = new Set(['OUTCOME_TRAFFIC', 'TRAFFIC', 'LINK_CLICKS'])
+const TIKTOK_TRAFFIC_OBJECTIVES = new Set(['TRAFFIC'])
+
+// Resumo neutro e factual — só frequência (saturação de audiência), sem CTR e sem
+// recomendação de otimização automática.
+function resumoMeta(freq: number): string {
+  if (freq < 1.3) return `Frequência de ${fmtF(freq)} indica público ainda fresco, com baixa repetição de exibição.`
+  if (freq <= 2.5) return `Frequência de ${fmtF(freq)} está em nível equilibrado, sem sinais de saturação.`
+  return `Frequência de ${fmtF(freq)} indica repetição mais alta de exibição para o mesmo público.`
 }
 
-function comentarioGoogle(cliques: number, impressoes: number, ctr: number, cpc: number, conversoes: number, custoConv: number, incluirValores: boolean): string {
+// Só chamado quando há campanhas de tráfego no período (ctr/cliques vêm desse recorte).
+function comentarioGoogleTrafego(ctr: number, cpc: number, conversoes: number, custoConv: number, incluirValores: boolean): string {
   const linhas: string[] = []
   if (ctr >= 5) linhas.push(`CTR de ${fmtPctn(ctr)} acima da média para busca paga.`)
   else if (ctr >= 2) linhas.push(`CTR de ${fmtPctn(ctr)} dentro da média para busca paga.`)
-  else linhas.push(`CTR de ${fmtPctn(ctr)} abaixo da média — revise termos de busca e extensões de anúncio.`)
+  else linhas.push(`CTR de ${fmtPctn(ctr)} abaixo da média para busca paga.`)
   if (conversoes > 0) {
     const convTxt = incluirValores && custoConv > 0
       ? `${fmtN(conversoes)} conversões registradas com custo médio de ${fmtBRLn(custoConv)}.`
@@ -100,10 +104,47 @@ function comentarioGoogle(cliques: number, impressoes: number, ctr: number, cpc:
     linhas.push(convTxt)
   } else if (incluirValores && cpc > 0) {
     linhas.push(`CPC médio de ${fmtBRLn(cpc)} no período.`)
-  } else {
-    linhas.push(`Nenhuma conversão registrada no período.`)
   }
   return linhas.join('\n')
+}
+
+// Soma impressões/cliques só das campanhas cujo objetivo é literalmente tráfego —
+// usado pra decidir se mostra CTR/Cliques e com qual base de cálculo.
+function bucketTrafegoMeta(campanhas: any[]): { impr: number; clicks: number } {
+  let impr = 0, clicks = 0
+  for (const c of campanhas ?? []) {
+    if (META_TRAFFIC_OBJECTIVES.has(String(c.objective ?? '').toUpperCase())) {
+      impr += c.impressions ?? 0
+      clicks += c.clicks ?? 0
+    }
+  }
+  return { impr, clicks }
+}
+
+function bucketTrafegoTikTok(campanhas: any[]): { impr: number; clicks: number } {
+  let impr = 0, clicks = 0
+  for (const c of campanhas ?? []) {
+    if (TIKTOK_TRAFFIC_OBJECTIVES.has(String(c.objective ?? '').toUpperCase())) {
+      impr += c.impressions ?? 0
+      clicks += c.clicks ?? 0
+    }
+  }
+  return { impr, clicks }
+}
+
+// Google não tem "objetivo" exposto por campanha aqui, mas vídeo (YouTube) já é
+// identificável pelo tipo — CTR de view ads não é uma leitura de tráfego.
+function bucketNaoVideoGoogle(campanhas: any[]): { impr: number; clicks: number; conv: number; custo: number } {
+  let impr = 0, clicks = 0, conv = 0, custo = 0
+  for (const c of campanhas ?? []) {
+    if (c.tipoRaw !== 'VIDEO') {
+      impr += c.impressoes ?? 0
+      clicks += c.cliques ?? 0
+      conv += c.conversoes ?? 0
+      custo += c.custo ?? 0
+    }
+  }
+  return { impr, clicks, conv, custo }
 }
 
 // ─── Match fuzzy de nomes de contas entre plataformas ─────────────────────────
@@ -952,15 +993,22 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     await Promise.all(fetches)
 
     // ── Totais Meta ──
+    // Alcance/frequência sempre vêm do total da conta (nunca somados por campanha —
+    // a mesma pessoa pode aparecer em campanhas diferentes, isso infla o número).
     const metaSpend = metaDados.reduce((s: number, a: any) => s + (a.spend ?? 0), 0)
     const metaImpr = metaDados.reduce((s: number, a: any) => s + (a.impressions ?? 0), 0)
     const metaReach = metaDados.reduce((s: number, a: any) => s + (a.reach ?? 0), 0)
-    const metaClicks = metaDados.reduce((s: number, a: any) => s + (a.clicks ?? 0), 0)
     const metaThru = metaDados.reduce((s: number, a: any) => s + (a.thruplays ?? 0), 0)
-    const metaCtr = metaImpr > 0 ? (metaClicks / metaImpr) * 100 : 0
-    const metaCpm = metaSpend > 0 && metaImpr > 0 ? (metaSpend / metaImpr) * 1000 : 0
-    const metaCpc = metaClicks > 0 ? metaSpend / metaClicks : 0
     const metaFreq = metaReach > 0 ? metaImpr / metaReach : 0
+    // Cliques/CTR só existem pra campanhas de objetivo tráfego — reconhecimento,
+    // engajamento e visualização não têm clique como meta, então CTR ali não diagnostica nada.
+    const metaTrafego = metaDados.reduce((acc: { impr: number; clicks: number }, a: any) => {
+      const b = bucketTrafegoMeta(a.campanhas ?? [])
+      return { impr: acc.impr + b.impr, clicks: acc.clicks + b.clicks }
+    }, { impr: 0, clicks: 0 })
+    const metaCtr = metaTrafego.impr > 0 ? (metaTrafego.clicks / metaTrafego.impr) * 100 : 0
+    const metaCpm = metaSpend > 0 && metaImpr > 0 ? (metaSpend / metaImpr) * 1000 : 0
+    const metaCpc = metaTrafego.clicks > 0 ? metaSpend / metaTrafego.clicks : 0
 
     // Audiência Meta: agrega por breakdown entre as contas filtradas
     const audGenero = new Map<string, number>()
@@ -980,11 +1028,16 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
 
     // ── Totais Google ──
     const gCusto = googleDados.reduce((s: number, a: any) => s + (a.custo ?? 0), 0)
-    const gCliques = googleDados.reduce((s: number, a: any) => s + (a.cliques ?? 0), 0)
     const gImpr = googleDados.reduce((s: number, a: any) => s + (a.impressoes ?? 0), 0)
     const gConv = googleDados.reduce((s: number, a: any) => s + (a.conversoes ?? 0), 0)
-    const gCtr = gImpr > 0 ? (gCliques / gImpr) * 100 : 0
-    const gCpc = gCliques > 0 ? gCusto / gCliques : 0
+    // Cliques/CTR excluem campanhas de vídeo (YouTube) — CTR de view ads não é tráfego.
+    const gTrafego = googleDados.reduce((acc: { impr: number; clicks: number; conv: number; custo: number }, a: any) => {
+      const b = bucketNaoVideoGoogle(a.campanhas ?? [])
+      return { impr: acc.impr + b.impr, clicks: acc.clicks + b.clicks, conv: acc.conv + b.conv, custo: acc.custo + b.custo }
+    }, { impr: 0, clicks: 0, conv: 0, custo: 0 })
+    const gCliques = gTrafego.clicks
+    const gCtr = gTrafego.impr > 0 ? (gTrafego.clicks / gTrafego.impr) * 100 : 0
+    const gCpc = gTrafego.clicks > 0 ? gTrafego.custo / gTrafego.clicks : 0
     const gCustoConv = gConv > 0 ? gCusto / gConv : 0
 
     // Cidades Google: agrega cliques por cidade entre as contas filtradas
@@ -1007,10 +1060,17 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     // ── Totais TikTok ──
     const tkSpend = tiktokDados.reduce((s: number, a: any) => s + (a.spend ?? 0), 0)
     const tkImpr = tiktokDados.reduce((s: number, a: any) => s + (a.impressions ?? 0), 0)
-    const tkCliques = tiktokDados.reduce((s: number, a: any) => s + (a.clicks ?? 0), 0)
-    const tkCtr = tkImpr > 0 ? (tkCliques / tkImpr) * 100 : 0
+    const tkReach = tiktokDados.reduce((s: number, a: any) => s + (a.reach ?? 0), 0)
+    const tkFreq = tkReach > 0 ? tkImpr / tkReach : 0
+    // Cliques/CTR só de campanhas com objetivo tráfego (mesmo critério do Meta).
+    const tkTrafego = tiktokDados.reduce((acc: { impr: number; clicks: number }, a: any) => {
+      const b = bucketTrafegoTikTok(a.campanhas ?? [])
+      return { impr: acc.impr + b.impr, clicks: acc.clicks + b.clicks }
+    }, { impr: 0, clicks: 0 })
+    const tkCliques = tkTrafego.clicks
+    const tkCtr = tkTrafego.impr > 0 ? (tkTrafego.clicks / tkTrafego.impr) * 100 : 0
     const tkCpm = tkSpend > 0 && tkImpr > 0 ? (tkSpend / tkImpr) * 1000 : 0
-    const tkCpc = tkCliques > 0 ? tkSpend / tkCliques : 0
+    const tkCpc = tkTrafego.clicks > 0 ? tkSpend / tkTrafego.clicks : 0
 
     // ── Audiência TikTok ──
     const tkAudGenMap = new Map<string, number>()
@@ -1034,15 +1094,19 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
 
     // ── Visão Geral (consolidado Meta + Google + TikTok) ──
     const totalImpr = metaImpr + gImpr + tkImpr
-    const totalCliques = metaClicks + gCliques + tkCliques
+    const totalCliquesTrafego = metaTrafego.clicks + gTrafego.clicks + tkTrafego.clicks
     const totalInvest = metaSpend + gCusto + tkSpend
     const redesSel = [redes.meta && 'Meta', redes.google && 'Google', redes.tiktok && 'TikTok'].filter(Boolean) as string[]
     const labelVG = redesSel.length > 1 ? `* Visão Geral (${redesSel.join(' + ')})` : '* Visão Geral'
     L.push(labelVG)
     L.push(`Impressões: ${fmtN(totalImpr)}`)
-    if (redes.meta && metaReach > 0) L.push(`Alcance: ${fmtN(metaReach)}`)
-    L.push(`Cliques: ${fmtN(totalCliques)}`)
-    if (redes.meta && metaFreq > 0) L.push(`Frequência: ${fmtF(metaFreq)}`)
+    // Alcance nunca é somado entre plataformas (a mesma pessoa pode estar em ambas) —
+    // cada rede aparece na sua própria linha.
+    if (redes.meta && metaReach > 0) L.push(`Alcance Meta: ${fmtN(metaReach)}`)
+    if (redes.tiktok && tkReach > 0) L.push(`Alcance TikTok: ${fmtN(tkReach)}`)
+    if (totalCliquesTrafego > 0) L.push(`Cliques: ${fmtN(totalCliquesTrafego)}`)
+    if (redes.meta && metaFreq > 0) L.push(`Frequência Meta: ${fmtF(metaFreq)}`)
+    if (redes.tiktok && tkFreq > 0) L.push(`Frequência TikTok: ${fmtF(tkFreq)}`)
     if (incluirValores && totalInvest > 0) L.push(`Investimento: ${fmtBRLn(totalInvest)}`)
     L.push('')
 
@@ -1055,20 +1119,22 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       } else {
         L.push('📊 Desempenho Meta Ads')
         L.push(`Impressões: ${fmtN(metaImpr)}`)
-        L.push(`Cliques: ${fmtN(metaClicks)}`)
-        L.push(`CTR: ${fmtPctn(metaCtr)}`)
         if (metaThru > 0) L.push(`ThruPlays: ${fmtN(metaThru)}`)
+        if (metaReach > 0) L.push(`Alcance: ${fmtN(metaReach)}`)
+        if (metaFreq > 0) L.push(`Frequência: ${fmtF(metaFreq)}`)
+        if (metaTrafego.impr > 0) {
+          L.push(`Cliques: ${fmtN(metaTrafego.clicks)}`)
+          L.push(`CTR: ${fmtPctn(metaCtr)}`)
+        }
         if (incluirValores) {
           L.push(`Investimento: ${fmtBRLn(metaSpend)}`)
           if (metaCpm > 0) L.push(`CPM: ${fmtBRLn(metaCpm)}`)
-          if (metaCpc > 0) L.push(`CPC: ${fmtBRLn(metaCpc)}`)
+          if (metaTrafego.impr > 0 && metaCpc > 0) L.push(`CPC: ${fmtBRLn(metaCpc)}`)
         }
         L.push('')
 
-        // Audiência Meta — alcance, frequência, gênero, idade, dispositivos
+        // Audiência — gênero, idade, dispositivos
         L.push('👥 Audiência')
-        if (metaReach > 0) L.push(`Alcance: ${fmtN(metaReach)}`)
-        if (metaFreq > 0) L.push(`Frequência: ${fmtF(metaFreq)}`)
         const generoLines = fmtBreakdown(audGenero)
         const idadeLines = fmtBreakdown(audIdade)
         const dispLines = fmtBreakdown(audDisp)
@@ -1090,7 +1156,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           L.push('')
         }
 
-        L.push(comentarioMeta(metaImpr, metaClicks, metaReach, metaCtr, metaFreq, metaSpend, metaThru, incluirValores))
+        if (metaFreq > 0) L.push(resumoMeta(metaFreq))
         L.push('')
       }
     }
@@ -1104,12 +1170,14 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       } else {
         L.push('📈 Desempenho Google Ads')
         L.push(`Impressões: ${fmtN(gImpr)}`)
-        L.push(`Cliques: ${fmtN(gCliques)}`)
-        L.push(`CTR: ${fmtPctn(gCtr)}`)
+        if (gTrafego.impr > 0) {
+          L.push(`Cliques: ${fmtN(gCliques)}`)
+          L.push(`CTR: ${fmtPctn(gCtr)}`)
+        }
         if (gConv > 0) L.push(`Conversões: ${fmtN(gConv)}`)
         if (incluirValores) {
           L.push(`Investimento: ${fmtBRLn(gCusto)}`)
-          if (gCpc > 0) L.push(`CPC: ${fmtBRLn(gCpc)}`)
+          if (gTrafego.impr > 0 && gCpc > 0) L.push(`CPC: ${fmtBRLn(gCpc)}`)
           if (gCustoConv > 0) L.push(`Custo/Conv.: ${fmtBRLn(gCustoConv)}`)
         }
         L.push('')
@@ -1135,7 +1203,8 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           L.push('')
         }
 
-        L.push(comentarioGoogle(gCliques, gImpr, gCtr, gCpc, gConv, gCustoConv, incluirValores))
+        if (gTrafego.impr > 0) L.push(comentarioGoogleTrafego(gCtr, gCpc, gConv, gCustoConv, incluirValores))
+        else if (gConv > 0) L.push(`${fmtN(gConv)} conversões registradas no período.`)
         L.push('')
       }
     }
@@ -1149,12 +1218,16 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       } else {
         L.push('📱 Desempenho TikTok')
         L.push(`Impressões: ${fmtN(tkImpr)}`)
-        L.push(`Cliques: ${fmtN(tkCliques)}`)
-        L.push(`CTR: ${fmtPctn(tkCtr)}`)
+        if (tkReach > 0) L.push(`Alcance: ${fmtN(tkReach)}`)
+        if (tkFreq > 0) L.push(`Frequência: ${fmtF(tkFreq)}`)
+        if (tkTrafego.impr > 0) {
+          L.push(`Cliques: ${fmtN(tkCliques)}`)
+          L.push(`CTR: ${fmtPctn(tkCtr)}`)
+        }
         if (incluirValores) {
           L.push(`Investimento: ${fmtBRLn(tkSpend)}`)
           if (tkCpm > 0) L.push(`CPM: ${fmtBRLn(tkCpm)}`)
-          if (tkCpc > 0) L.push(`CPC: ${fmtBRLn(tkCpc)}`)
+          if (tkTrafego.impr > 0 && tkCpc > 0) L.push(`CPC: ${fmtBRLn(tkCpc)}`)
         }
         L.push('')
 
@@ -1168,18 +1241,14 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       }
     }
 
-    // ── Desempenho Geral ──
-    L.push('Desempenho Geral')
+    // ── Resumo ── neutro e factual, sem CTR e sem recomendação de otimização.
+    L.push('Resumo')
     const partes: string[] = []
-    if (redes.meta && metaDados.length) partes.push(`Meta Ads com ${fmtN(metaImpr)} impressões e ${fmtN(metaClicks)} cliques`)
-    if (redes.google && googleDados.length) partes.push(`Google Ads com ${fmtN(gCliques)} cliques e CTR de ${fmtPctn(gCtr)}`)
-    if (redes.tiktok && tiktokDados.length) partes.push(`TikTok com ${fmtN(tkImpr)} impressões e CTR de ${fmtPctn(tkCtr)}`)
+    if (redes.meta && metaDados.length) partes.push(`Meta Ads com ${fmtN(metaImpr)} impressões`)
+    if (redes.google && googleDados.length) partes.push(`Google Ads com ${fmtN(gImpr)} impressões`)
+    if (redes.tiktok && tiktokDados.length) partes.push(`TikTok com ${fmtN(tkImpr)} impressões`)
     if (partes.length > 0) L.push(partes.join('; ') + '.')
-    if (incluirValores && totalInvest > 0) {
-      L.push(`Investimento total no período: ${fmtBRLn(totalInvest)}.`)
-    } else if (!incluirValores && redes.meta && metaDados.length && redes.google && googleDados.length) {
-      L.push(`CTR consolidado: Meta ${fmtPctn(metaCtr)} · Google ${fmtPctn(gCtr)}.`)
-    }
+    if (incluirValores && totalInvest > 0) L.push(`Investimento total no período: ${fmtBRLn(totalInvest)}.`)
 
     setMensagem(L.join('\n'))
     setLoading(false)

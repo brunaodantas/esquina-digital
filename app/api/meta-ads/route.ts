@@ -111,10 +111,11 @@ function extractReviewFeedback(fb: any): string {
 // Busca effective_status + orçamento de campanhas/conjuntos (o /insights não traz nenhum dos dois).
 // Retorna Map<id, { status, orcamento, orcamentoTipo }>. Falha não quebra a tabela.
 // daily_budget/lifetime_budget vêm em centavos (menor unidade da moeda).
-interface EntityMeta { status: string; orcamento: number; orcamentoTipo: 'diario' | 'total' | '' }
+interface EntityMeta { status: string; orcamento: number; orcamentoTipo: 'diario' | 'total' | ''; objective?: string }
 async function fetchEntityMeta(accountId: string, edge: 'campaigns' | 'adsets', token: string): Promise<Map<string, EntityMeta>> {
   const map = new Map<string, EntityMeta>()
-  let url: string | null = `${API}/act_${accountId}/${edge}?fields=id,effective_status,daily_budget,lifetime_budget&limit=500&access_token=${encodeURIComponent(token)}`
+  const fields = edge === 'campaigns' ? 'id,effective_status,daily_budget,lifetime_budget,objective' : 'id,effective_status,daily_budget,lifetime_budget'
+  let url: string | null = `${API}/act_${accountId}/${edge}?fields=${fields}&limit=500&access_token=${encodeURIComponent(token)}`
   let guard = 0
   while (url && guard < 20) {
     guard++
@@ -128,7 +129,7 @@ async function fetchEntityMeta(accountId: string, edge: 'campaigns' | 'adsets', 
       const life = parseInt(a.lifetime_budget ?? '0', 10)
       const orcamento = daily > 0 ? daily / 100 : life > 0 ? life / 100 : 0
       const orcamentoTipo: 'diario' | 'total' | '' = daily > 0 ? 'diario' : life > 0 ? 'total' : ''
-      map.set(id, { status: a.effective_status ?? 'ACTIVE', orcamento, orcamentoTipo })
+      map.set(id, { status: a.effective_status ?? 'ACTIVE', orcamento, orcamentoTipo, objective: a.objective ?? '' })
     }
     url = json.paging?.next ?? null
   }
@@ -175,6 +176,7 @@ export interface MetaCampaignData {
   nome: string
   status: string
   statusRevisao: string
+  objective: string
   orcamento: number
   orcamentoTipo: 'diario' | 'total' | ''
   spend: number
@@ -289,9 +291,9 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `meta|v6|${start}|${end}`
+  const chave = `meta|v7|${start}|${end}`
 
-  const cacheKey = `metav8|${start}|${end}`
+  const cacheKey = `metav9|${start}|${end}`
   if (!fresh && _cache?.key === cacheKey && Date.now() - _cache.ts < CACHE_TTL) {
     return NextResponse.json({ nomes: _cache.nomes, data: _cache.data })
   }
@@ -420,6 +422,7 @@ export async function GET(req: NextRequest) {
               nome: c.campaign_name ?? '',
               status: mapStatus(campStatusMap.get(String(c.campaign_id ?? ''))?.status ?? 'ACTIVE'),
               statusRevisao: metaStatusLabel(campStatusMap.get(String(c.campaign_id ?? ''))?.status ?? 'ACTIVE'),
+              objective: campStatusMap.get(String(c.campaign_id ?? ''))?.objective ?? '',
               orcamento: campStatusMap.get(String(c.campaign_id ?? ''))?.orcamento ?? 0,
               orcamentoTipo: campStatusMap.get(String(c.campaign_id ?? ''))?.orcamentoTipo ?? '',
               spend: parseFloat(c.spend || '0'),

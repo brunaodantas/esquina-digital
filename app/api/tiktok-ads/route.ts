@@ -61,6 +61,7 @@ export interface TikTokAccountData {
 export interface TikTokCampaignData {
   id: string
   nome: string
+  objective: string
   orcamento: number
   orcamentoTipo: 'diario' | 'total' | ''
   spend: number
@@ -111,7 +112,7 @@ export interface TikTokAdData {
 
 let _cache: { key: string; ts: number; data: TikTokAccountData[]; nomes: string[] } | null = null
 const CACHE_TTL = 30 * 60 * 1000
-const CACHE_V = 'v13'
+const CACHE_V = 'v14'
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
@@ -169,16 +170,17 @@ function tiktokStatusLabel(operation: string, secondary: string): string {
 
 // Busca orçamento de campanhas/grupos via /campaign/get/ e /adgroup/get/ (o /report/ não traz).
 // Retorna Map<id, {orcamento, tipo}>. Falha (ex.: escopo do token) não quebra a tabela.
-async function fetchTikTokBudgets(advertiserId: string, level: 'campaign' | 'adgroup'): Promise<Map<string, { orcamento: number; tipo: 'diario' | 'total' | '' }>> {
-  const map = new Map<string, { orcamento: number; tipo: 'diario' | 'total' | '' }>()
+async function fetchTikTokBudgets(advertiserId: string, level: 'campaign' | 'adgroup'): Promise<Map<string, { orcamento: number; tipo: 'diario' | 'total' | ''; objective?: string }>> {
+  const map = new Map<string, { orcamento: number; tipo: 'diario' | 'total' | ''; objective?: string }>()
   const path = level === 'campaign' ? '/campaign/get/' : '/adgroup/get/'
   const idKey = level === 'campaign' ? 'campaign_id' : 'adgroup_id'
+  const fields = level === 'campaign' ? [idKey, 'budget', 'budget_mode', 'objective_type'] : [idKey, 'budget', 'budget_mode']
   let page = 1, guard = 0
   while (guard < 20) {
     guard++
     const res = await tiktokGet(path, {
       advertiser_id: advertiserId,
-      fields: JSON.stringify([idKey, 'budget', 'budget_mode']),
+      fields: JSON.stringify(fields),
       page: String(page), page_size: '100',
     })
     if (res?.code !== 0) break
@@ -187,7 +189,7 @@ async function fetchTikTokBudgets(advertiserId: string, level: 'campaign' | 'adg
       const budget = Number(a.budget ?? 0)
       const mode = String(a.budget_mode ?? '')
       const tipo: 'diario' | 'total' | '' = mode.includes('DAY') ? 'diario' : mode.includes('TOTAL') ? 'total' : ''
-      map.set(id, { orcamento: budget > 0 ? budget : 0, tipo })
+      map.set(id, { orcamento: budget > 0 ? budget : 0, tipo, objective: a.objective_type ?? '' })
     }
     const info = res?.data?.page_info
     if (!info || page >= Number(info.total_page ?? 1)) break
@@ -362,6 +364,7 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
     campanhas.push({
       id: campId,
       nome: campName,
+      objective: '',
       orcamento: 0, orcamentoTipo: '',
       spend, impressions: Number(m.impressions ?? 0), reach: Number(m.reach ?? 0), clicks: Number(m.clicks ?? 0),
       videoViews: views,
@@ -398,7 +401,7 @@ async function getAccountMetrics(advertiserId: string, start: string, end: strin
   if (campanhas.length > 0) {
     try {
       const bMap = await fetchTikTokBudgets(advertiserId, 'campaign')
-      for (const c of campanhas) { const b = bMap.get(c.id); if (b) { c.orcamento = b.orcamento; c.orcamentoTipo = b.tipo } }
+      for (const c of campanhas) { const b = bMap.get(c.id); if (b) { c.orcamento = b.orcamento; c.orcamentoTipo = b.tipo; c.objective = b.objective ?? '' } }
     } catch (e) { console.error(`TikTok budget campaign ${advertiserId}:`, e) }
   }
   if (grupos.length > 0) {
@@ -486,7 +489,7 @@ export async function GET(req: NextRequest) {
   const end = searchParams.get('end') ?? hoje.toISOString().slice(0, 10)
 
   const fresh = searchParams.get('fresh') === '1'
-  const chave = `tiktok|v3|${start}|${end}`
+  const chave = `tiktok|v4|${start}|${end}`
 
   const cacheKey = `${CACHE_V}|${start}|${end}`
   const allNomesStatic = ADVERTISER_IDS.map(id => ADVERTISER_NAMES_FALLBACK[id] ?? `ID ${id}`)
