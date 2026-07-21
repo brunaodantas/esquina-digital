@@ -5,34 +5,15 @@ import { signInWithPopup, onAuthStateChanged, User } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
+import LoaderEsquina from './components/LoaderEsquina'
 
 type Screen = 'loading' | 'login' | 'checking' | 'pending' | 'auto-aprovado'
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>('loading')
-  const [progress, setProgress] = useState(0)
   const [user, setUser] = useState<User | null>(null)
   const [error, setError] = useState('')
   const router = useRouter()
-
-  useEffect(() => {
-    // Splash screen progress bar
-    const interval = setInterval(() => {
-      setProgress(p => {
-        if (p >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return p + 2
-      })
-    }, 30)
-    const timer = setTimeout(() => {
-      clearInterval(interval)
-      setProgress(100)
-      checkAuthState()
-    }, 1600)
-    return () => { clearInterval(interval); clearTimeout(timer) }
-  }, [])
 
   function checkAuthState() {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -108,16 +89,7 @@ export default function Home() {
   }
 
   if (screen === 'loading') {
-    return (
-      <div style={styles.center}>
-        <div style={styles.card}>
-          <img src="/logo.webp" alt="Esquina" style={{ height: 48, width: 'auto' }} />
-          <div style={styles.progressBar}>
-            <div style={{ ...styles.progressFill, width: `${progress}%` }} />
-          </div>
-        </div>
-      </div>
-    )
+    return <LoaderEsquina onDone={checkAuthState} />
   }
 
   if (screen === 'checking') {
@@ -228,20 +200,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#888888',
     textAlign: 'center',
     lineHeight: 1.6,
-  },
-  progressBar: {
-    width: '100%',
-    height: 3,
-    background: '#2a2a2a',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  progressFill: {
-    height: '100%',
-    background: '#1A3CFF',
-    borderRadius: 2,
-    transition: 'width 0.03s linear',
   },
   googleBtn: {
     display: 'flex',

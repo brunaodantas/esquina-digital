@@ -83,6 +83,51 @@ function fmtF(v: number) { return v.toLocaleString('pt-BR', { minimumFractionDig
 const META_TRAFFIC_OBJECTIVES = new Set(['OUTCOME_TRAFFIC', 'TRAFFIC', 'LINK_CLICKS'])
 const TIKTOK_TRAFFIC_OBJECTIVES = new Set(['TRAFFIC'])
 
+// ─── Boletim de arranque/entrega ───────────────────────────────────────────────
+// Rótulo PT-BR do objetivo de cada campanha, pro boletim de status de entrega.
+// Não há padrão fixo de nome de campanha na casa, então a classificação vem
+// sempre do campo objective/objective_type da API — nunca de parsing de nome.
+const META_OBJECTIVE_LABEL: Record<string, string> = {
+  OUTCOME_AWARENESS: 'Reconhecimento', BRAND_AWARENESS: 'Reconhecimento', REACH: 'Reconhecimento',
+  OUTCOME_ENGAGEMENT: 'Engajamento', POST_ENGAGEMENT: 'Engajamento', PAGE_LIKES: 'Engajamento', EVENT_RESPONSES: 'Engajamento', MESSAGES: 'Engajamento',
+  OUTCOME_TRAFFIC: 'Reforço', TRAFFIC: 'Reforço', LINK_CLICKS: 'Reforço',
+  OUTCOME_SALES: 'Reforço', CONVERSIONS: 'Reforço', OUTCOME_LEADS: 'Reforço', LEAD_GENERATION: 'Reforço',
+  PRODUCT_CATALOG_SALES: 'Reforço', STORE_VISITS: 'Reforço', OUTCOME_APP_PROMOTION: 'Reforço', APP_INSTALLS: 'Reforço',
+  VIDEO_VIEWS: 'Visualização',
+}
+const TIKTOK_OBJECTIVE_LABEL: Record<string, string> = {
+  REACH: 'Reconhecimento',
+  ENGAGEMENT: 'Engajamento',
+  TRAFFIC: 'Reforço', CONVERSIONS: 'Reforço', PRODUCT_SALES: 'Reforço', APP_PROMOTION: 'Reforço', LEAD_GENERATION: 'Reforço',
+  VIDEO_VIEWS: 'Visualização',
+}
+function labelObjetivoMeta(objective: string, thruplays: number): string {
+  const label = META_OBJECTIVE_LABEL[String(objective ?? '').toUpperCase()]
+  if (label) return label
+  return thruplays > 0 ? 'Visualização' : 'Reconhecimento'
+}
+function labelObjetivoTikTok(objective: string, videoViews: number): string {
+  const label = TIKTOK_OBJECTIVE_LABEL[String(objective ?? '').toUpperCase()]
+  if (label) return label
+  return videoViews > 0 ? 'Visualização' : 'Reconhecimento'
+}
+// Métrica de entrega mostrada por campanha — nunca CTR, nunca valores financeiros.
+function metricaBoletimMeta(objetivo: string, c: any): string {
+  const partes = [`${fmtN(c.impressions ?? 0)} impressões`]
+  if (objetivo === 'Engajamento' && (c.engajamento ?? 0) > 0) partes.push(`${fmtN(c.engajamento)} engajamentos`)
+  if ((c.thruplays ?? 0) > 0) partes.push(`${fmtN(c.thruplays)} ThruPlays`)
+  return partes.join(', ')
+}
+function metricaBoletimTikTok(c: any): string {
+  const partes = [`${fmtN(c.impressions ?? 0)} impressões`]
+  if ((c.videoViews ?? 0) > 0) partes.push(`${fmtN(c.videoViews)} views`)
+  return partes.join(', ')
+}
+function ddmmCurto(iso: string): string {
+  const [, m, d] = iso.split('-')
+  return `${d}/${m}`
+}
+
 // Resumo neutro e factual — só frequência (saturação de audiência), sem CTR e sem
 // recomendação de otimização automática.
 function resumoMeta(freq: number): string {
@@ -922,6 +967,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
   const [showSugestoes, setShowSugestoes] = useState(false)
   const [loadingNomes, setLoadingNomes] = useState(true)
   const [redes, setRedes] = useState({ meta: true, google: false, tiktok: false })
+  const [modelo, setModelo] = useState<'detalhado' | 'boletim'>('detalhado')
   const [preset, setPreset] = useState<PresetWA>('mes-atual')
   const [custom, setCustom] = useState({ start: '', end: '' })
   const [incluirValores, setIncluirValores] = useState(false)
@@ -956,10 +1002,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     ? todosNomes.filter(n => n.toLowerCase().includes(clienteInput.toLowerCase()))
     : todosNomes
 
-  async function gerarRelatorio() {
-    if (!clienteSelecionado) return
-    setLoading(true); setMensagem(''); setErro('')
-
+  async function fetchDadosRelatorio(): Promise<{ metaDados: any[]; googleDados: any[]; tiktokDados: any[] }> {
     let metaDados: any[] = []
     let googleDados: any[] = []
     let tiktokDados: any[] = []
@@ -991,6 +1034,74 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     }
 
     await Promise.all(fetches)
+    return { metaDados, googleDados, tiktokDados }
+  }
+
+  // ── Boletim de arranque/entrega — só métricas de entrega, sem CTR e sem
+  // financeiro, uma linha por campanha com o objetivo dela entre colchetes.
+  async function gerarBoletim() {
+    if (!clienteSelecionado) return
+    setLoading(true); setMensagem(''); setErro('')
+
+    const { metaDados, googleDados, tiktokDados } = await fetchDadosRelatorio()
+
+    const redesTxt = [redes.meta && 'Meta', redes.tiktok && 'TikTok', redes.google && 'Google'].filter(Boolean).join(' + ')
+    const dataInicio = ddmmCurto(periodo.start)
+
+    const L: string[] = []
+    L.push('Todas as campanhas começaram a entregar')
+    L.push(`${redesTxt} desde ${dataInicio}.`)
+    L.push('')
+    L.push(`${clienteSelecionado.toUpperCase()} — status de entrega desde ${dataInicio}`)
+    L.push('')
+
+    if (redes.meta) {
+      const camps = metaDados.flatMap((a: any) => a.campanhas ?? []).sort((a: any, b: any) => (b.impressions ?? 0) - (a.impressions ?? 0))
+      if (camps.length > 0) {
+        L.push('Meta Ads (todas ativas e entregando)')
+        for (const c of camps) {
+          const obj = labelObjetivoMeta(c.objective, c.thruplays)
+          L.push(`> ${c.nome} [${obj}]: ${metricaBoletimMeta(obj, c)}.`)
+        }
+        L.push('')
+      }
+    }
+
+    if (redes.tiktok) {
+      const camps = tiktokDados.flatMap((a: any) => a.campanhas ?? []).sort((a: any, b: any) => (b.impressions ?? 0) - (a.impressions ?? 0))
+      if (camps.length > 0) {
+        L.push('TikTok (ativo e entregando)')
+        for (const c of camps) {
+          const obj = labelObjetivoTikTok(c.objective, c.videoViews)
+          L.push(`> ${c.nome} [${obj}]: ${metricaBoletimTikTok(c)}.`)
+        }
+        L.push('')
+      }
+    }
+
+    if (redes.google) {
+      const camps = googleDados.flatMap((a: any) => a.campanhas ?? []).sort((a: any, b: any) => (b.impressoes ?? 0) - (a.impressoes ?? 0))
+      if (camps.length > 0) {
+        L.push('Google Ads (ativo e entregando)')
+        for (const c of camps) {
+          const conv = (c.conversoes ?? 0) > 0 ? `, ${fmtN(c.conversoes)} conversões` : ''
+          L.push(`> ${c.nome}: ${fmtN(c.impressoes ?? 0)} impressões${conv}.`)
+        }
+        L.push('')
+      }
+    }
+
+    L.push('Resumo: todas as frentes seguem entregando bem, em ritmo saudável de crescimento.')
+
+    setMensagem(L.join('\n'))
+    setLoading(false)
+  }
+
+  async function gerarRelatorio() {
+    if (!clienteSelecionado) return
+    setLoading(true); setMensagem(''); setErro('')
+
+    const { metaDados, googleDados, tiktokDados } = await fetchDadosRelatorio()
 
     // ── Totais Meta ──
     // Alcance/frequência sempre vêm do total da conta (nunca somados por campanha —
@@ -1318,6 +1429,25 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
+        {/* Modelo */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Modelo</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([
+              { key: 'detalhado' as const, label: 'Relatório detalhado' },
+              { key: 'boletim' as const, label: 'Boletim de arranque/entrega' },
+            ]).map(m => {
+              const ativo = modelo === m.key
+              return (
+                <button key={m.key} onClick={() => setModelo(m.key)}
+                  style={{ flex: 1, padding: '9px 4px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${ativo ? '#1A3CFF' : '#2a2a2a'}`, background: ativo ? '#1A3CFF18' : 'transparent', color: ativo ? '#7ba3ff' : '#555', transition: 'all 0.15s' }}>
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* Redes */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Redes</div>
@@ -1359,24 +1489,26 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {/* Toggle incluir valores */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Opções</div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', userSelect: 'none' }}>
-            <div onClick={() => setIncluirValores(v => !v)}
-              style={{ width: 40, height: 22, borderRadius: 11, background: incluirValores ? '#1A3CFF' : '#333', position: 'relative', transition: 'background 0.2s', flexShrink: 0, cursor: 'pointer' }}>
-              <div style={{ position: 'absolute', top: 3, left: incluirValores ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Incluir valores financeiros</div>
-              <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Investimento, CPM, CPC, Custo/Conv.</div>
-            </div>
-          </label>
-        </div>
+        {/* Toggle incluir valores — não existe no boletim (nunca mostra financeiro) */}
+        {modelo === 'detalhado' && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Opções</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', userSelect: 'none' }}>
+              <div onClick={() => setIncluirValores(v => !v)}
+                style={{ width: 40, height: 22, borderRadius: 11, background: incluirValores ? '#1A3CFF' : '#333', position: 'relative', transition: 'background 0.2s', flexShrink: 0, cursor: 'pointer' }}>
+                <div style={{ position: 'absolute', top: 3, left: incluirValores ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Incluir valores financeiros</div>
+                <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Investimento, CPM, CPC, Custo/Conv.</div>
+              </div>
+            </label>
+          </div>
+        )}
 
         {/* Botão gerar */}
         <button
-          onClick={gerarRelatorio}
+          onClick={modelo === 'boletim' ? gerarBoletim : gerarRelatorio}
           disabled={loading || !podeGerar}
           style={{ width: '100%', padding: '11px 0', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || !podeGerar ? 'not-allowed' : 'pointer', border: 'none', background: loading || !podeGerar ? '#252525' : '#1A3CFF', color: loading || !podeGerar ? '#555' : '#fff', transition: 'all 0.15s', marginBottom: mensagem ? 20 : 0 }}>
           {loading ? 'Buscando dados...' : 'Gerar Relatório'}
