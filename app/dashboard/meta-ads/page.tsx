@@ -62,6 +62,10 @@ const PRESETS: { key: Preset; label: string }[] = [
   { key: 'ytd-2026', label: '2026 (YTD)' },
 ]
 
+// Colunas visíveis por padrão na tabela de Campanhas/Conjuntos — as demais
+// só aparecem com "Mostrar mais colunas" (reduz a densidade inicial).
+const CORE_METRIC_COLS = new Set(['spend', 'impressions', 'clicks', 'ctr'])
+
 const NIVEL_TABS: { key: NivelMeta; label: string }[] = [
   { key: 'campanhas', label: 'Campanhas' },
   { key: 'conjuntos', label: 'Conjuntos de Anúncios' },
@@ -581,6 +585,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   const [busca, setBusca] = useState('')
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [maisColunas, setMaisColunas] = useState(false)
 
   function toggleSort(col: string) {
     if (sortCol === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc') }
@@ -709,6 +714,11 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
           onChange={e => setBusca(e.target.value)}
           style={{ background: t.inputBg, border: `1px solid ${t.inputBorder}`, color: t.inputText, borderRadius: 8, padding: '5px 12px', fontSize: 13, outline: 'none', width: 200 }}
         />
+        {(nivel === 'campanhas' || nivel === 'conjuntos') && (
+          <button onClick={() => setMaisColunas(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted, whiteSpace: 'nowrap' }}>
+            {maisColunas ? 'Menos colunas' : 'Mostrar mais colunas'}
+          </button>
+        )}
         <button onClick={exportCSV} title="Exportar CSV" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${t.border}`, background: t.chipBg, color: t.textMuted, whiteSpace: 'nowrap' }}>
           ↓ CSV
         </button>
@@ -725,13 +735,14 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 <th style={{ ...thS, textAlign: 'right', minWidth: 100 }}>ORÇAMENTO</th>
                 {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
                   const labels = ['GASTO','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
+                  if (!maisColunas && !CORE_METRIC_COLS.has(col)) return null
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                 })}
               </tr>
             </thead>
             <tbody>
               {sortedCampanhas.length === 0 ? (
-                <tr><td colSpan={15} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
+                <tr><td colSpan={maisColunas ? 15 : 7} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhuma campanha encontrada</td></tr>
               ) : sortedCampanhas.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 const obj = classifyObjetivo(c.nome)
@@ -751,16 +762,16 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                     <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
                     <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? <CopiavelNum compact={fmtNum(c.reach)} full={fmtNumFull(c.reach)} /> : '—'}</td>
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? <CopiavelNum compact={fmtNum(c.reach)} full={fmtNumFull(c.reach)} /> : '—'}</td>}
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.clicks)} full={fmtNumFull(c.clicks)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
-                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpe > 0 ? <CopiavelNum compact={fmtBRL(c.cpe)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? <CopiavelNum compact={fmtNum(c.thruplays)} full={fmtNumFull(c.thruplays)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(c.taxaVisualizacao)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpv > 0 ? <CopiavelNum compact={fmtBRL(c.cpv)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? <CopiavelNum compact={c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /> : '—'}</td>
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.cpe > 0 ? <CopiavelNum compact={fmtBRL(c.cpe)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? <CopiavelNum compact={fmtNum(c.thruplays)} full={fmtNumFull(c.thruplays)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(c.taxaVisualizacao)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.cpv > 0 ? <CopiavelNum compact={fmtBRL(c.cpv)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? <CopiavelNum compact={c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /> : '—'}</td>}
                   </tr>
                 )
               })}
@@ -771,16 +782,16 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                   <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
                   <td style={{ ...totalTdS, textAlign: 'right', color: '#60a5fa' }}><CopiavelNum compact={fmtBRL(totCampanhas.spend)} /></td>
                   <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totCampanhas.impressions)} full={fmtNumFull(totCampanhas.impressions)} /></td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>}
                   <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totCampanhas.clicks)} full={fmtNumFull(totCampanhas.clicks)} /></td>
                   <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(totCampanhas.ctr)} /></td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(totCampanhas.cpm)} /></td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpc > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpc)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpe > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpe)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.thruplays > 0 ? <CopiavelNum compact={fmtNum(totCampanhas.thruplays)} full={fmtNumFull(totCampanhas.thruplays)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(totCampanhas.taxaVisualizacao)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpv > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpv)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(totCampanhas.cpm)} /></td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpc > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpc)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpe > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpe)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.thruplays > 0 ? <CopiavelNum compact={fmtNum(totCampanhas.thruplays)} full={fmtNumFull(totCampanhas.thruplays)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(totCampanhas.taxaVisualizacao)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totCampanhas.cpv > 0 ? <CopiavelNum compact={fmtBRL(totCampanhas.cpv)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>}
                 </tr>
               )}
             </tbody>
@@ -797,13 +808,14 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 <th style={{ ...thS, minWidth: 160 }}>CAMPANHA</th>
                 {(['spend','impressions','reach','clicks','ctr','cpm','cpc','cpe','thruplays','taxaVisualizacao','cpv','frequency'] as const).map((col, i) => {
                   const labels = ['GASTO','IMPR.','ALCANCE','CLIQUES','CTR','CPM','CPC','CPE','VISUALIZAÇÕES','TAXA VIS.','CPV','FREQ.']
+                  if (!maisColunas && !CORE_METRIC_COLS.has(col)) return null
                   return <th key={col} onClick={() => toggleSort(col)} style={{ ...thS, textAlign: 'right', cursor: 'pointer', userSelect: 'none', color: sortCol === col ? t.textSecondary : t.textMuted }}>{labels[i]}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                 })}
               </tr>
             </thead>
             <tbody>
               {sortedAdsets.length === 0 ? (
-                <tr><td colSpan={16} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
+                <tr><td colSpan={maisColunas ? 16 : 8} style={{ ...tdS, textAlign: 'center', color: t.textMuted, padding: 28 }}>Nenhum conjunto encontrado</td></tr>
               ) : sortedAdsets.map(c => {
                 const share = totalSpend > 0 ? (c.spend / totalSpend) * 100 : 0
                 return (
@@ -817,16 +829,16 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{c.campanha}</td>
                     <td style={{ ...tdS, textAlign: 'right', color: '#60a5fa', fontWeight: 600 }}><CopiavelNum compact={fmtBRL(c.spend)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.impressions)} full={fmtNumFull(c.impressions)} /></td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? <CopiavelNum compact={fmtNum(c.reach)} full={fmtNumFull(c.reach)} /> : '—'}</td>
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.reach > 0 ? <CopiavelNum compact={fmtNum(c.reach)} full={fmtNumFull(c.reach)} /> : '—'}</td>}
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(c.clicks)} full={fmtNumFull(c.clicks)} /></td>
                     <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(c.ctr)} /></td>
-                    <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpe > 0 ? <CopiavelNum compact={fmtBRL(c.cpe)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? <CopiavelNum compact={fmtNum(c.thruplays)} full={fmtNumFull(c.thruplays)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(c.taxaVisualizacao)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.cpv > 0 ? <CopiavelNum compact={fmtBRL(c.cpv)} /> : '—'}</td>
-                    <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? <CopiavelNum compact={c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /> : '—'}</td>
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(c.cpm)} /></td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.cpc > 0 ? <CopiavelNum compact={fmtBRL(c.cpc)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.cpe > 0 ? <CopiavelNum compact={fmtBRL(c.cpe)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.thruplays > 0 ? <CopiavelNum compact={fmtNum(c.thruplays)} full={fmtNumFull(c.thruplays)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(c.taxaVisualizacao)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.cpv > 0 ? <CopiavelNum compact={fmtBRL(c.cpv)} /> : '—'}</td>}
+                    {maisColunas && <td style={{ ...tdS, textAlign: 'right' }}>{c.frequency > 0 ? <CopiavelNum compact={c.frequency.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /> : '—'}</td>}
                   </tr>
                 )
               })}
@@ -838,16 +850,16 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                   <td style={totalTdS}>—</td>
                   <td style={{ ...totalTdS, textAlign: 'right', color: '#60a5fa' }}><CopiavelNum compact={fmtBRL(totAdsets.spend)} /></td>
                   <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totAdsets.impressions)} full={fmtNumFull(totAdsets.impressions)} /></td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>}
                   <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtNum(totAdsets.clicks)} full={fmtNumFull(totAdsets.clicks)} /></td>
                   <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtPct(totAdsets.ctr)} /></td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(totAdsets.cpm)} /></td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpc > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpc)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpe > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpe)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.thruplays > 0 ? <CopiavelNum compact={fmtNum(totAdsets.thruplays)} full={fmtNumFull(totAdsets.thruplays)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(totAdsets.taxaVisualizacao)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpv > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpv)} /> : '—'}</td>
-                  <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}><CopiavelNum compact={fmtBRL(totAdsets.cpm)} /></td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpc > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpc)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpe > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpe)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.thruplays > 0 ? <CopiavelNum compact={fmtNum(totAdsets.thruplays)} full={fmtNumFull(totAdsets.thruplays)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.taxaVisualizacao > 0 ? <CopiavelNum compact={fmtPct(totAdsets.taxaVisualizacao)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>{totAdsets.cpv > 0 ? <CopiavelNum compact={fmtBRL(totAdsets.cpv)} /> : '—'}</td>}
+                  {maisColunas && <td style={{ ...totalTdS, textAlign: 'right' }}>—</td>}
                 </tr>
               )}
             </tbody>

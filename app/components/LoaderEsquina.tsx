@@ -34,6 +34,28 @@ export default function LoaderEsquina({ onDone }: { onDone: () => void }) {
     const phraseEl = phraseRef.current
     if (!wrap || !logoCanvas) return
 
+    // Respeita prefers-reduced-motion: pula direto pro fim (logo cheia, 100%,
+    // última frase), sem canvas animando — mesma regra já aplicada no CSS dos
+    // relatórios (feedback_relatorios_css_padrao).
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduceMotion) {
+      if (phraseEl) phraseEl.textContent = PHRASES[PHRASES.length - 1]
+      if (pctEl) pctEl.textContent = '100'
+      const lCtx0 = logoCanvas.getContext('2d')
+      const img = new Image()
+      img.onload = () => {
+        const availW = Math.min(window.innerWidth * .80, 372)
+        const w = Math.round(Math.max(200, Math.min(availW, 372)))
+        const h = Math.round(w / LOGO_ASPECT)
+        logoCanvas.width = w; logoCanvas.height = h
+        logoCanvas.style.width = w + 'px'; logoCanvas.style.height = h + 'px'
+        lCtx0?.drawImage(img, 0, 0, w, h)
+      }
+      img.src = '/logo.webp'
+      const t = setTimeout(onDone, 400)
+      return () => clearTimeout(t)
+    }
+
     let rafId = 0
     let progress = 0
     let dismissed = false
@@ -431,7 +453,7 @@ export default function LoaderEsquina({ onDone }: { onDone: () => void }) {
           font-weight: 500;
           letter-spacing: .06em;
           text-transform: uppercase;
-          color: rgba(190,170,255,.52);
+          color: rgba(190,170,255,.8);
           text-align: center;
           line-height: 1.4;
           white-space: nowrap;
@@ -449,6 +471,11 @@ export default function LoaderEsquina({ onDone }: { onDone: () => void }) {
         @media (max-width: 480px) {
           .loader-card { padding: 44px 28px 40px; gap: 24px; border-radius: 24px; width: min(400px, 94vw); }
           .loader-pct { font-size: clamp(2.6rem, 14vw, 3.4rem); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .loader-card { animation: none; opacity: 1; transform: none; }
+          .loader-pct-wrap { animation: none; opacity: 1; }
+          .loader-phrase { transition: none; }
         }
       `}</style>
     </div>

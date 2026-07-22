@@ -757,11 +757,62 @@ window.addEventListener('beforeprint', function() {
 </html>`
 }
 
+// Autocomplete de cliente compartilhado pelos modais de relatório — antes
+// duplicado (e levemente divergente) em cada modal.
+function ClienteAutocomplete({
+  nomes, loading, selecionado, onSelect, hint,
+}: {
+  nomes: string[]
+  loading: boolean
+  selecionado: string | null
+  onSelect: (nome: string | null) => void
+  hint?: boolean
+}) {
+  const [input, setInput] = useState('')
+  const [show, setShow] = useState(false)
+  const sugestoes = input.trim() ? nomes.filter(n => n.toLowerCase().includes(input.toLowerCase())) : nomes
+
+  return (
+    <div style={{ marginBottom: 16, position: 'relative' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
+        Cliente <span style={{ color: '#f87171' }}>*</span>
+      </div>
+      <input
+        placeholder={loading ? 'Carregando clientes...' : 'Buscar cliente...'}
+        value={input}
+        disabled={loading}
+        autoComplete="off"
+        onChange={e => { setInput(e.target.value); onSelect(null); setShow(true) }}
+        onFocus={() => setShow(true)}
+        onBlur={() => setTimeout(() => setShow(false), 150)}
+        style={{ width: '100%', background: selecionado ? '#0f2e1a' : '#1a1a1a', border: `1px solid ${selecionado ? '#22c55e55' : '#2a2a2a'}`, color: '#e8e8e8', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box', transition: 'all 0.15s' }}
+      />
+      {selecionado && <div style={{ fontSize: 11, color: '#4ade80', marginTop: 5 }}>✓ {selecionado}</div>}
+      {hint && !selecionado && !loading && (
+        <div style={{ fontSize: 11, color: '#555', marginTop: 5 }}>Selecione um cliente para filtrar os dados corretamente</div>
+      )}
+      {show && sugestoes.length > 0 && !selecionado && (
+        <div style={{ position: 'absolute', top: 'calc(100% - 8px)', left: 0, right: 0, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 8, zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+          {sugestoes.map(nome => (
+            <div
+              key={nome}
+              onMouseDown={() => { onSelect(nome); setInput(nome); setShow(false) }}
+              style={{ padding: '9px 12px', fontSize: 13, color: '#ddd', cursor: 'pointer', borderBottom: '1px solid #222', transition: 'background 0.1s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#2a2a2a')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              {nome}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
-  const [clienteInput, setClienteInput2] = useState('')
   const [clienteSelecionado, setClienteSelecionado2] = useState<string | null>(null)
   const [todosNomes2, setTodosNomes2] = useState<string[]>([])
-  const [showSugestoes2, setShowSugestoes2] = useState(false)
   const [loadingNomes2, setLoadingNomes2] = useState(true)
   const [secoes, setSecoes] = useState({ display: true, youtube: true, metaTD: true, metaVP: true, tiktok: false, diagnostico: true, conclusao: true })
   const [periodoStart, setPeriodoStart] = useState('')
@@ -795,8 +846,6 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
       setLoadingNomes2(false)
     })
   }, [])
-
-  const sugestoes2 = clienteInput.trim() ? todosNomes2.filter(n => n.toLowerCase().includes(clienteInput.toLowerCase())) : todosNomes2
 
   function toggleSecao(k: keyof typeof secoes) { setSecoes(p => ({ ...p, [k]: !p[k] })) }
 
@@ -878,32 +927,7 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Cliente */}
-        <div style={{ marginBottom: 16, position: 'relative' }}>
-          <span style={labelStyle}>Cliente <span style={{ color: '#f87171' }}>*</span></span>
-          <input
-            placeholder={loadingNomes2 ? 'Carregando...' : 'Buscar cliente...'}
-            value={clienteInput}
-            disabled={loadingNomes2}
-            autoComplete="off"
-            onChange={e => { setClienteInput2(e.target.value); setClienteSelecionado2(null); setShowSugestoes2(true) }}
-            onFocus={() => setShowSugestoes2(true)}
-            onBlur={() => setTimeout(() => setShowSugestoes2(false), 150)}
-            style={{ ...inputStyle, background: clienteSelecionado ? '#0f2e1a' : '#1a1a1a', border: `1px solid ${clienteSelecionado ? '#22c55e55' : '#2a2a2a'}` }}
-          />
-          {clienteSelecionado && <div style={{ fontSize: 11, color: '#4ade80', marginTop: 4 }}>✓ {clienteSelecionado}</div>}
-          {showSugestoes2 && sugestoes2.length > 0 && !clienteSelecionado && (
-            <div style={{ position: 'absolute', top: 'calc(100% - 4px)', left: 0, right: 0, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 8, zIndex: 100, maxHeight: 180, overflowY: 'auto', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-              {sugestoes2.map(nome => (
-                <div key={nome} onMouseDown={() => { setClienteSelecionado2(nome); setClienteInput2(nome); setShowSugestoes2(false) }}
-                  style={{ padding: '8px 12px', fontSize: 13, color: '#ddd', cursor: 'pointer', borderBottom: '1px solid #222' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#2a2a2a')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  {nome}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ClienteAutocomplete nomes={todosNomes2} loading={loadingNomes2} selecionado={clienteSelecionado} onSelect={setClienteSelecionado2} />
 
         {/* Período */}
         <div style={{ marginBottom: 16 }}>
@@ -963,10 +987,9 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
 
 // ─── Modal ─────────────────────────────────────────────────────────────────────
 function RelatorioModal({ onClose }: { onClose: () => void }) {
-  const [clienteInput, setClienteInput] = useState('')
   const [clienteSelecionado, setClienteSelecionado] = useState<string | null>(null)
   const [todosNomes, setTodosNomes] = useState<string[]>([])
-  const [showSugestoes, setShowSugestoes] = useState(false)
+  const [nomesPorPlataforma, setNomesPorPlataforma] = useState<{ meta: string[]; google: string[]; tiktok: string[] }>({ meta: [], google: [], tiktok: [] })
   const [loadingNomes, setLoadingNomes] = useState(true)
   const [redes, setRedes] = useState({ meta: true, google: false, tiktok: false })
   const [modelo, setModelo] = useState<'detalhado' | 'boletim'>('detalhado')
@@ -977,9 +1000,23 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
   const [mensagem, setMensagem] = useState('')
   const [copiado, setCopiado] = useState(false)
   const [erro, setErro] = useState('')
+  const [contasExcluidas, setContasExcluidas] = useState<Set<string>>(new Set())
+  const [progresso, setProgresso] = useState<{ meta?: 'ok' | 'erro'; google?: 'ok' | 'erro'; tiktok?: 'ok' | 'erro' }>({})
 
   const periodo = getPeriodoWA(preset, custom)
-  const podeGerar = !!clienteSelecionado && (redes.meta || redes.google || redes.tiktok) && (preset !== 'personalizado' || (!!custom.start && !!custom.end))
+
+  // Contas que o autocomplete de nomes encontrou para o cliente selecionado,
+  // por plataforma — mostradas como chips pra confirmar antes de gerar.
+  const contasMeta = redes.meta && clienteSelecionado ? nomesPorPlataforma.meta.filter(n => matchNome(n, clienteSelecionado)) : []
+  const contasGoogle = redes.google && clienteSelecionado ? nomesPorPlataforma.google.filter(n => matchNome(n, clienteSelecionado)) : []
+  const contasTiktok = redes.tiktok && clienteSelecionado ? nomesPorPlataforma.tiktok.filter(n => matchNome(n, clienteSelecionado)) : []
+  const totalContasAtivas = [...contasMeta, ...contasGoogle, ...contasTiktok].filter(n => !contasExcluidas.has(n)).length
+
+  const podeGerar = !!clienteSelecionado && (redes.meta || redes.google || redes.tiktok) && (preset !== 'personalizado' || (!!custom.start && !!custom.end)) && totalContasAtivas > 0
+
+  // Troca de cliente zera exclusões da seleção anterior — senão um nome
+  // removido pro cliente A ficaria "removido" ao trocar pro cliente B.
+  useEffect(() => { setContasExcluidas(new Set()) }, [clienteSelecionado])
 
   // Carrega nomes dos dois APIs ao abrir o modal (usa cache de 30min do servidor)
   useEffect(() => {
@@ -996,13 +1033,10 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       const tiktokNomes: string[] = (tiktok.data ?? []).map((a: any) => a.nome)
       const merged = [...new Set([...metaNomes, ...googleNomes, ...tiktokNomes])].sort()
       setTodosNomes(merged)
+      setNomesPorPlataforma({ meta: metaNomes, google: googleNomes, tiktok: tiktokNomes })
       setLoadingNomes(false)
     })
   }, [])
-
-  const sugestoes = clienteInput.trim()
-    ? todosNomes.filter(n => n.toLowerCase().includes(clienteInput.toLowerCase()))
-    : todosNomes
 
   async function fetchDadosRelatorio(): Promise<{ metaDados: any[]; googleDados: any[]; tiktokDados: any[] }> {
     let metaDados: any[] = []
@@ -1010,33 +1044,56 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     let tiktokDados: any[] = []
     const fetches: Promise<void>[] = []
 
+    // Acumula todas as falhas — antes, só a primeira plataforma a falhar
+    // aparecia, e as demais falhavam em silêncio.
+    function acumularErro(msg: string) {
+      setErro(prev => prev ? `${prev} ${msg}` : msg)
+    }
+    setProgresso({})
     if (redes.meta) {
       fetches.push(
         fetch(`/api/meta-ads?start=${periodo.start}&end=${periodo.end}`)
           .then(r => r.json())
-          .then(res => { if (!res.error) metaDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!)) })
-          .catch(() => setErro('Erro ao buscar dados do Meta Ads.'))
+          .then(res => {
+            if (!res.error) metaDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!) && !contasExcluidas.has(a.nome))
+            setProgresso(p => ({ ...p, meta: 'ok' }))
+          })
+          .catch(() => { acumularErro('Erro ao buscar dados do Meta Ads.'); setProgresso(p => ({ ...p, meta: 'erro' })) })
       )
     }
     if (redes.google) {
       fetches.push(
         fetch(`/api/google-ads?start=${periodo.start}&end=${periodo.end}`)
           .then(r => r.json())
-          .then(res => { if (!res.error) googleDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!)) })
-          .catch(() => setErro(prev => prev || 'Erro ao buscar dados do Google Ads.'))
+          .then(res => {
+            if (!res.error) googleDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!) && !contasExcluidas.has(a.nome))
+            setProgresso(p => ({ ...p, google: 'ok' }))
+          })
+          .catch(() => { acumularErro('Erro ao buscar dados do Google Ads.'); setProgresso(p => ({ ...p, google: 'erro' })) })
       )
     }
     if (redes.tiktok) {
       fetches.push(
         fetch(`/api/tiktok-ads?start=${periodo.start}&end=${periodo.end}`)
           .then(r => r.json())
-          .then(res => { if (!res.error) tiktokDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!)) })
-          .catch(() => setErro(prev => prev || 'Erro ao buscar dados do TikTok.'))
+          .then(res => {
+            if (!res.error) tiktokDados = (res.data ?? []).filter((a: any) => matchNome(a.nome, clienteSelecionado!) && !contasExcluidas.has(a.nome))
+            setProgresso(p => ({ ...p, tiktok: 'ok' }))
+          })
+          .catch(() => { acumularErro('Erro ao buscar dados do TikTok.'); setProgresso(p => ({ ...p, tiktok: 'erro' })) })
       )
     }
 
     await Promise.all(fetches)
     return { metaDados, googleDados, tiktokDados }
+  }
+
+  function progressoTexto() {
+    const partes: string[] = []
+    if (redes.meta) partes.push(`Meta ${progresso.meta === 'ok' ? '✓' : progresso.meta === 'erro' ? '✗' : '…'}`)
+    if (redes.google) partes.push(`Google ${progresso.google === 'ok' ? '✓' : progresso.google === 'erro' ? '✗' : '…'}`)
+    if (redes.tiktok) partes.push(`TikTok ${progresso.tiktok === 'ok' ? '✓' : progresso.tiktok === 'erro' ? '✗' : '…'}`)
+    return partes.join(' · ') || 'Buscando dados...'
   }
 
   // ── Boletim de arranque/entrega — só métricas de entrega, sem CTR e sem
@@ -1394,42 +1451,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Cliente — autocomplete obrigatório */}
-        <div style={{ marginBottom: 16, position: 'relative' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>
-            Cliente <span style={{ color: '#f87171' }}>*</span>
-          </div>
-          <input
-            placeholder={loadingNomes ? 'Carregando clientes...' : 'Buscar cliente...'}
-            value={clienteInput}
-            disabled={loadingNomes}
-            autoComplete="off"
-            onChange={e => { setClienteInput(e.target.value); setClienteSelecionado(null); setShowSugestoes(true) }}
-            onFocus={() => setShowSugestoes(true)}
-            onBlur={() => setTimeout(() => setShowSugestoes(false), 150)}
-            style={{ width: '100%', background: clienteSelecionado ? '#0f2e1a' : '#1a1a1a', border: `1px solid ${clienteSelecionado ? '#22c55e55' : '#2a2a2a'}`, color: '#e8e8e8', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box', transition: 'all 0.15s' }}
-          />
-          {clienteSelecionado && (
-            <div style={{ fontSize: 11, color: '#4ade80', marginTop: 5 }}>✓ {clienteSelecionado}</div>
-          )}
-          {!clienteSelecionado && !loadingNomes && (
-            <div style={{ fontSize: 11, color: '#555', marginTop: 5 }}>Selecione um cliente para filtrar os dados corretamente</div>
-          )}
-          {showSugestoes && sugestoes.length > 0 && !clienteSelecionado && (
-            <div style={{ position: 'absolute', top: 'calc(100% - 8px)', left: 0, right: 0, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 8, zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-              {sugestoes.map(nome => (
-                <div
-                  key={nome}
-                  onMouseDown={() => { setClienteSelecionado(nome); setClienteInput(nome); setShowSugestoes(false) }}
-                  style={{ padding: '9px 12px', fontSize: 13, color: '#ddd', cursor: 'pointer', borderBottom: '1px solid #222', transition: 'background 0.1s' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#2a2a2a')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  {nome}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ClienteAutocomplete nomes={todosNomes} loading={loadingNomes} selecionado={clienteSelecionado} onSelect={setClienteSelecionado} hint />
 
         {/* Modelo */}
         <div style={{ marginBottom: 16 }}>
@@ -1468,6 +1490,50 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
             })}
           </div>
         </div>
+
+        {/* Contas encontradas — confirmação antes de gerar */}
+        {clienteSelecionado && !loadingNomes && (redes.meta || redes.google || redes.tiktok) && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Contas encontradas</div>
+            {([
+              ['meta', 'Meta', contasMeta],
+              ['google', 'Google', contasGoogle],
+              ['tiktok', 'TikTok', contasTiktok],
+            ] as const).map(([key, label, contas]) => {
+              if (!redes[key]) return null
+              return (
+                <div key={key} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>{label}</div>
+                  {contas.length === 0 ? (
+                    <div style={{ fontSize: 12, color: '#f59e0b' }}>Nenhuma conta encontrada para este cliente.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {contas.map(nome => {
+                        const excluida = contasExcluidas.has(nome)
+                        return (
+                          <span key={nome} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 20, fontSize: 12, background: excluida ? '#2a1414' : '#14251a', color: excluida ? '#888' : '#86efac', textDecoration: excluida ? 'line-through' : 'none', border: `1px solid ${excluida ? '#3a2020' : '#22c55e33'}` }}>
+                            {nome}
+                            <button
+                              onClick={() => setContasExcluidas(prev => {
+                                const next = new Set(prev)
+                                if (next.has(nome)) next.delete(nome); else next.add(nome)
+                                return next
+                              })}
+                              title={excluida ? 'Incluir de novo' : 'Remover da geração'}
+                              style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}
+                            >
+                              {excluida ? '↺' : '×'}
+                            </button>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* Período */}
         <div style={{ marginBottom: 16 }}>
@@ -1513,7 +1579,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           onClick={modelo === 'boletim' ? gerarBoletim : gerarRelatorio}
           disabled={loading || !podeGerar}
           style={{ width: '100%', padding: '11px 0', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || !podeGerar ? 'not-allowed' : 'pointer', border: 'none', background: loading || !podeGerar ? '#252525' : '#1A3CFF', color: loading || !podeGerar ? '#555' : '#fff', transition: 'all 0.15s', marginBottom: mensagem ? 20 : 0 }}>
-          {loading ? 'Buscando dados...' : 'Gerar Relatório'}
+          {loading ? progressoTexto() : 'Gerar Relatório'}
         </button>
 
         {erro && <div style={{ fontSize: 12, color: '#f87171', marginTop: 10 }}>{erro}</div>}
