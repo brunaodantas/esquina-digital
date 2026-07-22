@@ -11,28 +11,30 @@ type Nivel = 'campanhas' | 'grupos' | 'anuncios'
 
 const C = {
   dark: {
-    page: '#07070f', card: '#0d0d1c', border: 'rgba(255,255,255,0.07)', borderInner: 'rgba(255,255,255,0.05)',
-    textPrimary: '#e4e4f4', textSecondary: '#8888b8', textMuted: '#52527a',
-    barTrack: 'rgba(255,255,255,0.07)', spinner: '#181830',
-    filtroBtn: '#111122', emptyText: '#52527a', chevron: '#52527a',
-    dropBg: '#0d0d1c', dropBorder: 'rgba(255,255,255,0.07)', dropText: '#8888b8', dropActive: '#e4e4f4', dropHover: 'rgba(255,255,255,0.05)',
-    inputBg: '#07070f', inputBorder: 'rgba(255,255,255,0.07)', inputText: '#8888b8',
-    selectBg: '#0d0d1c', selectBorder: 'rgba(255,255,255,0.07)', selectText: '#8888b8',
-    kpiBg: '#0d0d1c', kpiBorder: 'rgba(255,255,255,0.07)',
+    page: '#0a0a0a', card: '#141414', border: 'rgba(255,255,255,0.08)', borderInner: 'rgba(255,255,255,0.05)',
+    textPrimary: '#f2f2f0', textSecondary: '#a3a3a3', textMuted: '#737373',
+    barTrack: 'rgba(255,255,255,0.08)', spinner: '#1f1f1f',
+    filtroBtn: '#161616', emptyText: '#737373', chevron: '#737373',
+    dropBg: '#141414', dropBorder: 'rgba(255,255,255,0.08)', dropText: '#a3a3a3', dropActive: '#f2f2f0', dropHover: 'rgba(255,255,255,0.05)',
+    inputBg: '#0a0a0a', inputBorder: 'rgba(255,255,255,0.08)', inputText: '#a3a3a3',
+    selectBg: '#141414', selectBorder: 'rgba(255,255,255,0.08)', selectText: '#a3a3a3',
+    kpiBg: '#141414', kpiBorder: 'rgba(255,255,255,0.08)',
     tableBorder: 'rgba(255,255,255,0.05)', tableHover: 'rgba(255,255,255,0.03)',
-    chipBg: '#181830', nivelBg: '#07070f', nivelBorder: 'rgba(255,255,255,0.07)',
+    chipBg: '#1f1f1f', nivelBg: '#0a0a0a', nivelBorder: 'rgba(255,255,255,0.08)',
+    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)',
   },
   light: {
-    page: '#f4f4fb', card: '#ffffff', border: 'rgba(0,0,0,0.08)', borderInner: 'rgba(0,0,0,0.05)',
-    textPrimary: '#0f0f26', textSecondary: '#4a4a72', textMuted: '#8080a8',
-    barTrack: 'rgba(0,0,0,0.08)', spinner: '#e5e5f2',
-    filtroBtn: '#efeff8', emptyText: '#8080a8', chevron: '#8080a8',
-    dropBg: '#ffffff', dropBorder: 'rgba(0,0,0,0.08)', dropText: '#4a4a72', dropActive: '#0f0f26', dropHover: 'rgba(0,0,0,0.04)',
-    inputBg: '#f4f4fb', inputBorder: 'rgba(0,0,0,0.08)', inputText: '#4a4a72',
-    selectBg: '#ffffff', selectBorder: 'rgba(0,0,0,0.08)', selectText: '#4a4a72',
+    page: '#f5f5f4', card: '#ffffff', border: 'rgba(0,0,0,0.08)', borderInner: 'rgba(0,0,0,0.05)',
+    textPrimary: '#1c1917', textSecondary: '#57534e', textMuted: '#78716c',
+    barTrack: 'rgba(0,0,0,0.08)', spinner: '#e7e5e4',
+    filtroBtn: '#ebebe9', emptyText: '#78716c', chevron: '#78716c',
+    dropBg: '#ffffff', dropBorder: 'rgba(0,0,0,0.08)', dropText: '#57534e', dropActive: '#1c1917', dropHover: 'rgba(0,0,0,0.04)',
+    inputBg: '#f5f5f4', inputBorder: 'rgba(0,0,0,0.08)', inputText: '#57534e',
+    selectBg: '#ffffff', selectBorder: 'rgba(0,0,0,0.08)', selectText: '#57534e',
     kpiBg: '#ffffff', kpiBorder: 'rgba(0,0,0,0.08)',
     tableBorder: 'rgba(0,0,0,0.05)', tableHover: 'rgba(0,0,0,0.02)',
-    chipBg: '#e5e5f2', nivelBg: '#f4f4fb', nivelBorder: 'rgba(0,0,0,0.08)',
+    chipBg: '#e7e5e4', nivelBg: '#f5f5f4', nivelBorder: 'rgba(0,0,0,0.08)',
+    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)',
   },
 }
 
@@ -185,10 +187,10 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 999, background: t.dropBg, border: `1px solid ${t.dropBorder}`, borderRadius: 12, padding: 16, minWidth: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
             <div style={{ display: 'flex', gap: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
                 {PRESETS.map(p => (
-                  <div key={p.key} onClick={() => setTp(p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: tp === p.key ? '#1A3CFF1A' : 'transparent' }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, border: `2px solid ${tp === p.key ? '#1A3CFF' : t.textMuted}`, background: tp === p.key ? '#1A3CFF' : 'transparent' }} />
+                  <div key={p.key} onClick={() => setTp(p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: tp === p.key ? t.accentBg : 'transparent' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, border: `2px solid ${tp === p.key ? t.accent : t.textMuted}`, background: tp === p.key ? t.accent : 'transparent' }} />
                     <span style={{ fontSize: 13, color: tp === p.key ? t.dropActive : t.dropText }}>{p.label}</span>
                   </div>
                 ))}
@@ -202,7 +204,7 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${t.dropBorder}` }}>
               <button onClick={() => setAberto(false)} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: 'transparent', border: `1px solid ${t.border}`, color: t.textMuted, cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: '#1A3CFF', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Aplicar</button>
+              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: t.accent, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Aplicar</button>
             </div>
           </div>
         </>
@@ -353,7 +355,7 @@ function TrendChart({ serie, theme }: { serie: DailyPoint[]; theme: Theme }) {
   return (
     <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 4 }}>Barras:</span>
           {BAR_OPTIONS.map(o => (
@@ -381,14 +383,14 @@ function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: num
       <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: t.textPrimary }}>{acc.nome}</span>
-          <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF33' }}>{fmtBRL(acc.custo)}</span>
+          <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: t.accentBg, color: t.accent, border: `1px solid ${t.accentBg}` }}>{fmtBRL(acc.custo)}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {sharePct > 0 && <span style={{ fontSize: 11, color: t.textMuted }}>{fmtPct(sharePct)} do total</span>}
           <span style={{ color: t.chevron, fontSize: 12 }}>{open ? '▲' : '▼'}</span>
         </div>
       </button>
-      {sharePct > 0 && <div style={{ height: 2, background: t.barTrack, margin: '0 16px' }}><div style={{ width: `${Math.min(100, sharePct)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
+      {sharePct > 0 && <div style={{ height: 2, background: t.barTrack, margin: '0 16px' }}><div style={{ width: `${Math.min(100, sharePct)}%`, height: '100%', background: t.accent, borderRadius: 2 }} /></div>}
       {open && (
         <div style={{ padding: '12px 16px 16px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 16px' }}>
@@ -403,7 +405,7 @@ function AccountCard({ acc, totalCusto, t }: { acc: AccountData; totalCusto: num
             ].map(m => (
               <div key={m.label}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{m.label}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: m.h ?? t.textPrimary }}>{m.v}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: m.h ?? t.textPrimary, fontFamily: "'Sora', sans-serif" }}>{m.v}</div>
               </div>
             ))}
           </div>
@@ -453,7 +455,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
     if (!items.length) return null
     return (
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {items.map((item, i) => (
             <div key={item.label}>
@@ -473,7 +475,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
 
   const chip = (active: boolean): React.CSSProperties => ({
     padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-    border: `1px solid ${active ? '#1A3CFF' : t.border}`, background: active ? '#1A3CFF22' : 'transparent',
+    border: `1px solid ${active ? t.accent : t.border}`, background: active ? t.accentBg : 'transparent',
     color: active ? '#7ba3ff' : t.textMuted, transition: 'all 0.15s',
   })
 
@@ -492,7 +494,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 2 }}>Ver por:</span>
           {AUD_METRICAS_GOOGLE.map(m => (
@@ -599,7 +601,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   const chip = (active: boolean): React.CSSProperties => ({
     padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
     cursor: 'pointer', border: 'none', transition: 'all 0.15s',
-    background: active ? '#1A3CFF' : t.chipBg, color: active ? '#fff' : t.textMuted,
+    background: active ? t.accent : t.chipBg, color: active ? '#fff' : t.textMuted,
   })
 
   const filtCamp = campanhas.filter(c => {
@@ -661,7 +663,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   }
 
   const thS: React.CSSProperties = {
-    padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted,
+    padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif",
     textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left',
     borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap',
   }
@@ -723,8 +725,8 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
             <button key={tab.key} onClick={() => setNivel(tab.key)} style={{
               padding: '12px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               border: 'none', background: 'transparent', transition: 'all 0.15s',
-              color: nivel === tab.key ? '#1A3CFF' : t.textMuted,
-              borderBottom: nivel === tab.key ? '2px solid #1A3CFF' : '2px solid transparent',
+              color: nivel === tab.key ? t.accent : t.textMuted,
+              borderBottom: nivel === tab.key ? `2px solid ${t.accent}` : '2px solid transparent',
             }}>{tab.label}</button>
           ))}
         </div>
@@ -780,9 +782,9 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
                     <td style={tdS}>
                       <div style={{ fontWeight: 600, color: t.textPrimary }}>{c.nome}</div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 3 }}>
-                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600, background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF2a' }}>{c.tipo}</span>
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600, background: t.accentBg, color: t.accent, border: `1px solid ${t.accentBg}` }}>{c.tipo}</span>
                       </div>
-                      {share > 0 && <div style={{ marginTop: 5, height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
+                      {share > 0 && <div style={{ marginTop: 5, height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: t.accent, borderRadius: 2 }} /></div>}
                     </td>
                     <td style={tdS}><StatusPill label={c.status === 'ativo' ? 'Ativa' : 'Pausada'} /></td>
                     <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
@@ -1027,14 +1029,14 @@ export default function GoogleAdsPage({ theme = 'dark' }: { theme?: Theme }) {
           {lastUpdated ? `${String(lastUpdated.getHours()).padStart(2,'0')}:${String(lastUpdated.getMinutes()).padStart(2,'0')}` : 'Atualizar'}
         </button>
         <button onClick={toggleComparar} title="Comparar com o período anterior de mesma duração"
-          style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${comparar ? '#1A3CFF' : t.border}`, background: comparar ? '#1A3CFF22' : t.filtroBtn, color: comparar ? '#7ba3ff' : t.textMuted, transition: 'all 0.15s', flexShrink: 0 }}>
+          style={{ padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${comparar ? t.accent : t.border}`, background: comparar ? t.accentBg : t.filtroBtn, color: comparar ? t.accent : t.textMuted, transition: 'all 0.15s', flexShrink: 0 }}>
           ⇄ {loadingPrev ? '...' : comparar ? 'Comparando' : 'Comparar'}
         </button>
-        {loading && <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: '2px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
+        {loading && <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: `2px solid ${t.accent}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
       </div>
 
       {loading && !data ? (
-        <div style={center}><div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>
+        <div style={center}><div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: `3px solid ${t.accent}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>
       ) : error ? (
         <div style={{ ...center, flexDirection: 'column', gap: 8 }}>
           <span style={{ fontSize: 15, color: '#f87171' }}>Erro ao carregar dados</span>

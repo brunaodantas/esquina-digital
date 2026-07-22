@@ -17,28 +17,30 @@ const TK = '#00994D'
 
 const C = {
   dark: {
-    page: '#07070f', card: '#0d0d1c', border: 'rgba(255,255,255,0.07)', borderInner: 'rgba(255,255,255,0.05)',
-    textPrimary: '#e4e4f4', textSecondary: '#8888b8', textMuted: '#52527a',
-    barTrack: 'rgba(255,255,255,0.07)', spinner: '#181830',
-    filtroBtn: '#111122', emptyText: '#52527a', chevron: '#52527a',
-    dropBg: '#0d0d1c', dropBorder: 'rgba(255,255,255,0.07)', dropText: '#8888b8', dropActive: '#e4e4f4', dropHover: 'rgba(255,255,255,0.05)',
-    inputBg: '#07070f', inputBorder: 'rgba(255,255,255,0.07)', inputText: '#8888b8',
-    selectBg: '#0d0d1c', selectBorder: 'rgba(255,255,255,0.07)', selectText: '#8888b8',
-    kpiBg: '#0d0d1c', kpiBorder: 'rgba(255,255,255,0.07)',
+    page: '#0a0a0a', card: '#141414', border: 'rgba(255,255,255,0.08)', borderInner: 'rgba(255,255,255,0.05)',
+    textPrimary: '#f2f2f0', textSecondary: '#a3a3a3', textMuted: '#737373',
+    barTrack: 'rgba(255,255,255,0.08)', spinner: '#1f1f1f',
+    filtroBtn: '#161616', emptyText: '#737373', chevron: '#737373',
+    dropBg: '#141414', dropBorder: 'rgba(255,255,255,0.08)', dropText: '#a3a3a3', dropActive: '#f2f2f0', dropHover: 'rgba(255,255,255,0.05)',
+    inputBg: '#0a0a0a', inputBorder: 'rgba(255,255,255,0.08)', inputText: '#a3a3a3',
+    selectBg: '#141414', selectBorder: 'rgba(255,255,255,0.08)', selectText: '#a3a3a3',
+    kpiBg: '#141414', kpiBorder: 'rgba(255,255,255,0.08)',
     tableBorder: 'rgba(255,255,255,0.05)', tableHover: 'rgba(255,255,255,0.03)',
-    chipBg: '#181830', chipText: '#8888b8',
+    chipBg: '#1f1f1f', chipText: '#a3a3a3',
+    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)',
   },
   light: {
-    page: '#f4f4fb', card: '#ffffff', border: 'rgba(0,0,0,0.08)', borderInner: 'rgba(0,0,0,0.05)',
-    textPrimary: '#0f0f26', textSecondary: '#4a4a72', textMuted: '#8080a8',
-    barTrack: 'rgba(0,0,0,0.08)', spinner: '#e5e5f2',
-    filtroBtn: '#efeff8', emptyText: '#8080a8', chevron: '#8080a8',
-    dropBg: '#ffffff', dropBorder: 'rgba(0,0,0,0.08)', dropText: '#4a4a72', dropActive: '#0f0f26', dropHover: 'rgba(0,0,0,0.04)',
-    inputBg: '#f4f4fb', inputBorder: 'rgba(0,0,0,0.08)', inputText: '#4a4a72',
-    selectBg: '#ffffff', selectBorder: 'rgba(0,0,0,0.08)', selectText: '#4a4a72',
+    page: '#f5f5f4', card: '#ffffff', border: 'rgba(0,0,0,0.08)', borderInner: 'rgba(0,0,0,0.05)',
+    textPrimary: '#1c1917', textSecondary: '#57534e', textMuted: '#78716c',
+    barTrack: 'rgba(0,0,0,0.08)', spinner: '#e7e5e4',
+    filtroBtn: '#ebebe9', emptyText: '#78716c', chevron: '#78716c',
+    dropBg: '#ffffff', dropBorder: 'rgba(0,0,0,0.08)', dropText: '#57534e', dropActive: '#1c1917', dropHover: 'rgba(0,0,0,0.04)',
+    inputBg: '#f5f5f4', inputBorder: 'rgba(0,0,0,0.08)', inputText: '#57534e',
+    selectBg: '#ffffff', selectBorder: 'rgba(0,0,0,0.08)', selectText: '#57534e',
     kpiBg: '#ffffff', kpiBorder: 'rgba(0,0,0,0.08)',
     tableBorder: 'rgba(0,0,0,0.05)', tableHover: 'rgba(0,0,0,0.02)',
-    chipBg: '#e5e5f2', chipText: '#4a4a72',
+    chipBg: '#e7e5e4', chipText: '#57534e',
+    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)',
   },
 }
 
@@ -174,7 +176,7 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 999, background: t.dropBg, border: `1px solid ${t.dropBorder}`, borderRadius: 12, padding: 16, minWidth: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
             <div style={{ display: 'flex', gap: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
                 {PRESETS.map(p => (
                   <div key={p.key} onClick={() => setTp(p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: tp === p.key ? TK + '1A' : 'transparent' }}>
                     <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, border: `2px solid ${tp === p.key ? TK : t.textMuted}`, background: tp === p.key ? TK : 'transparent' }} />
@@ -308,7 +310,7 @@ function TrendChart({ serie, theme }: { serie: TikTokAccountData['serie']; theme
   return (
     <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 4 }}>Barras:</span>
           {TK_BAR_OPTIONS.map(o => <button key={o.key} onClick={() => toggleBar(o.key)} style={btnStyle(barMetrics.includes(o.key), o.color)}>{o.label}</button>)}
@@ -327,7 +329,7 @@ function TrendChart({ serie, theme }: { serie: TikTokAccountData['serie']; theme
 function KpiTile({ label, value, note, color, t, delta }: { label: string; value: string; note?: string; color: string; t: typeof C['dark']; delta?: number | null }) {
   return (
     <div style={{ background: t.kpiBg, border: `1px solid ${t.kpiBorder}`, borderRadius: 10, padding: '14px 16px', borderTop: `3px solid ${color}` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}><CopiavelNum compact={value} /></div>
       {note && <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>{note}</div>}
       {delta != null && (
@@ -371,7 +373,7 @@ function AccountCard({ acc, totalSpend, t }: { acc: TikTokAccountData; totalSpen
             ].map(m => (
               <div key={m.label}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{m.label}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: m.h ?? t.textPrimary }}>{m.v}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: m.h ?? t.textPrimary, fontFamily: "'Sora', sans-serif" }}>{m.v}</div>
               </div>
             ))}
           </div>
@@ -424,7 +426,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: TikTokAccountData[]; t: t
     if (!items.length) return null
     return (
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {items.map((item, i) => (
             <div key={item.label}>
@@ -457,7 +459,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: TikTokAccountData[]; t: t
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 2 }}>Ver por:</span>
           {AUD_METRICAS_TK.map(m => (
@@ -546,7 +548,7 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
     setTimeout(() => URL.revokeObjectURL(url), 100)
   }
 
-  const thS: React.CSSProperties = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left', borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap' }
+  const thS: React.CSSProperties = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left', borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap' }
   const tdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textSecondary, borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle' }
   const totalTdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textPrimary, fontWeight: 700, borderTop: `2px solid ${t.tableBorder}` }
 

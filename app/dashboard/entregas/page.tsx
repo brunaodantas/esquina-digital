@@ -29,32 +29,34 @@ interface ClienteData {
 
 const C = {
   dark: {
-    page: '#07070f', card: '#0d0d1c', cardInner: '#0a0a18',
-    border: 'rgba(255,255,255,0.07)', borderInner: 'rgba(255,255,255,0.05)',
-    textPrimary: '#e4e4f4', textSecondary: '#8888b8', textMuted: '#52527a',
+    page: '#0a0a0a', card: '#141414', cardInner: '#101010',
+    border: 'rgba(255,255,255,0.08)', borderInner: 'rgba(255,255,255,0.05)',
+    textPrimary: '#f2f2f0', textSecondary: '#a3a3a3', textMuted: '#737373',
     alertBg: '#1a0a1a', alertBorder: '#7f1d7f',
-    barTrack: 'rgba(255,255,255,0.07)', spinner: '#181830',
-    filtroBtn: '#111122', filtroBtnText: '#8888b8',
-    emptyText: '#52527a', chevron: '#52527a',
-    dropBg: '#0d0d1c', dropBorder: 'rgba(255,255,255,0.07)',
-    dropText: '#8888b8', dropActive: '#e4e4f4',
+    barTrack: 'rgba(255,255,255,0.08)', spinner: '#1f1f1f',
+    filtroBtn: '#161616', filtroBtnText: '#a3a3a3',
+    emptyText: '#737373', chevron: '#737373',
+    dropBg: '#141414', dropBorder: 'rgba(255,255,255,0.08)',
+    dropText: '#a3a3a3', dropActive: '#f2f2f0',
     dropHover: 'rgba(255,255,255,0.05)',
-    inputBg: '#07070f', inputBorder: 'rgba(255,255,255,0.07)', inputText: '#8888b8',
-    selectBg: '#0d0d1c', selectBorder: 'rgba(255,255,255,0.07)', selectText: '#8888b8',
+    inputBg: '#0a0a0a', inputBorder: 'rgba(255,255,255,0.08)', inputText: '#a3a3a3',
+    selectBg: '#141414', selectBorder: 'rgba(255,255,255,0.08)', selectText: '#a3a3a3',
+    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)',
   },
   light: {
-    page: '#f4f4fb', card: '#ffffff', cardInner: '#f8f8ff',
+    page: '#f5f5f4', card: '#ffffff', cardInner: '#fafaf9',
     border: 'rgba(0,0,0,0.08)', borderInner: 'rgba(0,0,0,0.05)',
-    textPrimary: '#0f0f26', textSecondary: '#4a4a72', textMuted: '#8080a8',
+    textPrimary: '#1c1917', textSecondary: '#57534e', textMuted: '#78716c',
     alertBg: '#fff5f5', alertBorder: '#fca5a5',
-    barTrack: 'rgba(0,0,0,0.08)', spinner: '#e5e5f2',
-    filtroBtn: '#efeff8', filtroBtnText: '#4a4a72',
-    emptyText: '#8080a8', chevron: '#8080a8',
+    barTrack: 'rgba(0,0,0,0.08)', spinner: '#e7e5e4',
+    filtroBtn: '#ebebe9', filtroBtnText: '#57534e',
+    emptyText: '#78716c', chevron: '#78716c',
     dropBg: '#ffffff', dropBorder: 'rgba(0,0,0,0.08)',
-    dropText: '#4a4a72', dropActive: '#0f0f26',
+    dropText: '#57534e', dropActive: '#1c1917',
     dropHover: 'rgba(0,0,0,0.04)',
-    inputBg: '#f4f4fb', inputBorder: 'rgba(0,0,0,0.08)', inputText: '#4a4a72',
-    selectBg: '#ffffff', selectBorder: 'rgba(0,0,0,0.08)', selectText: '#4a4a72',
+    inputBg: '#f5f5f4', inputBorder: 'rgba(0,0,0,0.08)', inputText: '#57534e',
+    selectBg: '#ffffff', selectBorder: 'rgba(0,0,0,0.08)', selectText: '#57534e',
+    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)',
   },
 }
 
@@ -321,8 +323,8 @@ function CampanhaCard({ c, t, dimmed }: { c: Campanha; t: typeof C['dark']; dimm
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           <span style={{
             fontSize: 11, padding: '3px 10px', borderRadius: 20,
-            background: '#1A3CFF18', color: '#7ba3ff',
-            border: '1px solid #1A3CFF33', whiteSpace: 'nowrap',
+            background: t.accentBg, color: t.accent,
+            border: `1px solid ${t.accentBg}`, whiteSpace: 'nowrap',
           }}>
             {periodoTag}
           </span>
@@ -480,7 +482,7 @@ function PeriodoDropdown({
             <div style={{ display: 'flex', gap: 20 }}>
               {/* Presets */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
                 {PRESETS.map(p => (
                   <div
                     key={p.key}
@@ -488,14 +490,14 @@ function PeriodoDropdown({
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
-                      background: tempPreset === p.key ? '#1A3CFF1A' : 'transparent',
+                      background: tempPreset === p.key ? t.accentBg : 'transparent',
                       transition: 'background 0.1s',
                     }}
                   >
                     <div style={{
                       width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
-                      border: `2px solid ${tempPreset === p.key ? '#1A3CFF' : t.textMuted}`,
-                      background: tempPreset === p.key ? '#1A3CFF' : 'transparent',
+                      border: `2px solid ${tempPreset === p.key ? t.accent : t.textMuted}`,
+                      background: tempPreset === p.key ? t.accent : 'transparent',
                     }} />
                     <span style={{ fontSize: 13, color: tempPreset === p.key ? t.dropActive : t.dropText }}>
                       {p.label}
@@ -538,7 +540,7 @@ function PeriodoDropdown({
               </button>
               <button
                 onClick={aplicar}
-                style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: '#1A3CFF', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: t.accent, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
               >
                 Aplicar
               </button>
@@ -677,7 +679,7 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
         </button>
 
         {loading && (
-          <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: '2px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+          <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: `2px solid ${t.accent}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
         )}
       </div>
 
@@ -695,7 +697,7 @@ export default function EntregasPage({ theme = 'dark' }: { theme?: Theme }) {
       {/* Conteúdo principal */}
       {loading && !data ? (
         <div style={center}>
-          <div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+          <div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: `3px solid ${t.accent}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         </div>
       ) : error ? (
         <div style={center}><span style={{ color: t.textMuted }}>{error}</span></div>

@@ -14,8 +14,8 @@ type Tab = 'meta' | 'entregas' | 'google-ads' | 'tiktok'
 type Theme = 'dark' | 'light'
 
 const H = {
-  dark: { bg: '#07070f', border: 'rgba(255,255,255,0.07)', tabBg: '#111122', tabText: '#8888b8', tabBorder: 'rgba(255,255,255,0.1)', userText: '#52527a' },
-  light: { bg: '#ffffff', border: 'rgba(0,0,0,0.08)', tabBg: '#efeff8', tabText: '#4a4a72', tabBorder: 'rgba(0,0,0,0.1)', userText: '#8080a8' },
+  dark: { bg: '#0a0a0a', border: 'rgba(255,255,255,0.08)', tabBg: '#161616', tabText: '#a3a3a3', tabBorder: 'rgba(255,255,255,0.1)', userText: '#737373', accent: '#f97316', accentSubtle: 'rgba(249,115,22,0.14)' },
+  light: { bg: '#f5f5f4', border: 'rgba(0,0,0,0.08)', tabBg: '#ebebe9', tabText: '#57534e', tabBorder: 'rgba(0,0,0,0.1)', userText: '#78716c', accent: '#ea580c', accentSubtle: 'rgba(234,88,12,0.10)' },
 }
 type PresetWA = 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'personalizado'
 
@@ -785,20 +785,20 @@ function ClienteAutocomplete({
         onChange={e => { setInput(e.target.value); onSelect(null); setShow(true) }}
         onFocus={() => setShow(true)}
         onBlur={() => setTimeout(() => setShow(false), 150)}
-        style={{ width: '100%', background: selecionado ? '#0f2e1a' : '#1a1a1a', border: `1px solid ${selecionado ? '#22c55e55' : '#2a2a2a'}`, color: '#e8e8e8', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box', transition: 'all 0.15s' }}
+        style={{ width: '100%', background: selecionado ? '#0f2e1a' : '#141414', border: `1px solid ${selecionado ? '#22c55e55' : '#262626'}`, color: '#f2f2f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box', transition: 'all 0.15s' }}
       />
       {selecionado && <div style={{ fontSize: 11, color: '#4ade80', marginTop: 5 }}>✓ {selecionado}</div>}
       {hint && !selecionado && !loading && (
         <div style={{ fontSize: 11, color: '#555', marginTop: 5 }}>Selecione um cliente para filtrar os dados corretamente</div>
       )}
       {show && sugestoes.length > 0 && !selecionado && (
-        <div style={{ position: 'absolute', top: 'calc(100% - 8px)', left: 0, right: 0, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 8, zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+        <div style={{ position: 'absolute', top: 'calc(100% - 8px)', left: 0, right: 0, background: '#1e1e1e', border: '1px solid #262626', borderRadius: 8, zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
           {sugestoes.map(nome => (
             <div
               key={nome}
               onMouseDown={() => { onSelect(nome); setInput(nome); setShow(false) }}
               style={{ padding: '9px 12px', fontSize: 13, color: '#ddd', cursor: 'pointer', borderBottom: '1px solid #222', transition: 'background 0.1s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#2a2a2a')}
+              onMouseEnter={e => (e.currentTarget.style.background = '#262626')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               {nome}
@@ -900,7 +900,7 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const inputStyle = { width: '100%', background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#e8e8e8', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }
+  const inputStyle = { width: '100%', background: '#141414', border: '1px solid #262626', color: '#f2f2f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box' as const }
   const labelStyle = { fontSize: 11, fontWeight: 700 as const, color: '#555', textTransform: 'uppercase' as const, letterSpacing: 0.8, marginBottom: 8, display: 'block' }
 
   const SECOES_LABELS: Array<[keyof typeof secoes, string]> = [
@@ -916,11 +916,11 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
   return (
     <div onClick={e => { if (e.target === e.currentTarget) onClose() }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 14, padding: 28, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto' }}>
+      <div style={{ background: '#161616', border: '1px solid #262626', borderRadius: 14, padding: 28, width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto' }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8e8' }}>Relatório Semanal</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#f2f2f0', fontFamily: "'Sora', sans-serif" }}>Relatório Semanal</div>
             <div style={{ fontSize: 12, color: '#555', marginTop: 3 }}>Gera slides HTML com print automático (A4 paisagem)</div>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 0, marginTop: -2 }}>×</button>
@@ -943,7 +943,7 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
           <span style={labelStyle}>Seções</span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             {SECOES_LABELS.map(([key, label]) => (
-              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', background: secoes[key] ? '#1a2a1a' : '#1a1a1a', border: `1px solid ${secoes[key] ? '#2a4a2a' : '#2a2a2a'}`, borderRadius: 7, padding: '7px 10px', transition: 'all 0.15s' }}>
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', background: secoes[key] ? '#1a2a1a' : '#141414', border: `1px solid ${secoes[key] ? '#2a4a2a' : '#262626'}`, borderRadius: 7, padding: '7px 10px', transition: 'all 0.15s' }}>
                 <input type="checkbox" checked={secoes[key]} onChange={() => toggleSecao(key)} style={{ accentColor: '#22c55e', width: 14, height: 14 }} />
                 <span style={{ fontSize: 12, color: secoes[key] ? '#86efac' : '#666', fontWeight: 500 }}>{label}</span>
               </label>
@@ -976,7 +976,7 @@ function RelatorioSemanalModal({ onClose }: { onClose: () => void }) {
         {erro && <div style={{ fontSize: 12, color: '#f87171', marginBottom: 12 }}>{erro}</div>}
 
         <button onClick={gerar} disabled={gerando || !podeGerar}
-          style={{ width: '100%', padding: '11px 0', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: gerando || !podeGerar ? 'not-allowed' : 'pointer', border: 'none', background: gerando || !podeGerar ? '#252525' : '#1A3CFF', color: gerando || !podeGerar ? '#555' : '#fff', transition: 'all 0.15s' }}>
+          style={{ width: '100%', padding: '11px 0', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: gerando || !podeGerar ? 'not-allowed' : 'pointer', border: 'none', background: gerando || !podeGerar ? '#252525' : '#f97316', color: gerando || !podeGerar ? '#555' : '#fff', transition: 'all 0.15s' }}>
           {gerando ? 'Buscando dados e gerando...' : 'Gerar Relatório (PDF)'}
         </button>
         <div style={{ fontSize: 11, color: '#555', marginTop: 8, textAlign: 'center' }}>Abre em nova aba → aciona impressão automática → salvar como PDF</div>
@@ -1439,12 +1439,12 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
     >
-      <div style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 14, padding: 28, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#161616', border: '1px solid #262626', borderRadius: 14, padding: 28, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
 
         {/* Cabeçalho */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8e8' }}>Relatório via WhatsApp</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#f2f2f0', fontFamily: "'Sora', sans-serif" }}>Relatório via WhatsApp</div>
             <div style={{ fontSize: 12, color: '#555', marginTop: 3 }}>Gera mensagem formatada para envio direto</div>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 0, marginTop: -2 }}>×</button>
@@ -1464,7 +1464,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
               const ativo = modelo === m.key
               return (
                 <button key={m.key} onClick={() => setModelo(m.key)}
-                  style={{ flex: 1, padding: '9px 4px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${ativo ? '#1A3CFF' : '#2a2a2a'}`, background: ativo ? '#1A3CFF18' : 'transparent', color: ativo ? '#7ba3ff' : '#555', transition: 'all 0.15s' }}>
+                  style={{ flex: 1, padding: '9px 4px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: `1px solid ${ativo ? '#f97316' : '#262626'}`, background: ativo ? '#f9731618' : 'transparent', color: ativo ? '#fdba74' : '#555', transition: 'all 0.15s' }}>
                   {m.label}
                 </button>
               )
@@ -1483,7 +1483,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
               const label = r === 'meta' ? 'Meta Ads' : r === 'google' ? 'Google Ads' : 'TikTok'
               return (
                 <button key={r} onClick={() => setRedes(p => ({ ...p, [r]: !p[r] }))}
-                  style={{ flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${ativo ? cor : '#2a2a2a'}`, background: ativo ? `${cor}18` : 'transparent', color: ativo ? corText : '#555', transition: 'all 0.15s' }}>
+                  style={{ flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${ativo ? cor : '#262626'}`, background: ativo ? `${cor}18` : 'transparent', color: ativo ? corText : '#555', transition: 'all 0.15s' }}>
                   {label}
                 </button>
               )
@@ -1539,7 +1539,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Período</div>
           <select value={preset} onChange={e => setPreset(e.target.value as PresetWA)}
-            style={{ width: '100%', background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#e8e8e8', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', cursor: 'pointer' }}>
+            style={{ width: '100%', background: '#141414', border: '1px solid #262626', color: '#f2f2f0', borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', cursor: 'pointer' }}>
             <option value="mes-atual">Este mês</option>
             <option value="mes-passado">Mês passado</option>
             <option value="ultimos-7">Últimos 7 dias</option>
@@ -1550,9 +1550,9 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
           {preset === 'personalizado' && (
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <input type="date" value={custom.start} onChange={e => setCustom(p => ({ ...p, start: e.target.value }))}
-                style={{ flex: 1, background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#e8e8e8', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none' }} />
+                style={{ flex: 1, background: '#141414', border: '1px solid #262626', color: '#f2f2f0', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none' }} />
               <input type="date" value={custom.end} onChange={e => setCustom(p => ({ ...p, end: e.target.value }))}
-                style={{ flex: 1, background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#e8e8e8', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none' }} />
+                style={{ flex: 1, background: '#141414', border: '1px solid #262626', color: '#f2f2f0', borderRadius: 8, padding: '7px 10px', fontSize: 13, outline: 'none' }} />
             </div>
           )}
         </div>
@@ -1563,11 +1563,11 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
             <div style={{ fontSize: 11, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Opções</div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', userSelect: 'none' }}>
               <div onClick={() => setIncluirValores(v => !v)}
-                style={{ width: 40, height: 22, borderRadius: 11, background: incluirValores ? '#1A3CFF' : '#333', position: 'relative', transition: 'background 0.2s', flexShrink: 0, cursor: 'pointer' }}>
+                style={{ width: 40, height: 22, borderRadius: 11, background: incluirValores ? '#f97316' : '#333', position: 'relative', transition: 'background 0.2s', flexShrink: 0, cursor: 'pointer' }}>
                 <div style={{ position: 'absolute', top: 3, left: incluirValores ? 20 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Incluir valores financeiros</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#f2f2f0' }}>Incluir valores financeiros</div>
                 <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>Investimento, CPM, CPC, Custo/Conv.</div>
               </div>
             </label>
@@ -1578,7 +1578,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
         <button
           onClick={modelo === 'boletim' ? gerarBoletim : gerarRelatorio}
           disabled={loading || !podeGerar}
-          style={{ width: '100%', padding: '11px 0', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || !podeGerar ? 'not-allowed' : 'pointer', border: 'none', background: loading || !podeGerar ? '#252525' : '#1A3CFF', color: loading || !podeGerar ? '#555' : '#fff', transition: 'all 0.15s', marginBottom: mensagem ? 20 : 0 }}>
+          style={{ width: '100%', padding: '11px 0', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: loading || !podeGerar ? 'not-allowed' : 'pointer', border: 'none', background: loading || !podeGerar ? '#252525' : '#f97316', color: loading || !podeGerar ? '#555' : '#fff', transition: 'all 0.15s', marginBottom: mensagem ? 20 : 0 }}>
           {loading ? progressoTexto() : 'Gerar Relatório'}
         </button>
 
@@ -1592,11 +1592,11 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
               readOnly
               value={mensagem}
               rows={16}
-              style={{ width: '100%', background: '#0d0d0d', border: '1px solid #2a2a2a', color: '#c8c8c8', borderRadius: 8, padding: '12px 14px', fontSize: 12, fontFamily: 'monospace', resize: 'vertical', outline: 'none', boxSizing: 'border-box', lineHeight: 1.75 }}
+              style={{ width: '100%', background: '#0a0a0a', border: '1px solid #262626', color: '#c8c8c8', borderRadius: 8, padding: '12px 14px', fontSize: 12, fontFamily: 'monospace', resize: 'vertical', outline: 'none', boxSizing: 'border-box', lineHeight: 1.75 }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button onClick={copiar}
-                style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${copiado ? '#22c55e' : '#2a2a2a'}`, background: copiado ? '#22c55e18' : 'transparent', color: copiado ? '#4ade80' : '#888', transition: 'all 0.2s' }}>
+                style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${copiado ? '#22c55e' : '#262626'}`, background: copiado ? '#22c55e18' : 'transparent', color: copiado ? '#4ade80' : '#888', transition: 'all 0.2s' }}>
                 {copiado ? '✓ Copiado!' : 'Copiar texto'}
               </button>
               <button onClick={abrirWhatsApp}
@@ -1686,10 +1686,10 @@ export default function Dashboard() {
         <div style={{ width: 1, height: 20, background: H[theme].border, marginRight: 4, flexShrink: 0 }} />
 
         {/* Abas de navegação */}
-        <button onClick={() => irParaAba('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'meta' ? '#fff' : H[theme].tabText, outline: activeTab !== 'meta' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Meta Ads</button>
-        <button onClick={() => irParaAba('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'google-ads' ? '#fff' : H[theme].tabText, outline: activeTab !== 'google-ads' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Google Ads</button>
-        <button onClick={() => irParaAba('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
-        <button onClick={() => irParaAba('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'entregas' ? '#fff' : H[theme].tabText, outline: activeTab !== 'entregas' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Entregas</button>
+        <button onClick={() => irParaAba('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? H[theme].accent : H[theme].tabBg, color: activeTab === 'meta' ? '#fff' : H[theme].tabText, outline: activeTab !== 'meta' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Meta Ads</button>
+        <button onClick={() => irParaAba('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? H[theme].accent : H[theme].tabBg, color: activeTab === 'google-ads' ? '#fff' : H[theme].tabText, outline: activeTab !== 'google-ads' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Google Ads</button>
+        <button onClick={() => irParaAba('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? H[theme].accent : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
+        <button onClick={() => irParaAba('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? H[theme].accent : H[theme].tabBg, color: activeTab === 'entregas' ? '#fff' : H[theme].tabText, outline: activeTab !== 'entregas' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Entregas</button>
 
         <div style={{ flex: 1 }} />
 
@@ -1697,7 +1697,7 @@ export default function Dashboard() {
         <button onClick={() => setShowRelatorio(true)} title="Gerar relatório para WhatsApp" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${H[theme].tabBorder}`, transition: 'all 0.15s', background: H[theme].tabBg, color: '#22c55e', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>✉</span> Relatório WA
         </button>
-        <button onClick={() => setShowRelatorioSemanal(true)} title="Gerar boletim semanal PDF" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${H[theme].tabBorder}`, transition: 'all 0.15s', background: H[theme].tabBg, color: '#1A3CFF', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => setShowRelatorioSemanal(true)} title="Gerar boletim semanal PDF" style={{ height: 32, padding: '0 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1px solid ${H[theme].tabBorder}`, transition: 'all 0.15s', background: H[theme].tabBg, color: H[theme].accent, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>📄</span> Boletim PDF
         </button>
 
@@ -1706,7 +1706,7 @@ export default function Dashboard() {
         <button onClick={toggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'} style={{ width: 32, height: 32, borderRadius: 7, fontSize: 15, background: H[theme].tabBg, border: `1px solid ${H[theme].tabBorder}`, color: H[theme].tabText, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {theme === 'dark' ? '☀' : '☽'}
         </button>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1A3CFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>{initials}</div>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: H[theme].accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>{initials}</div>
         <span style={{ fontSize: 13, color: H[theme].userText }}>{user?.displayName?.split(' ')[0]}</span>
         <button onClick={handleLogout} style={{ height: 30, padding: '0 12px', borderRadius: 6, fontSize: 12, background: 'transparent', border: `1px solid ${H[theme].tabBorder}`, color: H[theme].userText, cursor: 'pointer' }}>Sair</button>
       </div>
