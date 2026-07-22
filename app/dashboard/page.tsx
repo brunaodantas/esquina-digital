@@ -137,11 +137,10 @@ function resumoMeta(freq: number): string {
 }
 
 // Só chamado quando há campanhas de tráfego no período (ctr/cliques vêm desse recorte).
+// Sem comparação com "média" — só o número, factual, sem julgar se é bom ou ruim.
 function comentarioGoogleTrafego(ctr: number, cpc: number, conversoes: number, custoConv: number, incluirValores: boolean): string {
   const linhas: string[] = []
-  if (ctr >= 5) linhas.push(`CTR de ${fmtPctn(ctr)} acima da média para busca paga.`)
-  else if (ctr >= 2) linhas.push(`CTR de ${fmtPctn(ctr)} dentro da média para busca paga.`)
-  else linhas.push(`CTR de ${fmtPctn(ctr)} abaixo da média para busca paga.`)
+  linhas.push(`CTR de ${fmtPctn(ctr)} no período.`)
   if (conversoes > 0) {
     const convTxt = incluirValores && custoConv > 0
       ? `${fmtN(conversoes)} conversões registradas com custo médio de ${fmtBRLn(custoConv)}.`
@@ -177,12 +176,15 @@ function bucketTrafegoTikTok(campanhas: any[]): { impr: number; clicks: number }
   return { impr, clicks }
 }
 
-// Google não tem "objetivo" exposto por campanha aqui, mas vídeo (YouTube) já é
-// identificável pelo tipo — CTR de view ads não é uma leitura de tráfego.
-function bucketNaoVideoGoogle(campanhas: any[]): { impr: number; clicks: number; conv: number; custo: number } {
+// Google não tem "objetivo" exposto por campanha aqui, mas o tipo já entrega o
+// essencial: só busca (SEARCH) é de tráfego de verdade — Display, YouTube,
+// Discovery/Demand Gen e Performance Max misturam formatos de reconhecimento/
+// alcance onde CTR não diagnostica nada (mesmo critério do Meta/TikTok).
+const GOOGLE_TRAFFIC_TYPES = new Set(['SEARCH'])
+function bucketTrafegoGoogle(campanhas: any[]): { impr: number; clicks: number; conv: number; custo: number } {
   let impr = 0, clicks = 0, conv = 0, custo = 0
   for (const c of campanhas ?? []) {
-    if (c.tipoRaw !== 'VIDEO') {
+    if (GOOGLE_TRAFFIC_TYPES.has(String(c.tipoRaw ?? '').toUpperCase())) {
       impr += c.impressoes ?? 0
       clicks += c.cliques ?? 0
       conv += c.conversoes ?? 0
@@ -1143,7 +1145,7 @@ function RelatorioModal({ onClose }: { onClose: () => void }) {
     const gConv = googleDados.reduce((s: number, a: any) => s + (a.conversoes ?? 0), 0)
     // Cliques/CTR excluem campanhas de vídeo (YouTube) — CTR de view ads não é tráfego.
     const gTrafego = googleDados.reduce((acc: { impr: number; clicks: number; conv: number; custo: number }, a: any) => {
-      const b = bucketNaoVideoGoogle(a.campanhas ?? [])
+      const b = bucketTrafegoGoogle(a.campanhas ?? [])
       return { impr: acc.impr + b.impr, clicks: acc.clicks + b.clicks, conv: acc.conv + b.conv, custo: acc.custo + b.custo }
     }, { impr: 0, clicks: 0, conv: 0, custo: 0 })
     const gCliques = gTrafego.clicks
@@ -1548,6 +1550,13 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('meta')
+  // Só monta (e busca dados) a aba na primeira vez que é aberta — evita
+  // disparar as 4 buscas (Meta/Google/TikTok/Entregas) de uma vez no load.
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set(['meta']))
+  function irParaAba(t: Tab) {
+    setActiveTab(t)
+    setVisitedTabs(prev => prev.has(t) ? prev : new Set(prev).add(t))
+  }
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('esquina-theme') as Theme | null
@@ -1611,10 +1620,10 @@ export default function Dashboard() {
         <div style={{ width: 1, height: 20, background: H[theme].border, marginRight: 4, flexShrink: 0 }} />
 
         {/* Abas de navegação */}
-        <button onClick={() => setActiveTab('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'meta' ? '#fff' : H[theme].tabText, outline: activeTab !== 'meta' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Meta Ads</button>
-        <button onClick={() => setActiveTab('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'google-ads' ? '#fff' : H[theme].tabText, outline: activeTab !== 'google-ads' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Google Ads</button>
-        <button onClick={() => setActiveTab('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
-        <button onClick={() => setActiveTab('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'entregas' ? '#fff' : H[theme].tabText, outline: activeTab !== 'entregas' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Entregas</button>
+        <button onClick={() => irParaAba('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'meta' ? '#fff' : H[theme].tabText, outline: activeTab !== 'meta' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Meta Ads</button>
+        <button onClick={() => irParaAba('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'google-ads' ? '#fff' : H[theme].tabText, outline: activeTab !== 'google-ads' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Google Ads</button>
+        <button onClick={() => irParaAba('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
+        <button onClick={() => irParaAba('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? '#1A3CFF' : H[theme].tabBg, color: activeTab === 'entregas' ? '#fff' : H[theme].tabText, outline: activeTab !== 'entregas' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Entregas</button>
 
         <div style={{ flex: 1 }} />
 
@@ -1636,19 +1645,27 @@ export default function Dashboard() {
         <button onClick={handleLogout} style={{ height: 30, padding: '0 12px', borderRadius: 6, fontSize: 12, background: 'transparent', border: `1px solid ${H[theme].tabBorder}`, color: H[theme].userText, cursor: 'pointer' }}>Sair</button>
       </div>
 
-      {/* Conteúdo */}
-      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'meta' ? 'flex' : 'none', flexDirection: 'column' }}>
-        <MetaAdsPage theme={theme} />
-      </div>
-      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'entregas' ? 'flex' : 'none', flexDirection: 'column' }}>
-        <EntregasPage theme={theme} />
-      </div>
-      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'google-ads' ? 'flex' : 'none', flexDirection: 'column' }}>
-        <GoogleAdsPage theme={theme} />
-      </div>
-      <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'tiktok' ? 'flex' : 'none', flexDirection: 'column' }}>
-        <TikTokAdsPage theme={theme} visible={activeTab === 'tiktok'} />
-      </div>
+      {/* Conteúdo — só monta (e busca dados) depois da aba ser visitada pelo menos uma vez */}
+      {visitedTabs.has('meta') && (
+        <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'meta' ? 'flex' : 'none', flexDirection: 'column' }}>
+          <MetaAdsPage theme={theme} />
+        </div>
+      )}
+      {visitedTabs.has('entregas') && (
+        <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'entregas' ? 'flex' : 'none', flexDirection: 'column' }}>
+          <EntregasPage theme={theme} />
+        </div>
+      )}
+      {visitedTabs.has('google-ads') && (
+        <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'google-ads' ? 'flex' : 'none', flexDirection: 'column' }}>
+          <GoogleAdsPage theme={theme} />
+        </div>
+      )}
+      {visitedTabs.has('tiktok') && (
+        <div style={{ flex: 1, overflow: 'hidden', display: activeTab === 'tiktok' ? 'flex' : 'none', flexDirection: 'column' }}>
+          <TikTokAdsPage theme={theme} visible={activeTab === 'tiktok'} />
+        </div>
+      )}
 
       {showRelatorio && <RelatorioModal onClose={() => setShowRelatorio(false)} />}
       {showRelatorioSemanal && <RelatorioSemanalModal onClose={() => setShowRelatorioSemanal(false)} />}

@@ -282,7 +282,10 @@ export default function LoaderEsquina({ onDone }: { onDone: () => void }) {
       updatePct(progress)
       updatePhrase(now)
 
-      if (progress >= 1) {
+      // >= 0.999, não >= 1: o lerp assintótico rumo a 1 nunca bate exatamente
+      // no valor exato em tempo hábil (aproxima mas não alcança) — travava a
+      // tela em "100%" por vários segundos antes de finalmente destravar.
+      if (progress >= 0.999) {
         drawLogo(1); updatePct(1)
         dismissed = true
         setTimeout(finish, 520)
@@ -300,8 +303,13 @@ export default function LoaderEsquina({ onDone }: { onDone: () => void }) {
 
     rafId = requestAnimationFrame(frame)
 
+    // Segurança: nunca deixa o usuário preso na tela de entrada, aconteça o
+    // que acontecer com a animação (mesma rede de proteção do esquina.online).
+    const safety = setTimeout(() => { if (!dismissed) { dismissed = true; finish() } }, 7000)
+
     return () => {
       cancelAnimationFrame(rafId)
+      clearTimeout(safety)
       window.removeEventListener('resize', resizeBg)
       window.removeEventListener('resize', resizeLogo)
     }
