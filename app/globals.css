@@ -22,3 +22,10 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Foco de teclado visível — muitos controles inline usam outline:none sem
+   substituto, o que apaga o indicador de foco pra navegação por Tab. */
+:focus-visible {
+  outline: 2px solid #f97316;
+  outline-offset: 2px;
+}

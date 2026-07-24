@@ -13,9 +13,12 @@ import TikTokAdsPage from './tiktok-ads/page'
 type Tab = 'meta' | 'entregas' | 'google-ads' | 'tiktok'
 type Theme = 'dark' | 'light'
 
+// accentSolid: variante mais escura do laranja pra usar em fundo sólido com
+// texto branco em cima (abas ativas, avatar) — o accent puro (#f97316/#ea580c)
+// fica ~2,8-3,6:1 de contraste com branco, abaixo do mínimo WCAG AA de 4,5:1.
 const H = {
-  dark: { bg: '#0a0a0a', border: 'rgba(255,255,255,0.08)', tabBg: '#161616', tabText: '#a3a3a3', tabBorder: 'rgba(255,255,255,0.1)', userText: '#737373', accent: '#f97316', accentSubtle: 'rgba(249,115,22,0.14)' },
-  light: { bg: '#f5f5f4', border: 'rgba(0,0,0,0.08)', tabBg: '#ebebe9', tabText: '#57534e', tabBorder: 'rgba(0,0,0,0.1)', userText: '#78716c', accent: '#ea580c', accentSubtle: 'rgba(234,88,12,0.10)' },
+  dark: { bg: '#0a0a0a', border: 'rgba(255,255,255,0.08)', tabBg: '#161616', tabText: '#a3a3a3', tabBorder: 'rgba(255,255,255,0.1)', userText: '#737373', accent: '#f97316', accentSubtle: 'rgba(249,115,22,0.14)', accentSolid: '#c2410c' },
+  light: { bg: '#f5f5f4', border: 'rgba(0,0,0,0.08)', tabBg: '#ebebe9', tabText: '#57534e', tabBorder: 'rgba(0,0,0,0.1)', userText: '#78716c', accent: '#ea580c', accentSubtle: 'rgba(234,88,12,0.10)', accentSolid: '#c2410c' },
 }
 type PresetWA = 'mes-atual' | 'mes-passado' | 'ultimos-7' | 'ultimos-14' | 'ultimos-30' | 'personalizado'
 
@@ -1686,10 +1689,10 @@ export default function Dashboard() {
         <div style={{ width: 1, height: 20, background: H[theme].border, marginRight: 4, flexShrink: 0 }} />
 
         {/* Abas de navegação */}
-        <button onClick={() => irParaAba('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? H[theme].accent : H[theme].tabBg, color: activeTab === 'meta' ? '#fff' : H[theme].tabText, outline: activeTab !== 'meta' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Meta Ads</button>
-        <button onClick={() => irParaAba('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? H[theme].accent : H[theme].tabBg, color: activeTab === 'google-ads' ? '#fff' : H[theme].tabText, outline: activeTab !== 'google-ads' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Google Ads</button>
-        <button onClick={() => irParaAba('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? H[theme].accent : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
-        <button onClick={() => irParaAba('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? H[theme].accent : H[theme].tabBg, color: activeTab === 'entregas' ? '#fff' : H[theme].tabText, outline: activeTab !== 'entregas' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Entregas</button>
+        <button onClick={() => irParaAba('meta')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'meta' ? H[theme].accentSolid : H[theme].tabBg, color: activeTab === 'meta' ? '#fff' : H[theme].tabText, outline: activeTab !== 'meta' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Meta Ads</button>
+        <button onClick={() => irParaAba('google-ads')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'google-ads' ? H[theme].accentSolid : H[theme].tabBg, color: activeTab === 'google-ads' ? '#fff' : H[theme].tabText, outline: activeTab !== 'google-ads' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Google Ads</button>
+        <button onClick={() => irParaAba('tiktok')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'tiktok' ? H[theme].accentSolid : H[theme].tabBg, color: activeTab === 'tiktok' ? '#fff' : H[theme].tabText, outline: activeTab !== 'tiktok' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>TikTok</button>
+        <button onClick={() => irParaAba('entregas')} style={{ height: 32, padding: '0 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: activeTab === 'entregas' ? H[theme].accentSolid : H[theme].tabBg, color: activeTab === 'entregas' ? '#fff' : H[theme].tabText, outline: activeTab !== 'entregas' ? `1px solid ${H[theme].tabBorder}` : 'none' }}>Entregas</button>
 
         <div style={{ flex: 1 }} />
 
@@ -1706,7 +1709,7 @@ export default function Dashboard() {
         <button onClick={toggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'} style={{ width: 32, height: 32, borderRadius: 7, fontSize: 15, background: H[theme].tabBg, border: `1px solid ${H[theme].tabBorder}`, color: H[theme].tabText, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {theme === 'dark' ? '☀' : '☽'}
         </button>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: H[theme].accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>{initials}</div>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: H[theme].accentSolid, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>{initials}</div>
         <span style={{ fontSize: 13, color: H[theme].userText }}>{user?.displayName?.split(' ')[0]}</span>
         <button onClick={handleLogout} style={{ height: 30, padding: '0 12px', borderRadius: 6, fontSize: 12, background: 'transparent', border: `1px solid ${H[theme].tabBorder}`, color: H[theme].userText, cursor: 'pointer' }}>Sair</button>
       </div>

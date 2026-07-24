@@ -21,7 +21,7 @@ const C = {
     kpiBg: '#141414', kpiBorder: 'rgba(255,255,255,0.08)',
     tableBorder: 'rgba(255,255,255,0.05)', tableHover: 'rgba(255,255,255,0.03)',
     chipBg: '#1f1f1f', nivelBg: '#0a0a0a', nivelBorder: 'rgba(255,255,255,0.08)',
-    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)',
+    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)', accentSolid: '#c2410c', accentText: '#f97316',
   },
   light: {
     page: '#f5f5f4', card: '#ffffff', border: 'rgba(0,0,0,0.08)', borderInner: 'rgba(0,0,0,0.05)',
@@ -34,7 +34,7 @@ const C = {
     kpiBg: '#ffffff', kpiBorder: 'rgba(0,0,0,0.08)',
     tableBorder: 'rgba(0,0,0,0.05)', tableHover: 'rgba(0,0,0,0.02)',
     chipBg: '#e7e5e4', nivelBg: '#f5f5f4', nivelBorder: 'rgba(0,0,0,0.08)',
-    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)',
+    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)', accentSolid: '#c2410c', accentText: '#c2410c',
   },
 }
 
@@ -187,7 +187,7 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 999, background: t.dropBg, border: `1px solid ${t.dropBorder}`, borderRadius: 12, padding: 16, minWidth: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
             <div style={{ display: 'flex', gap: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
                 {PRESETS.map(p => (
                   <div key={p.key} onClick={() => setTp(p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: tp === p.key ? t.accentBg : 'transparent' }}>
                     <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, border: `2px solid ${tp === p.key ? t.accent : t.textMuted}`, background: tp === p.key ? t.accent : 'transparent' }} />
@@ -204,7 +204,7 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${t.dropBorder}` }}>
               <button onClick={() => setAberto(false)} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: 'transparent', border: `1px solid ${t.border}`, color: t.textMuted, cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: t.accent, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Aplicar</button>
+              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: t.accentSolid, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Aplicar</button>
             </div>
           </div>
         </>
@@ -355,7 +355,7 @@ function TrendChart({ serie, theme }: { serie: DailyPoint[]; theme: Theme }) {
   return (
     <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 4 }}>Barras:</span>
           {BAR_OPTIONS.map(o => (
@@ -455,7 +455,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
     if (!items.length) return null
     return (
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {items.map((item, i) => (
             <div key={item.label}>
@@ -494,7 +494,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: AccountData[]; t: typeof 
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 2 }}>Ver por:</span>
           {AUD_METRICAS_GOOGLE.map(m => (
@@ -582,8 +582,18 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   const [busca, setBusca] = useState('')
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [drillCampanha, setDrillCampanha] = useState<string | null>(null)
+  const [drillGrupo, setDrillGrupo] = useState<string | null>(null)
 
   useEffect(() => { setTipoTab('todas'); setStatusTab('todas'); setBusca(''); setSortCol(null) }, [nivel])
+
+  function resetDrill() { setDrillCampanha(null); setDrillGrupo(null) }
+  function drillToGrupos(campanhaNome: string) {
+    setDrillCampanha(campanhaNome); setDrillGrupo(null); setNivel('grupos')
+  }
+  function drillToAnuncios(campanhaNome: string, grupoNome: string) {
+    setDrillCampanha(campanhaNome); setDrillGrupo(grupoNome); setNivel('anuncios')
+  }
 
   function toggleSort(col: string) {
     if (sortCol === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc') }
@@ -601,7 +611,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   const chip = (active: boolean): React.CSSProperties => ({
     padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
     cursor: 'pointer', border: 'none', transition: 'all 0.15s',
-    background: active ? t.accent : t.chipBg, color: active ? '#fff' : t.textMuted,
+    background: active ? t.accentSolid : t.chipBg, color: active ? '#fff' : t.textMuted,
   })
 
   const filtCamp = campanhas.filter(c => {
@@ -618,6 +628,7 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   })
 
   const filtGrupos = grupos.filter(g => {
+    if (drillCampanha && g.campanhaNome !== drillCampanha) return false
     if (statusTab === 'ativo' && g.status !== 'ativo') return false
     if (statusTab === 'pausado' && g.status !== 'pausado') return false
     if (busca && !g.nome.toLowerCase().includes(busca.toLowerCase()) && !g.campanhaNome.toLowerCase().includes(busca.toLowerCase())) return false
@@ -625,6 +636,8 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   })
 
   const filtAnuncios = anuncios.filter(a => {
+    if (drillGrupo && a.grupoNome !== drillGrupo) return false
+    if (drillCampanha && !drillGrupo && a.campanhaNome !== drillCampanha) return false
     if (statusTab === 'ativo' && a.status !== 'ativo') return false
     if (statusTab === 'pausado' && a.status !== 'pausado') return false
     if (busca && !a.nome.toLowerCase().includes(busca.toLowerCase()) && !a.campanhaNome.toLowerCase().includes(busca.toLowerCase())) return false
@@ -670,6 +683,11 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
   const tdS: React.CSSProperties = {
     padding: '10px 12px', fontSize: 13, color: t.textSecondary,
     borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle',
+  }
+  const drillBtnS: React.CSSProperties = {
+    background: 'none', border: 'none', padding: 0, font: 'inherit', textAlign: 'left',
+    display: 'block', width: '100%', cursor: 'pointer',
+    fontWeight: 600, color: t.accentText, textDecoration: 'underline', textUnderlineOffset: 2,
   }
 
   const metricCols = (item: { custo: number; cliques: number; impressoes: number; videoViews: number; taxaVisualizacao: number; ctr: number; cpcMedio: number; cpm: number; cpv: number; conversoes: number; custoConversao: number }, share: number, cellStyle: React.CSSProperties = tdS) => (
@@ -722,13 +740,30 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
       {multiNivel && (
         <div style={{ display: 'flex', borderBottom: `1px solid ${t.nivelBorder}`, background: t.nivelBg, borderRadius: '12px 12px 0 0' }}>
           {NIVEL_TABS.map(tab => (
-            <button key={tab.key} onClick={() => setNivel(tab.key)} style={{
+            <button key={tab.key} onClick={() => { setNivel(tab.key); resetDrill() }} style={{
               padding: '12px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               border: 'none', background: 'transparent', transition: 'all 0.15s',
               color: nivel === tab.key ? t.accent : t.textMuted,
               borderBottom: nivel === tab.key ? `2px solid ${t.accent}` : '2px solid transparent',
             }}>{tab.label}</button>
           ))}
+        </div>
+      )}
+
+      {/* Breadcrumb de drill-down */}
+      {drillCampanha && (
+        <div style={{ padding: '8px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+          <button onClick={() => { resetDrill(); setNivel('campanhas') }} style={{ background: 'transparent', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 12, padding: 0 }}>Campanhas</button>
+          <span style={{ color: t.textMuted }}>/</span>
+          {drillGrupo ? (
+            <>
+              <button onClick={() => { setDrillGrupo(null); setNivel('grupos') }} style={{ background: 'transparent', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 12, padding: 0 }}>{drillCampanha}</button>
+              <span style={{ color: t.textMuted }}>/</span>
+              <span style={{ color: t.textPrimary, fontWeight: 600 }}>{drillGrupo}</span>
+            </>
+          ) : (
+            <span style={{ color: t.textPrimary, fontWeight: 600 }}>{drillCampanha}</span>
+          )}
         </div>
       )}
 
@@ -780,7 +815,11 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary }}>{c.nome}</div>
+                      <button
+                        onClick={() => drillToGrupos(c.nome)}
+                        title="Ver grupos desta campanha"
+                        style={drillBtnS}
+                      >{c.nome} ›</button>
                       <div style={{ display: 'flex', gap: 6, marginTop: 3 }}>
                         <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600, background: t.accentBg, color: t.accent, border: `1px solid ${t.accentBg}` }}>{c.tipo}</span>
                       </div>
@@ -818,7 +857,11 @@ function DataTable({ campanhas, grupos, anuncios, totalCusto, t, multiNivel }: {
               {sortedGrupos.length === 0 ? emptyRow(14) : sortedGrupos.map(g => (
                 <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                   <td style={tdS}>
-                    <div style={{ fontWeight: 600, color: t.textPrimary }}>{g.nome}</div>
+                    <button
+                      onClick={() => drillToAnuncios(g.campanhaNome, g.nome)}
+                      title="Ver anúncios deste grupo"
+                      style={drillBtnS}
+                    >{g.nome} ›</button>
                   </td>
                   <td style={tdS}><StatusPill label={g.status === 'ativo' ? 'Ativo' : 'Pausado'} /></td>
                   <td style={{ ...tdS, color: t.textMuted, fontSize: 12 }}>{g.campanhaNome}</td>

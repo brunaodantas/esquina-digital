@@ -152,17 +152,19 @@ export default function Home() {
   )
 }
 
+// Tokens alinhados com o redesign do dashboard (app/dashboard/page.tsx) —
+// antes essa tela ficava fora do sistema de tema, com cores e fonte próprias.
 const styles: Record<string, React.CSSProperties> = {
   center: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: '100vh',
-    background: '#111111',
+    background: '#0a0a0a',
   },
   card: {
-    background: '#1a1a1a',
-    border: '1px solid #2a2a2a',
+    background: '#141414',
+    border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 16,
     padding: '48px 40px',
     width: '100%',
@@ -172,34 +174,25 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 16,
   },
-  logo: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    background: '#1A3CFF',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 24,
-    fontWeight: 700,
-    color: '#fff',
-  },
   brand: {
     fontSize: 18,
     fontWeight: 600,
     color: '#ffffff',
+    fontFamily: "'Sora', sans-serif",
   },
   title: {
     fontSize: 20,
-    fontWeight: 600,
+    fontWeight: 700,
     color: '#ffffff',
     textAlign: 'center',
+    fontFamily: "'Sora', sans-serif",
   },
   muted: {
     fontSize: 14,
-    color: '#888888',
+    color: '#a3a3a3',
     textAlign: 'center',
     lineHeight: 1.6,
+    fontFamily: "'DM Sans', sans-serif",
   },
   googleBtn: {
     display: 'flex',
@@ -215,12 +208,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     cursor: 'pointer',
     marginTop: 8,
+    fontFamily: "'DM Sans', sans-serif",
   },
   spinner: {
     width: 32,
     height: 32,
-    border: '3px solid #2a2a2a',
-    borderTop: '3px solid #1A3CFF',
+    border: '3px solid rgba(255,255,255,0.08)',
+    borderTop: '3px solid #c2410c',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
   },
@@ -231,5 +225,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#ff4444',
     fontSize: 13,
     textAlign: 'center',
+    fontFamily: "'DM Sans', sans-serif",
   },
 }

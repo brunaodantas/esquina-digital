@@ -41,7 +41,7 @@ const C = {
     dropHover: 'rgba(255,255,255,0.05)',
     inputBg: '#0a0a0a', inputBorder: 'rgba(255,255,255,0.08)', inputText: '#a3a3a3',
     selectBg: '#141414', selectBorder: 'rgba(255,255,255,0.08)', selectText: '#a3a3a3',
-    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)',
+    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)', accentSolid: '#c2410c',
   },
   light: {
     page: '#f5f5f4', card: '#ffffff', cardInner: '#fafaf9',
@@ -56,7 +56,7 @@ const C = {
     dropHover: 'rgba(0,0,0,0.04)',
     inputBg: '#f5f5f4', inputBorder: 'rgba(0,0,0,0.08)', inputText: '#57534e',
     selectBg: '#ffffff', selectBorder: 'rgba(0,0,0,0.08)', selectText: '#57534e',
-    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)',
+    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)', accentSolid: '#c2410c',
   },
 }
 
@@ -482,7 +482,7 @@ function PeriodoDropdown({
             <div style={{ display: 'flex', gap: 20 }}>
               {/* Presets */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
                 {PRESETS.map(p => (
                   <div
                     key={p.key}
@@ -540,7 +540,7 @@ function PeriodoDropdown({
               </button>
               <button
                 onClick={aplicar}
-                style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: t.accent, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: t.accentSolid, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
               >
                 Aplicar
               </button>

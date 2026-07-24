@@ -27,7 +27,7 @@ const C = {
     kpiBg: '#141414', kpiBorder: 'rgba(255,255,255,0.08)',
     tableBorder: 'rgba(255,255,255,0.05)', tableHover: 'rgba(255,255,255,0.03)',
     chipBg: '#1f1f1f', chipText: '#a3a3a3',
-    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)',
+    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)', accentSolid: '#c2410c', accentText: '#f97316',
   },
   light: {
     page: '#f5f5f4', card: '#ffffff', border: 'rgba(0,0,0,0.08)', borderInner: 'rgba(0,0,0,0.05)',
@@ -40,7 +40,7 @@ const C = {
     kpiBg: '#ffffff', kpiBorder: 'rgba(0,0,0,0.08)',
     tableBorder: 'rgba(0,0,0,0.05)', tableHover: 'rgba(0,0,0,0.02)',
     chipBg: '#e7e5e4', chipText: '#57534e',
-    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)',
+    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)', accentSolid: '#c2410c', accentText: '#c2410c',
   },
 }
 
@@ -176,7 +176,7 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 999, background: t.dropBg, border: `1px solid ${t.dropBorder}`, borderRadius: 12, padding: 16, minWidth: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
             <div style={{ display: 'flex', gap: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
                 {PRESETS.map(p => (
                   <div key={p.key} onClick={() => setTp(p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: tp === p.key ? TK + '1A' : 'transparent' }}>
                     <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, border: `2px solid ${tp === p.key ? TK : t.textMuted}`, background: tp === p.key ? TK : 'transparent' }} />
@@ -310,7 +310,7 @@ function TrendChart({ serie, theme }: { serie: TikTokAccountData['serie']; theme
   return (
     <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 4 }}>Barras:</span>
           {TK_BAR_OPTIONS.map(o => <button key={o.key} onClick={() => toggleBar(o.key)} style={btnStyle(barMetrics.includes(o.key), o.color)}>{o.label}</button>)}
@@ -329,7 +329,7 @@ function TrendChart({ serie, theme }: { serie: TikTokAccountData['serie']; theme
 function KpiTile({ label, value, note, color, t, delta }: { label: string; value: string; note?: string; color: string; t: typeof C['dark']; delta?: number | null }) {
   return (
     <div style={{ background: t.kpiBg, border: `1px solid ${t.kpiBorder}`, borderRadius: 10, padding: '14px 16px', borderTop: `3px solid ${color}` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}><CopiavelNum compact={value} /></div>
       {note && <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>{note}</div>}
       {delta != null && (
@@ -426,7 +426,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: TikTokAccountData[]; t: t
     if (!items.length) return null
     return (
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {items.map((item, i) => (
             <div key={item.label}>
@@ -459,7 +459,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: TikTokAccountData[]; t: t
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 2 }}>Ver por:</span>
           {AUD_METRICAS_TK.map(m => (
@@ -501,8 +501,18 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
   const [busca, setBusca] = useState('')
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [drillCampanha, setDrillCampanha] = useState<string | null>(null)
+  const [drillConjunto, setDrillConjunto] = useState<string | null>(null)
 
   useEffect(() => { setBusca(''); setSortCol(null) }, [nivel])
+
+  function resetDrill() { setDrillCampanha(null); setDrillConjunto(null) }
+  function drillToConjuntos(campanhaNome: string) {
+    setDrillCampanha(campanhaNome); setDrillConjunto(null); setNivel('conjuntos')
+  }
+  function drillToAnuncios(campanhaNome: string, conjuntoNome: string) {
+    setDrillCampanha(campanhaNome); setDrillConjunto(conjuntoNome); setNivel('anuncios')
+  }
 
   function toggleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -518,8 +528,15 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
 
   const q = busca.toLowerCase()
   const filtCamp = campanhas.filter(c => !q || c.nome.toLowerCase().includes(q))
-  const filtGrupos = grupos.filter(g => !q || g.nome.toLowerCase().includes(q) || g.campanha.toLowerCase().includes(q))
-  const filtAnuncios = anuncios.filter(a => !q || a.nome.toLowerCase().includes(q) || a.adset.toLowerCase().includes(q) || a.campanha.toLowerCase().includes(q))
+  const filtGrupos = grupos.filter(g => {
+    if (drillCampanha && g.campanha !== drillCampanha) return false
+    return !q || g.nome.toLowerCase().includes(q) || g.campanha.toLowerCase().includes(q)
+  })
+  const filtAnuncios = anuncios.filter(a => {
+    if (drillConjunto && a.adset !== drillConjunto) return false
+    if (drillCampanha && !drillConjunto && a.campanha !== drillCampanha) return false
+    return !q || a.nome.toLowerCase().includes(q) || a.adset.toLowerCase().includes(q) || a.campanha.toLowerCase().includes(q)
+  })
   const sortedCamp = sortRows(filtCamp)
   const sortedGrupos = sortRows(filtGrupos)
   const sortedAnuncios = sortRows(filtAnuncios)
@@ -548,9 +565,14 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
     setTimeout(() => URL.revokeObjectURL(url), 100)
   }
 
-  const thS: React.CSSProperties = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left', borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap' }
+  const thS: React.CSSProperties = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left', borderBottom: `1px solid ${t.tableBorder}`, whiteSpace: 'nowrap' }
   const tdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textSecondary, borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle' }
   const totalTdS: React.CSSProperties = { padding: '10px 12px', fontSize: 13, color: t.textPrimary, fontWeight: 700, borderTop: `2px solid ${t.tableBorder}` }
+  const drillBtnS: React.CSSProperties = {
+    background: 'none', border: 'none', padding: 0, font: 'inherit', textAlign: 'left',
+    display: 'block', width: '100%', cursor: 'pointer',
+    fontWeight: 600, color: t.accentText, textDecoration: 'underline', textUnderlineOffset: 2,
+  }
 
   const metricHeaders = (
     <>
@@ -579,13 +601,30 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
       {/* Level tabs */}
       <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${t.border}`, padding: '0 16px', overflowX: 'auto' }}>
         {NIVEL_TABS_TK.map(tab => (
-          <button key={tab.key} onClick={() => setNivel(tab.key)} style={{
+          <button key={tab.key} onClick={() => { setNivel(tab.key); resetDrill() }} style={{
             padding: '12px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'transparent', whiteSpace: 'nowrap',
             color: nivel === tab.key ? TK : t.textMuted,
             borderBottom: nivel === tab.key ? `2px solid ${TK}` : '2px solid transparent', marginBottom: -1, transition: 'all 0.15s',
           }}>{tab.label}</button>
         ))}
       </div>
+
+      {/* Breadcrumb de drill-down */}
+      {drillCampanha && (
+        <div style={{ padding: '8px 16px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+          <button onClick={() => { resetDrill(); setNivel('campanhas') }} style={{ background: 'transparent', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 12, padding: 0 }}>Campanhas</button>
+          <span style={{ color: t.textMuted }}>/</span>
+          {drillConjunto ? (
+            <>
+              <button onClick={() => { setDrillConjunto(null); setNivel('conjuntos') }} style={{ background: 'transparent', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 12, padding: 0 }}>{drillCampanha}</button>
+              <span style={{ color: t.textMuted }}>/</span>
+              <span style={{ color: t.textPrimary, fontWeight: 600 }}>{drillConjunto}</span>
+            </>
+          ) : (
+            <span style={{ color: t.textPrimary, fontWeight: 600 }}>{drillCampanha}</span>
+          )}
+        </div>
+      )}
 
       {/* Search + export */}
       <div style={{ padding: '10px 16px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -606,7 +645,11 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{c.nome}</div>
+                      <button
+                        onClick={() => drillToConjuntos(c.nome)}
+                        title="Ver conjuntos desta campanha"
+                        style={{ ...drillBtnS, marginBottom: 3 }}
+                      >{c.nome} ›</button>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
                     </td>
                     <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
@@ -636,7 +679,11 @@ function DataTable({ campanhas, grupos, anuncios, totalSpend, t }: {
                 return (
                   <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 3 }}>{g.nome}</div>
+                      <button
+                        onClick={() => drillToAnuncios(g.campanha, g.nome)}
+                        title="Ver anúncios deste conjunto"
+                        style={{ ...drillBtnS, marginBottom: 3 }}
+                      >{g.nome} ›</button>
                       {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: TK, borderRadius: 2 }} /></div>}
                     </td>
                     <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(g.orcamento, g.orcamentoTipo)}</td>

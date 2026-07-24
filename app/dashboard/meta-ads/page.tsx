@@ -22,7 +22,7 @@ const C = {
     tableBorder: 'rgba(255,255,255,0.05)', tableHover: 'rgba(255,255,255,0.03)',
     chipBg: '#1f1f1f', chipText: '#a3a3a3',
     nivelBg: '#0a0a0a',
-    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)',
+    accent: '#f97316', accentBg: 'rgba(249,115,22,0.14)', accentSolid: '#c2410c', accentText: '#f97316',
   },
   light: {
     page: '#f5f5f4', card: '#ffffff', border: 'rgba(0,0,0,0.08)', borderInner: 'rgba(0,0,0,0.05)',
@@ -36,7 +36,7 @@ const C = {
     tableBorder: 'rgba(0,0,0,0.05)', tableHover: 'rgba(0,0,0,0.02)',
     chipBg: '#e7e5e4', chipText: '#57534e',
     nivelBg: '#f5f5f4',
-    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)',
+    accent: '#ea580c', accentBg: 'rgba(234,88,12,0.10)', accentSolid: '#c2410c', accentText: '#c2410c',
   },
 }
 
@@ -215,10 +215,10 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 999, background: t.dropBg, border: `1px solid ${t.dropBorder}`, borderRadius: 12, padding: 16, minWidth: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.35)' }}>
             <div style={{ display: 'flex', gap: 20 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>PERÍODOS</div>
                 {PRESETS.map(p => (
-                  <div key={p.key} onClick={() => setTp(p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: tp === p.key ? '#1A3CFF1A' : 'transparent' }}>
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, border: `2px solid ${tp === p.key ? '#1A3CFF' : t.textMuted}`, background: tp === p.key ? '#1A3CFF' : 'transparent' }} />
+                  <div key={p.key} onClick={() => setTp(p.key)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, cursor: 'pointer', background: tp === p.key ? t.accentBg : 'transparent' }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, border: `2px solid ${tp === p.key ? t.accent : t.textMuted}`, background: tp === p.key ? t.accent : 'transparent' }} />
                     <span style={{ fontSize: 13, color: tp === p.key ? t.dropActive : t.dropText }}>{p.label}</span>
                   </div>
                 ))}
@@ -232,7 +232,7 @@ function PeriodoDropdown({ preset, custom, t, onApply }: {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16, paddingTop: 12, borderTop: `1px solid ${t.dropBorder}` }}>
               <button onClick={() => setAberto(false)} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: 'transparent', border: `1px solid ${t.border}`, color: t.textMuted, cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: '#1A3CFF', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Aplicar</button>
+              <button onClick={aplicar} style={{ padding: '6px 16px', borderRadius: 7, fontSize: 13, background: t.accentSolid, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>Aplicar</button>
             </div>
           </div>
         </>
@@ -369,7 +369,7 @@ function TrendChart({ serie, theme }: { serie: MetaDailyPoint[]; theme: Theme })
   return (
     <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 4 }}>Barras:</span>
           {META_BAR_OPTIONS.map(o => (
@@ -392,7 +392,7 @@ function TrendChart({ serie, theme }: { serie: MetaDailyPoint[]; theme: Theme })
 function KpiTile({ label, value, note, color, t, delta }: { label: string; value: string; note?: string; color: string; t: typeof C['dark']; delta?: number | null }) {
   return (
     <div style={{ background: t.kpiBg, border: `1px solid ${t.kpiBorder}`, borderRadius: 10, padding: '14px 16px', borderTop: `3px solid ${color}` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color: t.textPrimary, lineHeight: 1.2 }}><CopiavelNum compact={value} /></div>
       {note && <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>{note}</div>}
       {delta != null && (
@@ -413,7 +413,7 @@ function AccountCard({ acc, totalSpend, t }: { acc: MetaAccountData; totalSpend:
       <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '14px 16px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: t.textPrimary }}>{acc.nome}</span>
-          <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#1A3CFF18', color: '#7ba3ff', border: '1px solid #1A3CFF33' }}>{fmtBRL(acc.spend)}</span>
+          <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: t.accentBg, color: t.accent, border: `1px solid ${t.accentBg}` }}>{fmtBRL(acc.spend)}</span>
           {acc.moeda !== 'BRL' && <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, background: '#f59e0b18', color: '#f59e0b', border: '1px solid #f59e0b33' }}>{acc.moeda}</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -421,7 +421,7 @@ function AccountCard({ acc, totalSpend, t }: { acc: MetaAccountData; totalSpend:
           <span style={{ color: t.chevron, fontSize: 12 }}>{open ? '▲' : '▼'}</span>
         </div>
       </button>
-      {sharePct > 0 && <div style={{ height: 2, background: t.barTrack, margin: '0 16px' }}><div style={{ width: `${Math.min(100, sharePct)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
+      {sharePct > 0 && <div style={{ height: 2, background: t.barTrack, margin: '0 16px' }}><div style={{ width: `${Math.min(100, sharePct)}%`, height: '100%', background: t.accent, borderRadius: 2 }} /></div>}
       {open && (
         <div style={{ padding: '12px 16px 16px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 16px' }}>
@@ -487,7 +487,7 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
     if (!items.length) return null
     return (
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{title}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {items.map((item, i) => (
             <div key={item.label}>
@@ -519,14 +519,14 @@ function AudienciaSection({ filtrado, t }: { filtrado: MetaAccountData[]; t: typ
 
   const chip = (active: boolean): React.CSSProperties => ({
     padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-    border: `1px solid ${active ? '#1A3CFF' : t.border}`, background: active ? '#1A3CFF22' : 'transparent',
+    border: `1px solid ${active ? t.accent : t.border}`, background: active ? t.accentBg : 'transparent',
     color: active ? '#7ba3ff' : t.textMuted, transition: 'all 0.15s',
   })
 
   return (
     <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, padding: '16px 20px', background: t.card, marginBottom: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audiência</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 10, color: t.textMuted, marginRight: 2 }}>Ver por:</span>
           {AUD_METRICAS_META.map(m => (
@@ -588,6 +588,16 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [maisColunas, setMaisColunas] = useState(false)
+  const [drillCampanha, setDrillCampanha] = useState<string | null>(null)
+  const [drillConjunto, setDrillConjunto] = useState<string | null>(null)
+
+  function resetDrill() { setDrillCampanha(null); setDrillConjunto(null) }
+  function drillToConjuntos(campanhaNome: string) {
+    setDrillCampanha(campanhaNome); setDrillConjunto(null); setBusca(''); setNivel('conjuntos')
+  }
+  function drillToAnuncios(campanhaNome: string, conjuntoNome: string) {
+    setDrillCampanha(campanhaNome); setDrillConjunto(conjuntoNome); setBusca(''); setNivel('anuncios')
+  }
 
   function toggleSort(col: string) {
     if (sortCol === col) { setSortDir(d => d === 'asc' ? 'desc' : 'asc') }
@@ -610,12 +620,15 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
   })
 
   const filteredAdsets = adsets.filter(c => {
+    if (drillCampanha && c.campanha !== drillCampanha) return false
     if (statusTab !== 'todas' && c.status !== statusTab) return false
     if (busca && !c.nome.toLowerCase().includes(busca.toLowerCase()) && !c.campanha.toLowerCase().includes(busca.toLowerCase())) return false
     return true
   })
 
   const filteredAds = ads.filter(c => {
+    if (drillConjunto && c.adset !== drillConjunto) return false
+    if (drillCampanha && !drillConjunto && c.campanha !== drillCampanha) return false
     if (statusTab !== 'todas' && c.status !== statusTab) return false
     if (busca && !c.nome.toLowerCase().includes(busca.toLowerCase()) && !c.campanha.toLowerCase().includes(busca.toLowerCase())) return false
     return true
@@ -655,7 +668,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
     padding: small ? '3px 10px' : '4px 12px', borderRadius: 20,
     fontSize: small ? 11 : 12, fontWeight: 600,
     cursor: 'pointer', border: 'none', transition: 'all 0.15s',
-    background: active ? t.accent : t.chipBg, color: active ? '#fff' : t.chipText,
+    background: active ? t.accentSolid : t.chipBg, color: active ? '#fff' : t.chipText,
   })
 
   const thS: React.CSSProperties = {
@@ -667,6 +680,13 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
     padding: '10px 12px', fontSize: 13, color: t.textSecondary,
     borderBottom: `1px solid ${t.tableBorder}`, verticalAlign: 'middle',
   }
+  // Botão real (não div) pra funcionar com teclado/leitor de tela — cor e
+  // sublinhado permanentes, não dependem de hover, pra sinalizar clicável.
+  const drillBtnS: React.CSSProperties = {
+    background: 'none', border: 'none', padding: 0, font: 'inherit', textAlign: 'left',
+    display: 'block', width: '100%', cursor: 'pointer',
+    fontWeight: 600, color: t.accentText, textDecoration: 'underline', textUnderlineOffset: 2,
+  }
 
   return (
     <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 12 }}>
@@ -675,7 +695,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
         {NIVEL_TABS.map(tab => (
           <button
             key={tab.key}
-            onClick={() => { setNivel(tab.key); setBusca('') }}
+            onClick={() => { setNivel(tab.key); setBusca(''); resetDrill() }}
             style={{
               padding: '12px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               border: 'none', background: 'transparent',
@@ -689,10 +709,27 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
         ))}
       </div>
 
+      {/* Breadcrumb de drill-down — só aparece depois de clicar numa campanha/conjunto */}
+      {drillCampanha && (
+        <div style={{ padding: '8px 16px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+          <button onClick={() => { resetDrill(); setNivel('campanhas'); setBusca('') }} style={{ background: 'transparent', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 12, padding: 0 }}>Campanhas</button>
+          <span style={{ color: t.textMuted }}>/</span>
+          {drillConjunto ? (
+            <>
+              <button onClick={() => { setDrillConjunto(null); setNivel('conjuntos'); setBusca('') }} style={{ background: 'transparent', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 12, padding: 0 }}>{drillCampanha}</button>
+              <span style={{ color: t.textMuted }}>/</span>
+              <span style={{ color: t.textPrimary, fontWeight: 600 }}>{drillConjunto}</span>
+            </>
+          ) : (
+            <span style={{ color: t.textPrimary, fontWeight: 600 }}>{drillCampanha}</span>
+          )}
+        </div>
+      )}
+
       {/* Objetivo filter — only for Campanhas */}
       {nivel === 'campanhas' && (
         <div style={{ padding: '10px 16px 8px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 4 }}>OBJETIVO</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 4 }}>OBJETIVO</span>
           {OBJETIVO_TABS.map(o => (
             <button key={o.key} onClick={() => setObjetivoTab(o.key)} style={chip(objetivoTab === o.key, true)}>{o.label}</button>
           ))}
@@ -702,7 +739,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
       {/* Status + search + export */}
       <div style={{ padding: '10px 16px', borderBottom: `1px solid ${t.tableBorder}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, fontFamily: "'Sora', sans-serif", textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 4 }}>STATUS</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, marginRight: 4 }}>STATUS</span>
           {(['todas', 'ativo', 'pausado'] as StatusTab[]).map(s => (
             <button key={s} onClick={() => setStatusTab(s)} style={chip(statusTab === s, true)}>
               {s === 'todas' ? 'Todas' : s === 'ativo' ? 'Ativas' : 'Pausadas'}
@@ -752,13 +789,17 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: share > 0 ? 5 : 3 }}>{c.nome}</div>
+                      <button
+                        onClick={() => drillToConjuntos(c.nome)}
+                        title="Ver conjuntos desta campanha"
+                        style={{ ...drillBtnS, marginBottom: share > 0 ? 5 : 3 }}
+                      >{c.nome} ›</button>
                       <div style={{ display: 'flex', gap: 4, marginBottom: share > 0 ? 5 : 0 }}>
                         <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: objColor + '22', color: objColor, fontWeight: 600 }}>
                           {obj === 'reconhecimento' ? 'Reconhecimento' : obj === 'engajamento' ? 'Engajamento' : 'Tráfego'}
                         </span>
                       </div>
-                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
+                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: t.accent, borderRadius: 2 }} /></div>}
                     </td>
                     <td style={tdS}><StatusPill label={c.statusRevisao} /></td>
                     <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
@@ -823,8 +864,12 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                 return (
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
-                      <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: share > 0 ? 5 : 0 }}>{c.nome}</div>
-                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
+                      <button
+                        onClick={() => drillToAnuncios(c.campanha, c.nome)}
+                        title="Ver anúncios deste conjunto"
+                        style={{ ...drillBtnS, marginBottom: share > 0 ? 5 : 0 }}
+                      >{c.nome} ›</button>
+                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: t.accent, borderRadius: 2 }} /></div>}
                     </td>
                     <td style={tdS}><StatusPill label={c.statusRevisao} /></td>
                     <td style={{ ...tdS, textAlign: 'right', color: t.textMuted }}>{fmtOrcamento(c.orcamento, c.orcamentoTipo)}</td>
@@ -890,7 +935,7 @@ function MetaDataTable({ campanhas, adsets, ads, totalSpend, t }: {
                   <tr key={c.id} onMouseEnter={e => (e.currentTarget.style.background = t.tableHover)} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <td style={tdS}>
                       <div style={{ fontWeight: 600, color: t.textPrimary, marginBottom: share > 0 ? 5 : 0 }}>{c.nome}</div>
-                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: '#1A3CFF', borderRadius: 2 }} /></div>}
+                      {share > 0 && <div style={{ height: 2, background: t.barTrack, borderRadius: 2 }}><div style={{ width: `${Math.min(100, share)}%`, height: '100%', background: t.accent, borderRadius: 2 }} /></div>}
                     </td>
                     <td style={tdS}><StatusPill label={c.statusRevisao} motivo={c.statusMotivo} /></td>
                     <td style={{ ...tdS, fontSize: 11, color: t.textMuted }}>{c.adset}</td>
@@ -1087,18 +1132,18 @@ export default function MetaAdsPage({ theme = 'dark' }: { theme?: Theme }) {
           <span style={{ display: 'inline-block', animation: loading ? 'spin 0.8s linear infinite' : 'none' }}>↻</span>
           {lastUpdated ? `${String(lastUpdated.getHours()).padStart(2,'0')}:${String(lastUpdated.getMinutes()).padStart(2,'0')}` : 'Atualizar'}
         </button>
-        {loading && <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: '2px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
+        {loading && <div style={{ width: 18, height: 18, border: `2px solid ${t.spinner}`, borderTop: `2px solid ${t.accent}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />}
         <button
           onClick={toggleComparar}
           title="Comparar com o período anterior de mesma duração"
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${comparar ? '#1A3CFF55' : t.border}`, background: comparar ? '#1A3CFF18' : t.filtroBtn, color: comparar ? '#7ba3ff' : t.textSecondary, transition: 'all 0.15s', flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', border: `1px solid ${comparar ? t.accent : t.border}`, background: comparar ? t.accentBg : t.filtroBtn, color: comparar ? t.accent : t.textSecondary, transition: 'all 0.15s', flexShrink: 0 }}
         >
           ⇄ {loadingPrev ? '...' : comparar ? 'Comparando' : 'Comparar'}
         </button>
       </div>
 
       {loading && !data ? (
-        <div style={center}><div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: '3px solid #1A3CFF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>
+        <div style={center}><div style={{ width: 28, height: 28, border: `3px solid ${t.spinner}`, borderTop: `3px solid ${t.accent}`, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /></div>
       ) : error ? (
         <div style={{ ...center, flexDirection: 'column', gap: 8 }}>
           <span style={{ fontSize: 15, color: '#f87171' }}>Erro ao carregar dados</span>
