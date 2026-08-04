@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readCache, writeCache } from '@/lib/cache'
 
+// Plano pago da Vercel permite até 300s; 60s dá folga confortável pras
+// chamadas em paralelo às contas de anúncio sem prender a função sem necessidade.
+export const maxDuration = 60
+
 const ADS_VERSION = 'v24'
 const BASE = `https://googleads.googleapis.com/${ADS_VERSION}`
 

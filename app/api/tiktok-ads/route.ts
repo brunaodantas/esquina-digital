@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readCache, writeCache } from '@/lib/cache'
 
+// Plano pago da Vercel permite até 300s; 60s dá folga confortável pras
+// chamadas em paralelo às contas de anúncio sem prender a função sem necessidade.
+export const maxDuration = 60
+
 const BASE = 'https://business-api.tiktok.com/open_api/v1.3'
 const TOKEN = process.env.TIKTOK_ACCESS_TOKEN ?? ''
 
